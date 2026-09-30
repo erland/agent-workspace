@@ -87,6 +87,24 @@ V1 stödjer bara Modal. Datamodellen ska inte kräva att en användare har flera
 
 ## 5. Runtime-profiler
 
+Runtime toolchains are prebuilt outside Modal job execution and published as public GHCR images. Agent Workspace does not run apt/npm/Playwright installation during normal workspace creation.
+
+```text
+GitHub Actions
+   |
+   +--> ghcr.io/erland/agent-workspace-runtime:java21-node22-v1
+                                                    |
+                                                    v
+                                      Modal images.fromRegistry()
+                                                    |
+                                      per-account Modal image cache
+                                                    |
+                                                    v
+                                                Sandbox
+```
+
+No Modal credential is stored in GitHub. Runtime publication uses GitHub's repository-scoped `GITHUB_TOKEN`. Because pilot users execute in separate Modal accounts, the GHCR runtime package must allow anonymous pulls.
+
 Extern modell:
 
 ```text
@@ -109,6 +127,8 @@ explicit request
 Java metadata kan inkludera relevanta `pom.xml` properties. Node metadata kan inkludera `package.json engines.node`, `.nvmrc`, `.node-version` och Volta-konfiguration.
 
 Ett workspace får en låst runtime-profil vid creation. Upload kan rapportera mismatch men får inte tyst byta profil.
+
+Each profile resolves to a versioned registry tag such as `ghcr.io/erland/agent-workspace-runtime:java21-node22-v1`. The runtime image already contains JDK, Node/npm, Maven, unzip, Playwright and Chromium. `bootstrapCommands` is intentionally empty in production runtime profiles.
 
 ## 6. Workspace state
 
