@@ -1,0 +1,203 @@
+# Architecture – agent-workspace v1
+
+## 1. Arkitekturstil
+
+Modulär monolit i TypeScript/Node 22 med ett provider-neutralt execution-interface.
+
+```text
+ChatGPT / Claude / MCP client
+            |
+         MCP + OAuth
+            v
++-----------------------------+
+| agent-workspace             |
+|                             |
+| MCP/API layer               |
+| Auth / identity             |
+| WorkspaceService            |
+| RuntimeResolver             |
+| VerificationService         |
+| PrototypeService            |
+| SandboxProvider             |
++-------------+---------------+
+              |
+              v
+     ModalSandboxProvider
+              |
+              v
+       User's Modal account
+              |
+              v
+        Modal Sandbox
+```
+
+## 2. Teknikstack
+
+- Node 22
+- TypeScript
+- official MCP SDK
+- Fastify eller motsvarande tunt HTTP-lager där HTTP endpoints behövs
+- Zod för externa kontrakt/config validation
+- Modal JavaScript/TypeScript SDK
+- PostgreSQL när multi-user persistence introduceras
+- container deployment med Coolify som målprofil
+
+## 3. Provider-abstraktion
+
+Domän- och MCP-lager ska bero på ett interface, inte Modal SDK.
+
+Konceptuellt kontrakt:
+
+```ts
+interface SandboxProvider {
+  createWorkspace(options: CreateWorkspaceOptions): Promise<WorkspaceHandle>;
+  uploadArchive(handle: WorkspaceHandle, archive: Uint8Array): Promise<void>;
+  exec(handle: WorkspaceHandle, command: Command): Promise<ExecutionResult>;
+  readFile(handle: WorkspaceHandle, path: string): Promise<Uint8Array>;
+  writeFile(handle: WorkspaceHandle, path: string, content: Uint8Array): Promise<void>;
+  terminate(handle: WorkspaceHandle): Promise<void>;
+}
+```
+
+V1 implementation:
+
+```text
+ModalSandboxProvider
+```
+
+Framtida providers får implementera samma core capabilities. Provider-specifika features får inte läcka in i v1 MCP-kontraktet.
+
+## 4. Execution account
+
+Varje användare har exakt en execution provider/account.
+
+```text
+User
+└── ExecutionAccount
+    ├── provider = MODAL (v1)
+    ├── providerAccountId
+    ├── credentialRef
+    └── status
+
+credentialRef → server-side encrypted secret/secret-manager entry
+              → Modal OAuth refresh token
+```
+
+V1 stödjer bara Modal. Datamodellen ska inte kräva att en användare har flera providers samtidigt.
+
+## 5. Runtime-profiler
+
+Extern modell:
+
+```text
+java17-node20
+java17-node22
+java21-node20
+java21-node22  <- default
+java25-node20
+java25-node22
+```
+
+Runtime selection priority:
+
+```text
+explicit request
+→ project metadata
+→ default
+```
+
+Java metadata kan inkludera relevanta `pom.xml` properties. Node metadata kan inkludera `package.json engines.node`, `.nvmrc`, `.node-version` och Volta-konfiguration.
+
+Ett workspace får en låst runtime-profil vid creation. Upload kan rapportera mismatch men får inte tyst byta profil.
+
+## 6. Workspace state
+
+Pre-persistence development state kan hållas processlokalt under tidiga steg. När multi-user/auth introduceras persisteras minst:
+
+```text
+Workspace
+├── id
+├── userId
+├── provider
+├── providerWorkspaceId
+├── runtimeProfile
+├── status
+├── createdAt
+└── expiresAt
+```
+
+Projektfiler lagras i sandboxen, inte i PostgreSQL.
+
+## 7. Verification strategies
+
+### npm
+
+- `npm ci` när kompatibel lockfile finns, annars `npm install`.
+- `npm test` om script finns.
+- `npm run build` om script finns.
+
+### Maven
+
+- använd `./mvnw` om wrapper finns,
+- annars systemets Maven i runtime-imagen,
+- kör `test`,
+- kör `package -DskipTests`.
+
+Alla resultat normaliseras till provider-neutrala `ExecutionResult`/`VerificationResult`.
+
+## 8. Prototype
+
+PrototypeService ska:
+
+1. installera dependencies,
+2. välja stödd startstrategi,
+3. starta server i sandbox,
+4. verifiera readiness,
+5. köra Playwright/Chromium mot localhost,
+6. returnera PNG bytes + viewport metadata.
+
+Publik URL krävs inte i v1.
+
+## 9. Säkerhetsgränser
+
+- ingen Docker socket på appservern,
+- ingen användarkod exekveras på appservern,
+- provider credentials stannar i backend/provider-klient,
+- inga backend secrets förs in i sandboxen,
+- ZIP valideras före extraktion,
+- TTL, CPU, memory och timeout begränsas,
+- sandbox cleanup sker explicit och genom TTL fallback.
+
+## 10. Deployment
+
+Coolify host:
+
+```text
+agent-workspace container
+PostgreSQL (när persistence krävs)
+```
+
+Modal hostar all build/browser-exekvering. Coolify-servern behöver därför inte Java, Maven, Node build tooling eller Chromium för användarprojekten.
+
+## 11. Multi-user persistence (DEV-012)
+
+PostgreSQL becomes the system of record for identity and workspace metadata:
+
+```text
+app_user
+  ├── external_identity (issuer + subject)
+  ├── execution_account (exactly one per user in v1)
+  └── workspace
+```
+
+`execution_account` stores `credentialRef`, never Modal refresh tokens, token secrets or OAuth client secrets. Credential material remains behind the server-side `ExecutionAccountCredentialStore` boundary from DEV-011.
+
+Workspace rows are ownership-scoped by `user_id` and contain enough provider metadata (`provider_id`, `provider_workspace_id`, runtime, status and expiry) to rehydrate a provider handle after an application restart. Project/prototype metadata may be stored as JSONB; project source files remain in the sandbox, not PostgreSQL.
+
+`WorkspaceService` accepts an optional `WorkspaceRepository`. With persistence enabled it writes state transitions, can rehydrate a workspace after process restart and can reconcile persisted expired READY workspaces through `cleanupExpired()`.
+
+## Deployment boundary (DEV-015)
+
+Production `agent-workspace` is a single Node 22 application container plus external PostgreSQL. The application container contains only the control plane. It never mounts Docker socket and does not contain Java, Maven, Chromium or user-project build tooling. User code execution remains behind `SandboxProvider` (Modal in v1).
+
+`/health` is an unauthenticated liveness endpoint. `/ready` verifies PostgreSQL connectivity. The MCP endpoint remains OAuth protected at `/mcp`.

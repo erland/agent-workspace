@@ -1,0 +1,80 @@
+schema_version: 1
+project: agent-workspace
+mode: CREATE
+phase: implementation
+active_work:
+  selected_step: null
+  in_progress: null
+  state: ready_for_merge_review
+completed_steps:
+- id: DEV-001
+  verification: PASSED
+  evidence: User verified the full DEV-001 test flow locally.
+- id: DEV-002
+  verification: PASSED
+  evidence: User verified the full DEV-002 test flow locally, including live Modal workspace lifecycle.
+- id: DEV-003
+  verification: PASSED
+  evidence: User verified the full DEV-003 ZIP upload and validation flow locally.
+- id: DEV-004
+  verification: PASSED
+  evidence: User verified the full DEV-004 project/runtime detection flow locally.
+- id: DEV-005
+  verification: PASSED
+  evidence: User verified npm PASS/FAIL flows locally.
+- id: DEV-006
+  verification: PASSED
+  evidence: User verified Maven PASS/FAIL flows locally.
+- id: DEV-007
+  verification: PASSED
+  evidence: User verified all six Java/Node runtime profiles locally.
+- id: DEV-008
+  verification: PASSED
+  evidence: User reran the DEV-008 prototype readiness flow successfully after the readiness-script regression fix.
+- id: DEV-009
+  verification: PASSED
+  evidence: User verified the DEV-009 screenshot flow locally.
+- id: DEV-010
+  verification: PASSED
+  evidence: User verified the DEV-010 MCP flow locally.
+- id: DEV-012
+  verification: PASSED
+  evidence: User verified the DEV-012 persistence flow locally.
+- id: DEV-013
+  verification: PASSED
+  evidence: User verified the DEV-013 remote-auth flow locally.
+- id: DEV-014
+  verification: PASSED
+  evidence: User verified the DEV-014 security verification flow locally.
+- id: DEV-015
+  verification: PASSED
+  evidence: User verified the DEV-015 test flow in the local environment.
+- id: DEV-016
+  verification: PASSED
+  evidence: User verified the DEV-016 acceptance flow in the local environment.
+- id: DEV-017
+  verification: PASSED
+  evidence: User ran `npm run verify:dev017` locally and confirmed PASS.
+deferred_steps:
+- id: DEV-011
+  verification: DEFERRED
+  reason: The Modal third-party OAuth/account-linking feasibility flow currently fails because it depends on Modal-issued OAuth integration credentials and two authorized Modal identities.
+  decision: User explicitly chose to defer DEV-011 for now. It must not be represented as PASSED and remains a known production/release limitation.
+release_constraints:
+- DEV-011 remains required before claiming the complete multi-user production account-linking flow is verified.
+verification:
+  last_result: DEV-017_PASSED
+  passed:
+  - User reports that all verification commands through DEV-016 pass in the local environment except DEV-011.
+  - DEV-017 release-readiness harness, static checks and documentation are implemented.
+  - User ran `npm run verify:dev017` locally and confirmed PASS.
+  required_failures: []
+  deferred:
+  - DEV-011 Modal OAuth/account-linking feasibility verification.
+next:
+  recommended: MERGE-READINESS-REVIEW
+  reason: DEV-017 passed locally. Review PR status, remaining known limitation DEV-011 and repository mergeability before merging.
+planning_handoff:
+  complete: true
+  development_started: true
+  source_of_truth: project_zip
