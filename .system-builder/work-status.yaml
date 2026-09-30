@@ -3,9 +3,9 @@ project: agent-workspace
 mode: CREATE
 phase: implementation
 active_work:
-  selected_step: DEV-017
-  in_progress: DEV-017
-  state: verification_pending
+  selected_step: null
+  in_progress: null
+  state: ready_for_merge_review
 completed_steps:
 - id: DEV-001
   verification: PASSED
@@ -52,6 +52,9 @@ completed_steps:
 - id: DEV-016
   verification: PASSED
   evidence: User verified the DEV-016 acceptance flow in the local environment.
+- id: DEV-017
+  verification: PASSED
+  evidence: User ran `npm run verify:dev017` locally and confirmed PASS.
 deferred_steps:
 - id: DEV-011
   verification: DEFERRED
@@ -60,16 +63,17 @@ deferred_steps:
 release_constraints:
 - DEV-011 remains required before claiming the complete multi-user production account-linking flow is verified.
 verification:
-  last_result: DEV-017_IMPLEMENTED_VERIFICATION_PENDING
+  last_result: DEV-017_PASSED
   passed:
   - User reports that all verification commands through DEV-016 pass in the local environment except DEV-011.
   - DEV-017 release-readiness harness, static checks and documentation are implemented.
+  - User ran `npm run verify:dev017` locally and confirmed PASS.
   required_failures: []
   deferred:
   - DEV-011 Modal OAuth/account-linking feasibility verification.
 next:
-  recommended: DEV-017-VERIFY
-  reason: Run `npm install && npm run verify:dev017` from a clean checkout. Mark DEV-017 complete only after PASS; DEV-011 remains deferred.
+  recommended: MERGE-READINESS-REVIEW
+  reason: DEV-017 passed locally. Review PR status, remaining known limitation DEV-011 and repository mergeability before merging.
 planning_handoff:
   complete: true
   development_started: true
