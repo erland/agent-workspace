@@ -12,7 +12,7 @@ import { createRemoteJWKSet, jwtVerify, SignJWT } from "jose";
 import { isPrincipalAllowed, type AuthenticatedPrincipal } from "./principal.js";
 import type { RemoteOAuthConfig } from "./oauth-config.js";
 import type { IdentityService } from "../persistence/identity-service.js";
-import type { AuthorizationCodeRecord, OAuthClientRecord, PostgresOAuthStore, RefreshTokenRecord } from "./oauth-store.js";
+import type { AuthorizationCodeRecord, OAuthClientRecord, OAuthStore, RefreshTokenRecord } from "./oauth-store.js";
 
 const GOOGLE_ISSUER = "https://accounts.google.com";
 const GOOGLE_AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -115,7 +115,7 @@ export class AgentOAuthServer {
 
   constructor(
     private readonly config: AgentOAuthServerConfig,
-    private readonly store: PostgresOAuthStore,
+    private readonly store: OAuthStore,
     private readonly identityService: IdentityService,
     private readonly now: () => Date = () => new Date()
   ) {
