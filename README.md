@@ -283,3 +283,14 @@ The command runs unit tests, typecheck, production build, MCP contract tests, au
 DEV-011 remains a documented exception while Modal third-party OAuth/account-linking feasibility is deferred. This does not block continued release-candidate preparation, but it does block claiming that the complete multi-user production account-linking flow has been verified.
 
 See `docs/dev-017-verification.md` for the release checklist and exact limitation.
+
+
+## Recommended Coolify topology
+
+Production deployment should expose only Coolify's HTTPS reverse proxy publicly. The Node service listens on container port `3000` and should not use a host mapping such as `3000:3000`.
+
+```text
+Internet → Coolify Traefik → Agent Workspace :3000 → external PostgreSQL
+```
+
+No Nginx layer is required inside the Agent Workspace container. PostgreSQL is not bundled with the application image; point `DATABASE_URL` at the separate database.
