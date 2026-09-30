@@ -5,7 +5,7 @@ export interface RemoteOAuthConfig {
   audience: string;
   jwksUri: string;
   requiredScope: string;
-  allowedEmails: string[];
+  allowedEmails?: string[];
   port: number;
   host: string;
 }
