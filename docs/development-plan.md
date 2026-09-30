@@ -562,3 +562,25 @@ Varje steg ska minst köra relevant subset av:
 ### DEV-015 implementation note
 
 Implementation now includes the production Dockerfile, `/health` and `/ready`, PostgreSQL startup migrations and Coolify configuration documentation. Clean container/Coolify deployment remains external verification before DEV-015 can be marked fully complete.
+
+
+## DEV-018 – Personal Modal credentials and settings
+
+Goal: allow an allowlisted authenticated user to configure and use their own Modal API credentials without third-party Modal OAuth.
+
+Implementation:
+- OIDC web login with Authorization Code + PKCE for `/settings`.
+- signed HttpOnly/Secure application session and CSRF-protected forms.
+- AES-256-GCM encrypted PostgreSQL credential store behind `ExecutionAccountCredentialStore`.
+- per-user `ExecutionAccount.credentialRef`.
+- save-and-test, connection test and disconnect actions.
+- legacy `env:` credentials retained for development/backward compatibility.
+
+Required verification:
+- [x] automated encryption/decryption, tamper and wrong-key tests are implemented.
+- [x] automated save/invalid/disconnect/user-isolation tests are implemented.
+- [ ] full CI passes on the DEV-018 branch.
+- [ ] deployed OIDC login to `/settings` is verified.
+- [ ] an allowlisted user saves a real personal Modal token and connection verification passes.
+- [ ] a second user is verified to execute through a distinct Modal account.
+- [ ] disconnect is verified in the deployed environment.
