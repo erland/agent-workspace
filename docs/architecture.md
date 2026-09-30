@@ -201,3 +201,29 @@ Workspace rows are ownership-scoped by `user_id` and contain enough provider met
 Production `agent-workspace` is a single Node 22 application container plus external PostgreSQL. The application container contains only the control plane. It never mounts Docker socket and does not contain Java, Maven, Chromium or user-project build tooling. User code execution remains behind `SandboxProvider` (Modal in v1).
 
 `/health` is an unauthenticated liveness endpoint. `/ready` verifies PostgreSQL connectivity. The MCP endpoint remains OAuth protected at `/mcp`.
+
+
+## 12. Personal Modal credential settings
+
+Pilot users may connect their own Modal account without Modal third-party OAuth by entering a normal Modal API Token ID + Token Secret in the authenticated `/settings` page.
+
+The web flow uses the configured OIDC issuer with Authorization Code + PKCE. No OAuth access/id token is persisted in the browser session; Agent Workspace stores a signed HttpOnly/Secure application session cookie.
+
+Credential storage:
+
+```text
+app_user
+  └── execution_account
+       └── credential_ref = secret:modal:<user-id>
+                |
+                v
+        execution_credential
+        AES-256-GCM ciphertext
+                |
+                v
+        ModalSandboxProvider
+```
+
+The encryption master key is supplied only through `AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY`. The encrypted store remains behind `ExecutionAccountCredentialStore`, allowing later replacement with an external secret manager without changing domain or MCP layers.
+
+Legacy `env:` credential references remain readable for development/backward compatibility. New user-managed credentials are persistent encrypted records.
