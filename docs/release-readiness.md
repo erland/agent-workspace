@@ -31,7 +31,7 @@ The v1 implementation covers:
 | Reproducible npm dependencies | yes | PASS | committed `package-lock.json`, `npm ci` in CI/Docker |
 | Documentation/repository hygiene | yes | PASS | DEV-017 checks + post-merge reconciliation |
 | DEV-011 Modal third-party OAuth onboarding | no for personal-token pilot; yes only for third-party OAuth claim | DEFERRED | Personal API tokens now provide per-user Modal isolation; Modal-issued OAuth integration is still unavailable |
-| DEV-018 personal Modal credential settings | yes for production pilot | PENDING_EXTERNAL | Automated tests, typecheck, build, auth/security/deployment and release checks pass in GitHub Actions run 36757092150; deployed OIDC/settings/two-user Modal acceptance not yet evidenced |
+| DEV-018 shared auth + personal Modal credential settings | yes for production pilot | PENDING_EXTERNAL | Shared Google-backed Agent Workspace OAuth server and encrypted personal Modal credentials are implemented; deployed MCP OAuth/settings/two-user Modal acceptance is not yet evidenced |
 | DEV-015 real deployment verification | yes for production deployment | PENDING | Clean Coolify-like deployment with PostgreSQL/OAuth/provider connectivity not yet evidenced |
 | DEV-016 deployed remote MCP acceptance | yes for production deployment | PENDING | Must run after DEV-015 against deployed OAuth-protected MCP endpoint |
 
@@ -51,7 +51,7 @@ This does not constitute final acceptance of the deployed production path.
 
 The implemented security baseline includes resource limits, TTL cleanup, rate limiting, ZIP limits, bounded/redacted logs, server-side credential handling, audit events and Modal outbound-domain restrictions.
 
-Personal Modal credentials are encrypted at rest behind the credential-store abstraction. Production acceptance still requires DEV-018 deployed OIDC/settings verification. DEV-011 only blocks claiming third-party Modal OAuth onboarding, not per-user Modal isolation through personal API tokens.
+Personal Modal credentials are encrypted at rest behind the credential-store abstraction. Agent Workspace now also implements the shared OAuth authorization server for MCP and settings with Google as upstream identity. Production acceptance still requires DEV-018 deployed Google/MCP OAuth/settings verification. DEV-011 only blocks claiming third-party Modal OAuth onboarding, not per-user Modal isolation through personal API tokens.
 
 ## Packaging / deployment
 
