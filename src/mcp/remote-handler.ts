@@ -36,7 +36,7 @@ export function createRemoteMcpHandler(
       const auth = await gate(request);
       if (auth instanceof Response) return auth;
       const principal = principalFromAuthInfo(auth);
-      if (!isPrincipalAllowed(principal, config.allowedEmails)) return new Response("Forbidden", { status: 403 });
+      if (!isPrincipalAllowed(principal, config.allowedEmails ?? [])) return new Response("Forbidden", { status: 403 });
       return handler.fetch(request, { authInfo: auth });
     },
     close: () => handler.close()
