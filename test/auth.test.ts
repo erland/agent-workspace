@@ -23,6 +23,16 @@ describe("remote OAuth configuration", () => {
     });
   });
 
+
+  it("defaults issuer and JWKS to the Agent Workspace origin", () => {
+    const config = loadRemoteOAuthConfig({
+      AGENT_WORKSPACE_PUBLIC_BASE_URL: "https://workspace.example/"
+    });
+    assert.equal(config.issuer, "https://workspace.example/");
+    assert.equal(config.jwksUri, "https://workspace.example/jwks");
+    assert.deepEqual(protectedResourceMetadata(config).authorization_servers, ["https://workspace.example/"]);
+  });
+
   it("rejects insecure non-local public endpoints", () => {
     assert.throws(() => loadRemoteOAuthConfig({
       AGENT_WORKSPACE_PUBLIC_BASE_URL: "http://workspace.example/",
