@@ -152,11 +152,20 @@ body{font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:48px 
 header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
 .card{border:1px solid #ddd;border-radius:12px;padding:20px;margin:24px 0}
 label{display:block;font-weight:600;margin:14px 0 6px}
-input{box-sizing:border-box;width:100%;padding:10px;border:1px solid #aaa;border-radius:8px}
-button{padding:10px 14px;border:1px solid #888;border-radius:8px;background:#fff;cursor:pointer;margin-top:14px}
+input{box-sizing:border-box;width:100%;padding:12px;border:1px solid #aaa;border-radius:8px;font-size:16px}
+button{min-height:44px;padding:10px 14px;border:1px solid #888;border-radius:8px;background:#fff;cursor:pointer;margin-top:14px;font:inherit}
 .actions{display:flex;gap:10px;flex-wrap:wrap}
 .muted{color:#666;font-size:.9rem}.message{background:#f4f4f4;padding:12px;border-radius:8px;margin:18px 0}
 .status{font-weight:700}.warning{margin-top:12px;padding:12px;border:1px solid #bbb;border-radius:8px;font-weight:600}
+@media (max-width:600px){
+  body{margin:20px auto;padding:0 14px}
+  header{flex-direction:column;align-items:stretch;gap:8px}
+  header form{width:100%}
+  .card{padding:16px;margin:18px 0}
+  .actions{display:block}
+  .actions form{width:100%}
+  button{width:100%}
+}
 </style>
 </head>
 <body>
