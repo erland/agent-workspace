@@ -69,6 +69,8 @@ AGENT_WORKSPACE_WEB_OIDC_CLIENT_SECRET=<oidc-client-secret-if-required>
 AGENT_WORKSPACE_WEB_SESSION_SECRET=<random-session-secret>
 AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY=<base64-32-byte-key>
 AGENT_WORKSPACE_MODAL_APP_NAME=agent-workspace
+AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX=ghcr.io/erland/agent-workspace-runtime
+AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION=1
 HOST=0.0.0.0
 PORT=3000
 AGENT_WORKSPACE_VERSION=<release/version>
@@ -159,6 +161,16 @@ AGENT_WORKSPACE_CREDENTIAL_MODAL_USER_1_TOKEN_SECRET=...
 ```
 
 Modal third-party OAuth är fortfarande uppskjutet; se DEV-011. Det behövs inte för att isolera pilotanvändarnas Modal-konton när varje användare konfigurerar sin egen API-token i `/settings`.
+
+## Runtime images
+
+Runtime toolchains are built by GitHub Actions and published to GHCR; Coolify does not build Java/Node/Maven/Chromium images and the Agent Workspace application does not install those tools when a Modal sandbox starts.
+
+The GHCR package must be public because each pilot user's Modal account resolves the same registry images independently. GitHub Actions uses only `GITHUB_TOKEN` with `packages: write`; no Modal credential is required in GitHub.
+
+After the first successful `Runtime Images` workflow on `main`, verify that the package `agent-workspace-runtime` is publicly readable. If GitHub created it as private, change the package visibility to Public before external users start sandboxes.
+
+When `runtime-images/Dockerfile` changes, increment `runtime-images/version.txt` and deploy Agent Workspace with the matching `AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION`.
 
 ## PostgreSQL
 
