@@ -4,10 +4,14 @@ import { Readable } from "node:stream";
 import { loadRemoteOAuthConfig } from "../auth/oauth-config.js";
 import { JwtAccessTokenVerifier } from "../auth/jwt-access-token-verifier.js";
 import { EnvironmentExecutionAccountCredentialStore } from "../execution/environment-credential-store.js";
+import { EncryptedExecutionAccountCredentialStore } from "../execution/encrypted-credential-store.js";
+import { RoutingExecutionAccountCredentialStore } from "../execution/routing-credential-store.js";
+import { ModalCredentialManager } from "../execution/modal-credential-manager.js";
 import { DefaultExecutionProviderFactory } from "../execution/execution-provider-factory.js";
 import { IdentityService } from "../persistence/identity-service.js";
 import { createPostgresPool, PgSqlClient } from "../persistence/postgres/pool.js";
 import {
+  PostgresEncryptedCredentialRepository,
   PostgresExecutionAccountRepository,
   PostgresExternalIdentityRepository,
   PostgresUserRepository,
@@ -19,6 +23,9 @@ import { DEFAULT_SECURITY_POLICY } from "../security/security-policy.js";
 import { JsonLineAuditEventSink } from "../audit/audit-events.js";
 import { ExpiredWorkspaceCleanupJob } from "../workspace/expired-workspace-cleanup-job.js";
 import { handleHealthRequest } from "../http/health.js";
+import { createSettingsHandler } from "../http/settings.js";
+import { loadWebOidcConfig, WebOidcAuth } from "../auth/web-oidc.js";
+import { SandboxModalCredentialVerifier } from "../providers/modal/modal-credential-verifier.js";
 
 const config = loadRemoteOAuthConfig();
 const SERVICE_VERSION = process.env.npm_package_version ?? process.env.AGENT_WORKSPACE_VERSION ?? "unknown";
@@ -29,10 +36,20 @@ const users = new PostgresUserRepository(db);
 const identities = new PostgresExternalIdentityRepository(db);
 const executionAccounts = new PostgresExecutionAccountRepository(db);
 const workspaces = new PostgresWorkspaceRepository(db);
+const encryptedCredentialRecords = new PostgresEncryptedCredentialRepository(db);
 const identityService = new IdentityService(users, identities, executionAccounts);
+const environmentCredentialStore = new EnvironmentExecutionAccountCredentialStore();
+const persistentCredentialStore = process.env.AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY
+  ? EncryptedExecutionAccountCredentialStore.fromEnvironment(encryptedCredentialRecords)
+  : undefined;
+const mutableCredentialStore = persistentCredentialStore
+  ? new RoutingExecutionAccountCredentialStore(environmentCredentialStore, persistentCredentialStore)
+  : undefined;
+const executionCredentialStore = mutableCredentialStore ?? environmentCredentialStore;
+const modalAppName = process.env.AGENT_WORKSPACE_MODAL_APP_NAME ?? "agent-workspace";
 const providerFactory = new DefaultExecutionProviderFactory(
-  new EnvironmentExecutionAccountCredentialStore(),
-  process.env.AGENT_WORKSPACE_MODAL_APP_NAME ?? "agent-workspace"
+  executionCredentialStore,
+  modalAppName
 );
 const remote = createRemoteMcpHandler(config, new JwtAccessTokenVerifier(config), {
   identityService,
@@ -43,6 +60,22 @@ const remote = createRemoteMcpHandler(config, new JwtAccessTokenVerifier(config)
   rateLimiter: new InMemoryFixedWindowRateLimiter({ limitPerMinute: DEFAULT_SECURITY_POLICY.requestRateLimitPerMinute }),
   audit: new JsonLineAuditEventSink()
 });
+
+const webOidcConfig = loadWebOidcConfig(config);
+if (webOidcConfig && !mutableCredentialStore) {
+  throw new Error("AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY is required when web settings are enabled");
+}
+const settingsHandler = webOidcConfig && mutableCredentialStore
+  ? createSettingsHandler({
+      auth: new WebOidcAuth(webOidcConfig),
+      identityService,
+      modalCredentials: new ModalCredentialManager(
+        executionAccounts,
+        mutableCredentialStore,
+        new SandboxModalCredentialVerifier(modalAppName)
+      )
+    })
+  : undefined;
 
 const cleanupJob = new ExpiredWorkspaceCleanupJob(workspaces, executionAccounts, providerFactory);
 const cleanupTimer = setInterval(() => {
@@ -60,11 +93,16 @@ server.listen(config.port, config.host, () => {
 async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
     const request = await toWebRequest(req, config.publicBaseUrl);
-    const health = await handleHealthRequest(request, {
+    const settings = settingsHandler
+      ? await settingsHandler(request)
+      : (new URL(request.url).pathname.startsWith("/settings")
+          ? new Response("Settings login is not configured", { status: 503 })
+          : undefined);
+    const health = settings ? undefined : await handleHealthRequest(request, {
       version: SERVICE_VERSION,
       checkDatabase: async () => { await pool.query("select 1"); }
     });
-    const response = health ?? await remote.fetch(request);
+    const response = settings ?? health ?? await remote.fetch(request);
     res.statusCode = response.status;
     response.headers.forEach((value, key) => res.setHeader(key, value));
     if (response.body) Readable.fromWeb(response.body as never).pipe(res);
