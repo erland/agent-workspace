@@ -1,11 +1,11 @@
 schema_version: 1
 project: agent-workspace
 mode: CREATE
-phase: release_readiness
+phase: implementation
 active_work:
-  selected_step: null
-  in_progress: null
-  state: development_complete_release_not_ready
+  selected_step: DEV-018
+  in_progress: DEV-018
+  state: dev018_verification_pending
 completed_steps:
 - id: DEV-001
   verification: PASSED
@@ -60,9 +60,10 @@ deferred_steps:
 - id: DEV-011
   verification: DEFERRED
   reason: Modal third-party OAuth/account-linking feasibility requires a Modal-issued OAuth integration and two authorized Modal identities.
-  decision: User explicitly chose to defer DEV-011 for now. It remains required before claiming the complete multi-user production account-linking flow is verified.
+  decision: User explicitly chose to defer DEV-011 for now. Personal per-user Modal API tokens provide account isolation for the pilot; DEV-011 remains a future self-service OAuth improvement.
 release_constraints:
-- DEV-011 must be verified before claiming complete multi-user Modal account linking is production ready.
+- DEV-011 is required only before claiming Modal third-party OAuth account linking is production ready; it is not required for per-user pilot isolation with personal API tokens.
+- DEV-018 deployed settings/OIDC/personal-token acceptance must be verified before production pilot readiness.
 - DEV-015 must be verified in a real deployment environment.
 - DEV-016 must be repeated through the deployed remote OAuth-protected MCP endpoint.
 verification:
@@ -75,15 +76,16 @@ verification:
   deferred:
   - DEV-011 Modal OAuth/account-linking feasibility verification.
   pending_external:
+  - DEV-018 deployed OIDC/settings/personal Modal credential verification.
   - DEV-015 deployment verification.
   - DEV-016 deployed remote MCP acceptance.
 release_readiness:
   artifact: READY_WITH_WARNINGS
   production: NOT_READY
-  rationale: Source, CI, local acceptance and packaging are green. Full production readiness still requires DEV-011, DEV-015 and DEV-016 external gates.
+  rationale: Personal Modal credential support is implemented but DEV-018 deployed acceptance is pending; DEV-015 and DEV-016 production gates also remain pending.
 next:
-  recommended: DEV-015-DEPLOYMENT-VERIFY
-  reason: If production release is pursued, verify a real Coolify-like deployment first; DEV-011 remains explicitly deferred by user decision.
+  recommended: DEV-018-VERIFY
+  reason: Complete CI and deployed OIDC/settings/personal Modal credential acceptance before returning to DEV-015/016 deployment verification.
 planning_handoff:
   complete: true
   development_started: true
