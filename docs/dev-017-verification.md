@@ -15,7 +15,7 @@ DEV-011 is therefore a known release constraint, not a completed step.
 Run:
 
 ```bash
-npm install
+npm ci
 npm run verify:dev017
 ```
 
