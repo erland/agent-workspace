@@ -41,6 +41,7 @@ export function createSettingsHandler(deps: SettingsDependencies) {
         ...(session.principal.displayName ? { displayName: session.principal.displayName } : {}),
         csrf: session.csrf,
         connected: status.connected,
+        needsRenewal: status.needsRenewal,
         ...(status.updatedAt ? { updatedAt: status.updatedAt } : {}),
         ...(safeMessage(url.searchParams.get("message"))
           ? { message: safeMessage(url.searchParams.get("message"))! }
@@ -122,12 +123,20 @@ function renderSettings(input: {
   displayName?: string;
   csrf: string;
   connected: boolean;
+  needsRenewal: boolean;
   updatedAt?: string;
   message?: string;
 }): string {
   const identity = escapeHtml(input.displayName ?? input.email ?? "Inloggad användare");
   const email = input.email ? `<div class="muted">${escapeHtml(input.email)}</div>` : "";
-  const status = input.connected ? "Ansluten" : "Ej ansluten";
+  const status = input.needsRenewal
+    ? "Modal-token behöver förnyas"
+    : input.connected
+      ? "Ansluten"
+      : "Ej ansluten";
+  const renewalHelp = input.needsRenewal
+    ? '<div class="warning">Modal accepterar inte längre de sparade credentials. Skapa en ny Modal-token och ersätt den nedan.</div>'
+    : "";
   const updated = input.updatedAt ? `<div class="muted">Senast ändrad: ${escapeHtml(input.updatedAt)}</div>` : "";
   const message = input.message ? `<div class="message">${escapeHtml(input.message)}</div>` : "";
   const csrf = escapeHtml(input.csrf);
@@ -147,7 +156,7 @@ input{box-sizing:border-box;width:100%;padding:10px;border:1px solid #aaa;border
 button{padding:10px 14px;border:1px solid #888;border-radius:8px;background:#fff;cursor:pointer;margin-top:14px}
 .actions{display:flex;gap:10px;flex-wrap:wrap}
 .muted{color:#666;font-size:.9rem}.message{background:#f4f4f4;padding:12px;border-radius:8px;margin:18px 0}
-.status{font-weight:700}
+.status{font-weight:700}.warning{margin-top:12px;padding:12px;border:1px solid #bbb;border-radius:8px;font-weight:600}
 </style>
 </head>
 <body>
@@ -156,7 +165,7 @@ button{padding:10px 14px;border:1px solid #888;border-radius:8px;background:#fff
 ${message}
 <section class="card">
 <h2>Modal</h2>
-<div class="status">${status}</div>${updated}
+<div class="status">${status}</div>${renewalHelp}${updated}
 <p class="muted">Dina Modal API-credentials lagras krypterat. Token secret visas aldrig igen efter att den sparats.</p>
 <form method="post" action="/settings/modal/save">
 <input type="hidden" name="csrf" value="${csrf}">
@@ -166,7 +175,7 @@ ${message}
 <input id="tokenSecret" name="tokenSecret" type="password" autocomplete="new-password" required>
 <button>Spara och testa</button>
 </form>
-${input.connected ? `<div class="actions">
+${(input.connected || input.needsRenewal) ? `<div class="actions">
 <form method="post" action="/settings/modal/test"><input type="hidden" name="csrf" value="${csrf}"><button>Testa anslutning</button></form>
 <form method="post" action="/settings/modal/disconnect"><input type="hidden" name="csrf" value="${csrf}"><button>Koppla bort Modal</button></form>
 </div>` : ""}
