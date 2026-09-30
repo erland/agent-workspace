@@ -156,6 +156,10 @@ export class PostgresOAuthStore {
       token_hash: string;
       client_id: string;
       user_id: string;
+      identity_issuer: string;
+      identity_subject: string;
+      email: string | null;
+      display_name: string | null;
       scope: string;
       resource: string;
       expires_at: string | Date;
@@ -171,6 +175,10 @@ export class PostgresOAuthStore {
       tokenHash: row.token_hash,
       clientId: row.client_id,
       userId: row.user_id,
+      identityIssuer: row.identity_issuer,
+      identitySubject: row.identity_subject,
+      ...(row.email ? { email: row.email } : {}),
+      ...(row.display_name ? { displayName: row.display_name } : {}),
       scope: row.scope,
       resource: row.resource,
       expiresAt: toIso(row.expires_at)
