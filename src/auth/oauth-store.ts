@@ -34,7 +34,16 @@ export interface RefreshTokenRecord {
   expiresAt: string;
 }
 
-export class PostgresOAuthStore {
+export interface OAuthStore {
+  registerClient(record: OAuthClientRecord): Promise<void>;
+  findClient(clientId: string): Promise<OAuthClientRecord | undefined>;
+  saveAuthorizationCode(record: AuthorizationCodeRecord): Promise<void>;
+  consumeAuthorizationCode(codeHash: string): Promise<AuthorizationCodeRecord | undefined>;
+  saveRefreshToken(record: RefreshTokenRecord): Promise<void>;
+  consumeRefreshToken(tokenHash: string): Promise<RefreshTokenRecord | undefined>;
+}
+
+export class PostgresOAuthStore implements OAuthStore {
   constructor(private readonly db: SqlClient, private readonly now: () => Date = () => new Date()) {}
 
   async registerClient(record: OAuthClientRecord): Promise<void> {
