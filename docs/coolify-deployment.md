@@ -4,6 +4,26 @@
 
 `agent-workspace` kör som en vanlig Node 22-container i Coolify. PostgreSQL är extern från applikationscontainern. Alla npm/Maven/Chromium-jobb körs hos execution providern (Modal i v1).
 
+Rekommenderad nätverkstopologi:
+
+```text
+Internet
+   |
+   | HTTPS :443
+   v
+Coolify reverse proxy (Traefik)
+   |
+   | internt Docker-nätverk
+   v
+Agent Workspace :3000
+   |
+   | DATABASE_URL
+   v
+Separat PostgreSQL
+```
+
+Lägg **inte** in Nginx i Agent Workspace-containern. Coolifys reverse proxy terminerar TLS och routar trafiken vidare till Node-processen. Node-port `3000` ska inte publiceras som host-port.
+
 Apphosten behöver därför **inte**:
 
 - Docker socket,
@@ -17,7 +37,9 @@ Apphosten behöver därför **inte**:
 
 Bygg från repositoryts `Dockerfile`. Imagen kör migrationer före serverstart och startar därefter `dist/mcp/remote.js`.
 
-Standardport är `3000`. Coolify ska routa HTTPS-domänen till den porten.
+Standardport är `3000`. Den porten är endast applikationens interna lyssningsport. Coolify ska routa den publika HTTPS-domänen via Traefik till containerport `3000`.
+
+Använd inte explicit host-port mapping som `3000:3000`. Det skulle kringgå den rekommenderade reverse-proxyvägen och exponera Node direkt från hosten.
 
 ### Health
 
@@ -140,28 +162,32 @@ Modal third-party OAuth är fortfarande uppskjutet; se DEV-011. Det behövs inte
 
 ## PostgreSQL
 
-Använd en persistent PostgreSQL-databas och TLS där providern stödjer det. Vid containerstart körs SQL-migrationer från `db/migrations` under PostgreSQL advisory lock. Redan applicerade migrationer spåras i `schema_migration`.
+Använd en separat persistent PostgreSQL-databas och TLS där providern stödjer det. Agent Workspace-containern innehåller ingen PostgreSQL-server och ingen separat PostgreSQL-resurs behöver skapas i Coolify om en extern databas redan finns. Vid containerstart körs SQL-migrationer från `db/migrations` under PostgreSQL advisory lock. Redan applicerade migrationer spåras i `schema_migration`.
 
 Applikationscontainern lagrar inga projektfiler permanent. Workspace-data ligger i sandbox-providern och metadata i PostgreSQL.
 
 ## Coolify-konfiguration
 
-1. Skapa PostgreSQL-resurs eller använd extern PostgreSQL.
+1. Säkerställ att den separata PostgreSQL-databasen är nåbar från Coolify-hostens Docker-nätverk eller via dess nätverksadress.
 2. Skapa Application från Git-repot och välj Dockerfile build pack.
-3. Lägg in environment variables/secrets ovan.
-4. Exponera port `3000` via önskad HTTPS-domän.
-5. Ange health path `/health`.
-6. Deploya.
-7. Verifiera `/health` = 200 och `/ready` = 200.
-8. Registrera Google Web OAuth client med callback `/auth/google/callback`.
-9. Verifiera RFC 8414 metadata, JWKS och RFC 9728 protected-resource metadata.
-10. Verifiera ett fullständigt MCP Authorization Code + PKCE-flöde via Google och att lokalt utfärdad token accepteras av `/mcp`.
-11. Verifiera inloggning till `/settings` med samma Google-identitet.
-12. Verifiera att en allowlistad användare kan spara/testa sin egen Modal-token och att en ej allowlistad användare nekas.
-13. Verifiera två användare mot två skilda Modal-konton.
-14. Verifiera refresh-tokenrotation och reconnect efter service-restart.
+3. Lägg in environment variables/secrets ovan, inklusive `DATABASE_URL` till den separata databasen.
+4. Ange applikationens interna port som `3000` och koppla önskad `https://`-domän till applikationen.
+5. Lägg inte till någon host-port mapping för `3000`.
+6. Låt Coolifys Traefik-proxy hantera TLS och publik ingress på 80/443.
+7. Ange health path `/health`.
+8. Deploya.
+9. Verifiera att `/health` = 200 och `/ready` = 200 via den publika HTTPS-domänen.
+10. Registrera Google Web OAuth client med callback `/auth/google/callback`.
+11. Verifiera RFC 8414 metadata, JWKS och RFC 9728 protected-resource metadata.
+12. Verifiera ett fullständigt MCP Authorization Code + PKCE-flöde via Google och att lokalt utfärdad token accepteras av `/mcp`.
+13. Verifiera inloggning till `/settings` med samma Google-identitet.
+14. Verifiera att en allowlistad användare kan spara/testa sin egen Modal-token och att en ej allowlistad användare nekas.
+15. Verifiera två användare mot två skilda Modal-konton.
+16. Verifiera refresh-tokenrotation och reconnect efter service-restart.
 
 ## Säkerhetsgräns
+
+Publik trafik ska endast gå via Coolifys reverse proxy. Exponera inte Node-port `3000` direkt från hosten.
 
 Montera **inte** `/var/run/docker.sock`. Lägg inte Java, Maven eller browser i applikationsimagen. Modal/annan `SandboxProvider` är den enda platsen där användarprojekt får exekveras.
 
