@@ -27,9 +27,15 @@ class MemoryAccountRepository implements ExecutionAccountRepository {
 class RecordingVerifier implements ModalCredentialVerifier {
   calls: ModalExecutionCredentials[] = [];
   fail = false;
+  authFail = false;
   async verify(credentials: Extract<ModalExecutionCredentials, { kind: "token" }>) {
     this.calls.push(structuredClone(credentials));
-    if (this.fail) throw new Error("invalid modal credentials");
+    if (this.authFail) {
+      const error = new Error("token has expired");
+      error.name = "AuthError";
+      throw error;
+    }
+    if (this.fail) throw new Error("temporary verification failure");
   }
 }
 
@@ -94,6 +100,57 @@ describe("ModalCredentialManager", () => {
     await assert.rejects(() => manager.saveAndTest("usr-1", "ak-bad", "as-bad"));
     assert.equal(await accounts.findByUserId("usr-1"), undefined);
     assert.equal(encrypted.records.size, 0);
+  });
+
+  it("marks an existing connection as needing renewal after a Modal auth failure", async () => {
+    const encrypted = new MemoryCredentialRepository();
+    const store = new EncryptedExecutionAccountCredentialStore(encrypted, Buffer.alloc(32, 6));
+    const accounts = new MemoryAccountRepository();
+    const verifier = new RecordingVerifier();
+    const manager = new ModalCredentialManager(accounts, store, verifier);
+
+    await manager.saveAndTest("usr-1", "ak-1", "as-1");
+    verifier.authFail = true;
+    await assert.rejects(() => manager.test("usr-1"), /expired/);
+
+    assert.equal((await accounts.findByUserId("usr-1"))?.status, "REVOKED");
+    assert.deepEqual(await manager.status("usr-1"), {
+      connected: false,
+      needsRenewal: true,
+      updatedAt: (await accounts.findByUserId("usr-1"))!.updatedAt
+    });
+  });
+
+  it("does not mark credentials revoked for a non-authentication failure", async () => {
+    const encrypted = new MemoryCredentialRepository();
+    const store = new EncryptedExecutionAccountCredentialStore(encrypted, Buffer.alloc(32, 8));
+    const accounts = new MemoryAccountRepository();
+    const verifier = new RecordingVerifier();
+    const manager = new ModalCredentialManager(accounts, store, verifier);
+
+    await manager.saveAndTest("usr-1", "ak-1", "as-1");
+    verifier.fail = true;
+    await assert.rejects(() => manager.test("usr-1"), /temporary/);
+    assert.equal((await accounts.findByUserId("usr-1"))?.status, "CONNECTED");
+  });
+
+  it("replacing credentials clears the renewal status", async () => {
+    const encrypted = new MemoryCredentialRepository();
+    const store = new EncryptedExecutionAccountCredentialStore(encrypted, Buffer.alloc(32, 10));
+    const accounts = new MemoryAccountRepository();
+    const verifier = new RecordingVerifier();
+    const manager = new ModalCredentialManager(accounts, store, verifier);
+
+    await manager.saveAndTest("usr-1", "ak-old", "as-old");
+    verifier.authFail = true;
+    await assert.rejects(() => manager.test("usr-1"));
+    verifier.authFail = false;
+    await manager.saveAndTest("usr-1", "ak-new", "as-new");
+
+    assert.equal((await accounts.findByUserId("usr-1"))?.status, "CONNECTED");
+    assert.deepEqual(await store.getModalCredentials("secret:modal:usr-1"), {
+      kind: "token", tokenId: "ak-new", tokenSecret: "as-new"
+    });
   });
 
   it("keeps users isolated and deletes credential material on disconnect", async () => {
