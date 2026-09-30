@@ -72,7 +72,7 @@ release_constraints:
 verification:
   last_result: DEVELOPMENT_AND_LOCAL_ACCEPTANCE_PASSED_RELEASE_GATES_PENDING
   passed:
-  - DEV-018 automated unit/type/build/auth/security/deployment/release checks passed in GitHub Actions run 36757092150.
+  - DEV-018 shared-auth/personal-credential unit, typecheck, build, MCP-contract, auth, security, deployment and release checks passed in GitHub Actions run 36762061458.
   - User ran all local verification commands through DEV-016; all passed except the intentionally deferred DEV-011 flow.
   - DEV-017 local release-readiness command passed.
   - GitHub CI passed on merged main commit d3d55106bee3b393b5390151c2ef6fcbff87aab0.
