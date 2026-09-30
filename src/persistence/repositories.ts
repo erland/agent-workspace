@@ -27,3 +27,21 @@ export interface WorkspaceRepository {
   listExpiredReady(nowIso: string, limit?: number): Promise<PersistedWorkspace[]>;
   countReadyForUser(userId: string): Promise<number>;
 }
+
+
+export interface EncryptedCredentialRecord {
+  ref: string;
+  userId: string;
+  provider: "modal";
+  iv: string;
+  ciphertext: string;
+  authTag: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EncryptedCredentialRepository {
+  upsert(record: EncryptedCredentialRecord): Promise<void>;
+  findByRef(ref: string): Promise<EncryptedCredentialRecord | undefined>;
+  deleteByRef(ref: string): Promise<void>;
+}
