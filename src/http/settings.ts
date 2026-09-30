@@ -1,9 +1,15 @@
-import type { WebOidcAuth } from "../auth/web-oidc.js";
+import type { AuthenticatedPrincipal } from "../auth/principal.js";
 import type { IdentityService } from "../persistence/identity-service.js";
 import type { ModalCredentialManager } from "../execution/modal-credential-manager.js";
 
+export interface SettingsAuth {
+  beginSettingsLogin(): Promise<Response>;
+  settingsSession(request: Request): { principal: AuthenticatedPrincipal; csrf: string } | undefined;
+  logoutSettings(): Response;
+}
+
 export interface SettingsDependencies {
-  auth: WebOidcAuth;
+  auth: SettingsAuth;
   identityService: IdentityService;
   modalCredentials: ModalCredentialManager;
 }
@@ -14,13 +20,9 @@ export function createSettingsHandler(deps: SettingsDependencies) {
     if (!url.pathname.startsWith("/settings")) return undefined;
 
     if (request.method === "GET" && url.pathname === "/settings/login") {
-      return deps.auth.beginLogin();
+      return deps.auth.beginSettingsLogin();
     }
-    if (request.method === "GET" && url.pathname === "/settings/callback") {
-      return deps.auth.completeLogin(request);
-    }
-
-    const session = deps.auth.session(request);
+    const session = deps.auth.settingsSession(request);
     if (!session) {
       return new Response(null, { status: 302, headers: { location: "/settings/login" } });
     }
@@ -49,7 +51,7 @@ export function createSettingsHandler(deps: SettingsDependencies) {
     if (request.method === "POST" && url.pathname === "/settings/logout") {
       const form = await request.formData();
       if (!validCsrf(form, session.csrf)) return new Response("Forbidden", { status: 403 });
-      return deps.auth.logout();
+      return deps.auth.logoutSettings();
     }
 
     if (request.method === "POST" && url.pathname === "/settings/modal/save") {
