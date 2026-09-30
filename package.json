@@ -48,7 +48,9 @@
     "verify:dev015": "npm run test && npm run typecheck && npm run build && npm run test:deployment && npm run check:container",
     "check:container": "node scripts/check-dev015-container.mjs",
     "smoke:acceptance": "tsx src/smoke/e2e-acceptance-smoke.ts",
-    "verify:dev016": "npm run test && npm run typecheck && npm run build && npm run smoke:acceptance"
+    "verify:dev016": "npm run test && npm run typecheck && npm run build && npm run smoke:acceptance",
+    "check:release": "node scripts/check-dev017-release.mjs",
+    "verify:dev017": "npm run test && npm run typecheck && npm run build && npm run test:mcp-contract && npm run test:auth && npm run test:security && npm run test:deployment && npm run check:release"
   },
   "dependencies": {
     "modal": "^0.10.1",
