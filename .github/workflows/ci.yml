@@ -5,7 +5,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   test:
@@ -23,9 +23,19 @@ jobs:
           node-version: "22"
 
       - name: Generate lockfile candidate
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Commit generated lockfile
+        if: github.event_name == 'push'
         run: |
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          echo "LOCKFILE_BASE64=$(base64 -w0 package-lock.json)"
+          if git diff --quiet -- package-lock.json && git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "Lägg till package-lock för reproducerbara byggen"
+          git push origin HEAD:${GITHUB_REF_NAME}
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
