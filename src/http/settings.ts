@@ -39,8 +39,10 @@ export function createSettingsHandler(deps: SettingsDependencies) {
         displayName: session.principal.displayName,
         csrf: session.csrf,
         connected: status.connected,
-        updatedAt: status.updatedAt,
-        message: safeMessage(url.searchParams.get("message"))
+        ...(status.updatedAt ? { updatedAt: status.updatedAt } : {}),
+        ...(safeMessage(url.searchParams.get("message"))
+          ? { message: safeMessage(url.searchParams.get("message"))! }
+          : {})
       }));
     }
 
