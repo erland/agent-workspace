@@ -12,6 +12,21 @@ Full production deployment readiness is **NOT_READY** until the remaining extern
 
 See `docs/release-readiness.md` for the canonical readiness decision.
 
+## Personal Modal credentials
+
+Pilot users can configure their own Modal API Token ID + Token Secret at `/settings`. The settings page uses OIDC Authorization Code + PKCE, applies the same email allowlist as the MCP endpoint, verifies Modal credentials before connecting the account, and stores credential material AES-256-GCM encrypted in PostgreSQL. The execution-account row contains only a `credentialRef`.
+
+Required settings when enabling this flow:
+
+```text
+AGENT_WORKSPACE_WEB_OIDC_CLIENT_ID=...
+AGENT_WORKSPACE_WEB_OIDC_CLIENT_SECRET=...   # when required by the IdP
+AGENT_WORKSPACE_WEB_SESSION_SECRET=...
+AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY=... # Base64, exactly 32 decoded bytes
+```
+
+Register `https://<public-host>/settings/callback` as the OIDC redirect URI.
+
 
 ## DEV-001 development setup
 
