@@ -11,6 +11,10 @@ export interface AuthorizationCodeRecord {
   clientId: string;
   redirectUri: string;
   userId: string;
+  identityIssuer: string;
+  identitySubject: string;
+  email?: string;
+  displayName?: string;
   scope: string;
   resource: string;
   codeChallenge: string;
@@ -21,6 +25,10 @@ export interface RefreshTokenRecord {
   tokenHash: string;
   clientId: string;
   userId: string;
+  identityIssuer: string;
+  identitySubject: string;
+  email?: string;
+  displayName?: string;
   scope: string;
   resource: string;
   expiresAt: string;
@@ -62,13 +70,18 @@ export class PostgresOAuthStore {
   async saveAuthorizationCode(record: AuthorizationCodeRecord): Promise<void> {
     await this.db.query(
       `insert into oauth_authorization_code
-         (code_hash, client_id, redirect_uri, user_id, scope, resource, code_challenge, expires_at, created_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+         (code_hash, client_id, redirect_uri, user_id, identity_issuer, identity_subject, email, display_name,
+          scope, resource, code_challenge, expires_at, created_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
       [
         record.codeHash,
         record.clientId,
         record.redirectUri,
         record.userId,
+        record.identityIssuer,
+        record.identitySubject,
+        record.email ?? null,
+        record.displayName ?? null,
         record.scope,
         record.resource,
         record.codeChallenge,
@@ -84,6 +97,10 @@ export class PostgresOAuthStore {
       client_id: string;
       redirect_uri: string;
       user_id: string;
+      identity_issuer: string;
+      identity_subject: string;
+      email: string | null;
+      display_name: string | null;
       scope: string;
       resource: string;
       code_challenge: string;
@@ -91,7 +108,8 @@ export class PostgresOAuthStore {
     }>(
       `delete from oauth_authorization_code
        where code_hash = $1 and expires_at > now()
-       returning code_hash, client_id, redirect_uri, user_id, scope, resource, code_challenge, expires_at`,
+       returning code_hash, client_id, redirect_uri, user_id, identity_issuer, identity_subject, email, display_name,
+                 scope, resource, code_challenge, expires_at`,
       [codeHash]
     );
     const row = result.rows[0];
@@ -100,6 +118,10 @@ export class PostgresOAuthStore {
       clientId: row.client_id,
       redirectUri: row.redirect_uri,
       userId: row.user_id,
+      identityIssuer: row.identity_issuer,
+      identitySubject: row.identity_subject,
+      ...(row.email ? { email: row.email } : {}),
+      ...(row.display_name ? { displayName: row.display_name } : {}),
       scope: row.scope,
       resource: row.resource,
       codeChallenge: row.code_challenge,
@@ -110,12 +132,17 @@ export class PostgresOAuthStore {
   async saveRefreshToken(record: RefreshTokenRecord): Promise<void> {
     await this.db.query(
       `insert into oauth_refresh_token
-         (token_hash, client_id, user_id, scope, resource, expires_at, created_at)
-       values ($1,$2,$3,$4,$5,$6,$7)`,
+         (token_hash, client_id, user_id, identity_issuer, identity_subject, email, display_name,
+          scope, resource, expires_at, created_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
       [
         record.tokenHash,
         record.clientId,
         record.userId,
+        record.identityIssuer,
+        record.identitySubject,
+        record.email ?? null,
+        record.displayName ?? null,
         record.scope,
         record.resource,
         record.expiresAt,
@@ -135,7 +162,8 @@ export class PostgresOAuthStore {
     }>(
       `delete from oauth_refresh_token
        where token_hash = $1 and expires_at > now()
-       returning token_hash, client_id, user_id, scope, resource, expires_at`,
+       returning token_hash, client_id, user_id, identity_issuer, identity_subject, email, display_name,
+                 scope, resource, expires_at`,
       [tokenHash]
     );
     const row = result.rows[0];
