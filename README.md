@@ -15,7 +15,7 @@ Requirements:
 Install dependencies:
 
 ```bash
-npm install
+npm ci
 ```
 
 Run local verification:
@@ -62,7 +62,7 @@ Java 17/21/25 × Node 20/22. The default is Java 21 + Node 22.
 Run the required authenticated verification with:
 
 ```bash
-npm install
+npm ci
 npm run verify:dev002
 ```
 
@@ -75,7 +75,7 @@ DEV-003 validates ZIP archives before they are transferred to the sandbox provid
 Run the authenticated end-to-end verification with:
 
 ```bash
-npm install
+npm ci
 npm run verify:dev003
 ```
 
@@ -89,7 +89,7 @@ DEV-004 analyzes the validated ZIP before provider upload and detects Maven/npm 
 Run the authenticated combined verification with:
 
 ```bash
-npm install
+npm ci
 npm run verify:dev004
 ```
 
@@ -102,7 +102,7 @@ DEV-005 adds normalized npm project verification with `npm ci`/`npm install`, op
 Authenticated verification:
 
 ```bash
-npm install
+npm ci
 npm run verify:dev005
 ```
 
@@ -144,7 +144,7 @@ A running prototype can now be captured as PNG through Playwright/Chromium with 
 Run the authenticated live smoke on your Mac with:
 
 ```bash
-npm install
+npm ci
 npm run verify:dev009
 ```
 
@@ -152,7 +152,7 @@ Successful live verification writes `output-dev009/desktop.png`, `tablet.png`, a
 
 ## MCP development server
 
-After `npm install`, start the local stdio MCP server with:
+After `npm ci`, start the local stdio MCP server with:
 
 ```bash
 npm run mcp:stdio
@@ -212,7 +212,7 @@ See `docs/security-baseline.md` and `docs/dev-014-verification.md` for the exact
 Run the local verification with:
 
 ```bash
-npm install
+npm ci
 npm run verify:dev014
 ```
 
@@ -233,7 +233,7 @@ See `docs/coolify-deployment.md` for the environment contract and deployment pro
 Release-candidate preparation is verified with:
 
 ```bash
-npm install
+npm ci
 npm run verify:dev017
 ```
 
