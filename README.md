@@ -162,7 +162,7 @@ DEV-010 exposes: `get_capabilities`, `get_profile`, `workspace_create`, `workspa
 
 ## DEV-011: user-specific Modal accounts
 
-Production design now uses one `ExecutionAccount` per Agent Workspace user. Modal OAuth refresh credentials are resolved server-side from a credential reference and used to construct a dedicated `ModalClient` for that user's operations. See `docs/dev-011-verification.md` for the live two-user feasibility test and the remaining Modal OAuth registration dependency.
+Production design now uses one `ExecutionAccount` per Agent Workspace user. Modal OAuth refresh credentials are resolved server-side from a credential reference and used to construct a dedicated `ModalClient` for that user's operations. See `docs/dev-011-verification.md` for the live two-user feasibility test and the remaining Modal OAuth registration dependency. DEV-011 is currently explicitly deferred; it must be completed before the full multi-user Modal account-linking flow is claimed as production verified.
 
 ## DEV-012 persistence
 
@@ -226,3 +226,19 @@ Health endpoints:
 - `GET /ready` – PostgreSQL readiness
 
 See `docs/coolify-deployment.md` for the environment contract and deployment procedure.
+
+
+## DEV-017 release readiness
+
+Release-candidate preparation is verified with:
+
+```bash
+npm install
+npm run verify:dev017
+```
+
+The command runs unit tests, typecheck, production build, MCP contract tests, auth/security/deployment tests and static release-readiness checks.
+
+DEV-011 remains a documented exception while Modal third-party OAuth/account-linking feasibility is deferred. This does not block continued release-candidate preparation, but it does block claiming that the complete multi-user production account-linking flow has been verified.
+
+See `docs/dev-017-verification.md` for the release checklist and exact limitation.
