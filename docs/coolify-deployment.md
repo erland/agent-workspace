@@ -42,6 +42,10 @@ AGENT_WORKSPACE_OAUTH_JWKS_URI=https://issuer.example/.well-known/jwks.json
 AGENT_WORKSPACE_OAUTH_AUDIENCE=https://workspace.example/mcp
 AGENT_WORKSPACE_OAUTH_SCOPE=agent-workspace
 AGENT_WORKSPACE_ALLOWED_EMAILS=user1@example.com,user2@example.com
+AGENT_WORKSPACE_WEB_OIDC_CLIENT_ID=<oidc-client-id>
+AGENT_WORKSPACE_WEB_OIDC_CLIENT_SECRET=<oidc-client-secret-if-required>
+AGENT_WORKSPACE_WEB_SESSION_SECRET=<random-session-secret>
+AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY=<base64-32-byte-key>
 AGENT_WORKSPACE_MODAL_APP_NAME=agent-workspace
 HOST=0.0.0.0
 PORT=3000
@@ -54,9 +58,41 @@ AGENT_WORKSPACE_VERSION=<release/version>
 
 Sätt `AGENT_WORKSPACE_ALLOWED_EMAILS` till en kommaseparerad lista med de e-postadresser som får använda MCP-tjänsten under pilotfasen, till exempel `anna@example.com,bertil@example.com`. Matchning är case-insensitive och whitespace trimmas. När variabeln är satt får en giltigt autentiserad användare som saknar e-postclaim eller vars e-postadress inte finns i listan HTTP `403 Forbidden`. Om variabeln lämnas tom är allowlist-spärren avstängd.
 
-Detta är särskilt rekommenderat så länge DEV-011 är uppskjuten och flera tillåtna användare kan dela samma manuellt konfigurerade Modal execution account.
+Allowlisten ska användas under pilotfasen. Med personliga Modal credentials behöver de tillåtna användarna inte dela Modal-konto.
 
-## Execution credentials
+## Personliga Modal credentials
+
+Normal pilotdrift använder `/settings`. Användaren loggar in via OIDC och anger sin egen Modal API Token ID + Token Secret. Agent Workspace verifierar credentialsen mot Modal innan execution account markeras `CONNECTED`.
+
+Token-materialet krypteras med AES-256-GCM innan det lagras i PostgreSQL. `execution_account` lagrar endast en `credential_ref`. Token secret visas aldrig igen efter sparning.
+
+Generera master key en gång och spara den som Coolify secret:
+
+```bash
+openssl rand -base64 32
+```
+
+Resultatet sätts som `AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY`. Tappa inte bort eller byt nyckeln utan en planerad rotation, eftersom befintliga credentials annars inte kan dekrypteras.
+
+Generera även en separat web session secret, exempelvis:
+
+```bash
+openssl rand -base64 48
+```
+
+och sätt den som `AGENT_WORKSPACE_WEB_SESSION_SECRET`.
+
+Hos OIDC-providern registreras en web client med callback:
+
+```text
+https://workspace.example/settings/callback
+```
+
+Sätt client-id som `AGENT_WORKSPACE_WEB_OIDC_CLIENT_ID` och, för confidential clients, client secret som `AGENT_WORKSPACE_WEB_OIDC_CLIENT_SECRET`.
+
+### Legacy environment credentials
+
+Environment-baserade credentials stöds fortsatt för utveckling/bakåtkompatibilitet men rekommenderas inte för normal multi-user pilotdrift.
 
 V1 lagrar endast `credential_ref` i PostgreSQL. Själva Modal-credentials finns server-side. För en referens som:
 
@@ -79,7 +115,7 @@ AGENT_WORKSPACE_CREDENTIAL_MODAL_USER_1_TOKEN_ID=...
 AGENT_WORKSPACE_CREDENTIAL_MODAL_USER_1_TOKEN_SECRET=...
 ```
 
-Modal OAuth-länkning är fortfarande blockerad tills tredjeparts-OAuth-konfigurationen är tillgänglig; se DEV-011.
+Modal third-party OAuth är fortfarande uppskjutet; se DEV-011. Det behövs inte för att isolera pilotanvändarnas Modal-konton när varje användare konfigurerar sin egen API-token i `/settings`.
 
 ## PostgreSQL
 
@@ -96,8 +132,10 @@ Applikationscontainern lagrar inga projektfiler permanent. Workspace-data ligger
 5. Ange health path `/health`.
 6. Deploya.
 7. Verifiera `/health` = 200 och `/ready` = 200.
-8. Verifiera OAuth protected-resource metadata och därefter `/mcp` med giltigt token.
-9. Verifiera execution-provider connectivity med ett testkonto innan publikt bruk.
+8. Registrera OIDC web client med callback `/settings/callback` och verifiera inloggning till `/settings`.
+9. Verifiera att en allowlistad användare kan spara/testa sin egen Modal-token och att en ej allowlistad användare nekas.
+10. Verifiera OAuth protected-resource metadata och därefter `/mcp` med giltigt token.
+11. Verifiera att MCP-exekvering använder respektive användares personliga Modal-konto.
 
 ## Säkerhetsgräns
 
