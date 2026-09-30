@@ -5,7 +5,7 @@ phase: implementation
 active_work:
   selected_step: DEV-018
   in_progress: DEV-018
-  state: dev018_verification_pending
+  state: dev018_external_verification_pending
 completed_steps:
 - id: DEV-001
   verification: PASSED
@@ -47,6 +47,9 @@ completed_steps:
   verification: PASSED
   evidence: User verified DEV-014 locally and subsequently passed the DEV-016 authenticated Modal acceptance path covering representative npm, Maven, prototype, screenshot and cleanup flows.
 pending_steps:
+- id: DEV-018
+  verification: EXTERNAL_VERIFICATION_PENDING
+  reason: Automated tests and CI pass, but deployed OIDC/settings, real personal Modal token, two-user account isolation and disconnect still require external verification.
 - id: DEV-015
   verification: EXTERNAL_VERIFICATION_PENDING
   reason: Local DEV-015 tests passed, but the canonical verification requires a clean deployment to a real Coolify-like environment with PostgreSQL/OAuth configuration and health/auth/provider connectivity checks.
@@ -69,6 +72,7 @@ release_constraints:
 verification:
   last_result: DEVELOPMENT_AND_LOCAL_ACCEPTANCE_PASSED_RELEASE_GATES_PENDING
   passed:
+  - DEV-018 automated unit/type/build/auth/security/deployment/release checks passed in GitHub Actions run 36757092150.
   - User ran all local verification commands through DEV-016; all passed except the intentionally deferred DEV-011 flow.
   - DEV-017 local release-readiness command passed.
   - GitHub CI passed on merged main commit d3d55106bee3b393b5390151c2ef6fcbff87aab0.
