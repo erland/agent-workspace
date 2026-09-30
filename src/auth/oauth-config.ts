@@ -12,14 +12,18 @@ export interface RemoteOAuthConfig {
 
 export function loadRemoteOAuthConfig(env: NodeJS.ProcessEnv = process.env): RemoteOAuthConfig {
   const publicBaseUrl = requiredUrl(env.AGENT_WORKSPACE_PUBLIC_BASE_URL, "AGENT_WORKSPACE_PUBLIC_BASE_URL");
-  const issuer = requiredUrl(env.AGENT_WORKSPACE_OAUTH_ISSUER, "AGENT_WORKSPACE_OAUTH_ISSUER");
+  const issuer = env.AGENT_WORKSPACE_OAUTH_ISSUER
+    ? requiredUrl(env.AGENT_WORKSPACE_OAUTH_ISSUER, "AGENT_WORKSPACE_OAUTH_ISSUER")
+    : publicBaseUrl;
   const mcpUrl = new URL("/mcp", ensureTrailingSlash(publicBaseUrl)).toString();
   return {
     publicBaseUrl,
     mcpUrl,
     issuer,
     audience: env.AGENT_WORKSPACE_OAUTH_AUDIENCE ?? mcpUrl,
-    jwksUri: requiredUrl(env.AGENT_WORKSPACE_OAUTH_JWKS_URI, "AGENT_WORKSPACE_OAUTH_JWKS_URI"),
+    jwksUri: env.AGENT_WORKSPACE_OAUTH_JWKS_URI
+      ? requiredUrl(env.AGENT_WORKSPACE_OAUTH_JWKS_URI, "AGENT_WORKSPACE_OAUTH_JWKS_URI")
+      : new URL("/jwks", ensureTrailingSlash(publicBaseUrl)).toString(),
     requiredScope: env.AGENT_WORKSPACE_OAUTH_SCOPE ?? "agent-workspace",
     allowedEmails: parseEmailAllowlist(env.AGENT_WORKSPACE_ALLOWED_EMAILS),
     port: positiveInteger(env.PORT, 3000, "PORT"),
