@@ -25,18 +25,19 @@ describe("runtime profiles", () => {
   });
 
 
-  it("normalizes apt sources to HTTPS before apt-get update", () => {
+  it("uses prebuilt versioned GHCR images without per-workspace bootstrap", () => {
     for (const profile of Object.values(RUNTIME_PROFILES)) {
-      const command = profile.bootstrapCommands[0]?.argv.join(" ") ?? "";
-      const httpsRewrite = command.indexOf("s|http://|https://|g");
-      const aptUpdate = command.indexOf("apt-get update");
-      assert.ok(httpsRewrite >= 0, `${profile.id} must rewrite apt sources to HTTPS`);
-      assert.ok(aptUpdate > httpsRewrite, `${profile.id} must rewrite apt sources before apt-get update`);
+      assert.equal(
+        profile.imageRef,
+        `ghcr.io/erland/agent-workspace-runtime:${profile.id}-v1`
+      );
+      assert.deepEqual(profile.bootstrapCommands, []);
     }
   });
   it("resolves an explicitly requested Java 25 / Node 20 runtime", () => {
     const profile = resolveRuntimeProfile({ java: "25", node: "20" });
     assert.equal(profile.id, "java25-node20");
-    assert.equal(profile.imageRef, "eclipse-temurin:25-jdk-noble");
+    assert.equal(profile.imageRef, "ghcr.io/erland/agent-workspace-runtime:java25-node20-v1");
+    assert.deepEqual(profile.bootstrapCommands, []);
   });
 });
