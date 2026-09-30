@@ -207,7 +207,11 @@ Production `agent-workspace` is a single Node 22 application container plus exte
 
 Pilot users may connect their own Modal account without Modal third-party OAuth by entering a normal Modal API Token ID + Token Secret in the authenticated `/settings` page.
 
-The web flow uses the configured OIDC issuer with Authorization Code + PKCE. No OAuth access/id token is persisted in the browser session; Agent Workspace stores a signed HttpOnly/Secure application session cookie.
+Agent Workspace is the OAuth authorization server for both MCP and settings. Google is an upstream OpenID Connect identity provider used only to authenticate the human. After Google login, Agent Workspace issues its own access/refresh tokens for the MCP resource and uses the same upstream identity in the settings session.
+
+MCP authorization uses RFC 9728 protected-resource metadata plus RFC 8414 authorization-server metadata. Authorization Code + PKCE S256 is mandatory. Access tokens are short-lived Ed25519-signed JWTs with audience bound to the exact MCP resource. Authorization codes and refresh tokens are opaque, stored only as SHA-256 hashes, and consumed once; refresh is rotation-based.
+
+Public MCP clients can use Dynamic Client Registration. Client ID Metadata Documents are accepted only from explicitly configured trusted origins, avoiding arbitrary server-side metadata fetching.
 
 Credential storage:
 
@@ -227,3 +231,27 @@ app_user
 The encryption master key is supplied only through `AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY`. The encrypted store remains behind `ExecutionAccountCredentialStore`, allowing later replacement with an external secret manager without changing domain or MCP layers.
 
 Legacy `env:` credential references remain readable for development/backward compatibility. New user-managed credentials are persistent encrypted records.
+
+
+## 13. Authentication topology
+
+```text
+MCP client                         Browser
+    |                                 |
+    | RFC 9728 / RFC 8414             | /settings/login
+    v                                 v
+Agent Workspace OAuth Authorization Server
+    |
+    | Google OAuth/OIDC
+    v
+Google account
+    |
+    v
+Agent Workspace identity (Google issuer + subject)
+    |
+    +--> local JWT access token --> /mcp
+    |
+    +--> signed web session ------> /settings
+```
+
+Google credentials are never accepted directly by `/mcp`. This keeps resource/audience/scope enforcement under Agent Workspace control while retaining Google as the single human identity source.
