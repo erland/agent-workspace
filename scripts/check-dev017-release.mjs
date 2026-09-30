@@ -15,7 +15,8 @@ const requiredFiles = [
   "docs/release-readiness.md",
   "runtime-images/Dockerfile",
   "runtime-images/version.txt",
-  ".github/workflows/runtime-images.yml"
+  ".github/workflows/runtime-images.yml",
+  ".github/workflows/release-image.yml"
 ];
 
 for (const path of requiredFiles) {
@@ -74,6 +75,23 @@ if (!runtimeWorkflow.includes("packages: write")) {
 }
 if (runtimeWorkflow.includes("MODAL_TOKEN_ID") || runtimeWorkflow.includes("MODAL_TOKEN_SECRET")) {
   throw new Error("Runtime image workflow must not require Modal credentials");
+}
+
+const releaseWorkflow = await readFile(".github/workflows/release-image.yml", "utf8");
+for (const required of [
+  "release:",
+  "types: [published]",
+  "packages: write",
+  "github.event.release.tag_name",
+  "ghcr.io/",
+  "AGENT_WORKSPACE_VERSION"
+]) {
+  if (!releaseWorkflow.includes(required)) {
+    throw new Error(`Release image workflow is missing required release behavior: ${required}`);
+  }
+}
+if (releaseWorkflow.includes("MODAL_TOKEN_ID") || releaseWorkflow.includes("MODAL_TOKEN_SECRET")) {
+  throw new Error("Application release image workflow must not require Modal credentials");
 }
 
 const status = await readFile(".system-builder/work-status.yaml", "utf8");
