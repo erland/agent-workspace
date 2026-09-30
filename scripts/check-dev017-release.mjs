@@ -12,7 +12,10 @@ const requiredFiles = [
   "docs/security-baseline.md",
   "docs/coolify-deployment.md",
   "docs/dev-017-verification.md",
-  "docs/release-readiness.md"
+  "docs/release-readiness.md",
+  "runtime-images/Dockerfile",
+  "runtime-images/version.txt",
+  ".github/workflows/runtime-images.yml"
 ];
 
 for (const path of requiredFiles) {
@@ -54,6 +57,23 @@ for (const name of [
   if (!envExample.includes(`${name}=`)) {
     throw new Error(`.env.example is missing ${name}`);
   }
+}
+
+const runtimeProfile = await readFile("src/core/runtime-profile.ts", "utf8");
+const runtimeVersion = (await readFile("runtime-images/version.txt", "utf8")).trim();
+if (!runtimeVersion || !runtimeProfile.includes(`DEFAULT_RUNTIME_IMAGE_VERSION = "${runtimeVersion}"`)) {
+  throw new Error("runtime-images/version.txt must match DEFAULT_RUNTIME_IMAGE_VERSION");
+}
+if (!runtimeProfile.includes("bootstrapCommands: []")) {
+  throw new Error("Runtime profiles must not reinstall the fixed toolchain during workspace startup");
+}
+
+const runtimeWorkflow = await readFile(".github/workflows/runtime-images.yml", "utf8");
+if (!runtimeWorkflow.includes("packages: write")) {
+  throw new Error("Runtime image workflow must have packages: write permission");
+}
+if (runtimeWorkflow.includes("MODAL_TOKEN_ID") || runtimeWorkflow.includes("MODAL_TOKEN_SECRET")) {
+  throw new Error("Runtime image workflow must not require Modal credentials");
 }
 
 const status = await readFile(".system-builder/work-status.yaml", "utf8");
