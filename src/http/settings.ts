@@ -35,8 +35,8 @@ export function createSettingsHandler(deps: SettingsDependencies) {
     if (request.method === "GET" && url.pathname === "/settings") {
       const status = await deps.modalCredentials.status(user.id);
       return html(renderSettings({
-        email: session.principal.email,
-        displayName: session.principal.displayName,
+        ...(session.principal.email ? { email: session.principal.email } : {}),
+        ...(session.principal.displayName ? { displayName: session.principal.displayName } : {}),
         csrf: session.csrf,
         connected: status.connected,
         ...(status.updatedAt ? { updatedAt: status.updatedAt } : {}),
