@@ -42,6 +42,7 @@ export function loadWebOidcConfig(
   env: NodeJS.ProcessEnv = process.env
 ): WebOidcConfig | undefined {
   const clientId = env.AGENT_WORKSPACE_WEB_OIDC_CLIENT_ID?.trim();
+  const clientSecret = env.AGENT_WORKSPACE_WEB_OIDC_CLIENT_SECRET?.trim();
   const sessionSecret = env.AGENT_WORKSPACE_WEB_SESSION_SECRET?.trim();
   if (!clientId && !sessionSecret) return undefined;
   if (!clientId || !sessionSecret) {
@@ -54,9 +55,7 @@ export function loadWebOidcConfig(
     issuer: oauth.issuer,
     jwksUri: oauth.jwksUri,
     clientId,
-    ...(env.AGENT_WORKSPACE_WEB_OIDC_CLIENT_SECRET?.trim()
-      ? { clientSecret: env.AGENT_WORKSPACE_WEB_OIDC_CLIENT_SECRET.trim() }
-      : {}),
+    ...(clientSecret ? { clientSecret } : {}),
     redirectUri: new URL("/settings/callback", oauth.publicBaseUrl).toString(),
     sessionSecret,
     allowedEmails: oauth.allowedEmails ?? []
@@ -154,10 +153,7 @@ export class WebOidcAuth {
       status: 302,
       headers: {
         location: "/settings",
-        "set-cookie": [
-          cookie("aw_session", this.sign(session), 8 * 60 * 60),
-          cookie("aw_login", "", 0)
-        ].join(", ")
+        "set-cookie": cookie("aw_session", this.sign(session), 8 * 60 * 60)
       }
     });
   }
@@ -178,7 +174,7 @@ export class WebOidcAuth {
 
   private async discovery(): Promise<DiscoveryDocument> {
     this.discoveryPromise ??= (async () => {
-      const url = new URL("/.well-known/openid-configuration", ensureTrailingSlash(this.config.issuer));
+      const url = new URL(".well-known/openid-configuration", ensureTrailingSlash(this.config.issuer));
       const response = await fetch(url);
       if (!response.ok) throw new Error("OIDC discovery failed");
       const doc = await response.json() as Partial<DiscoveryDocument>;
