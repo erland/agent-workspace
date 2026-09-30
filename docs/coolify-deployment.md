@@ -82,13 +82,34 @@ openssl rand -base64 48
 
 och sätt den som `AGENT_WORKSPACE_WEB_SESSION_SECRET`.
 
-Hos OIDC-providern registreras en web client med callback:
+I Google Cloud Console skapas en OAuth 2.0 Client ID av typen **Web application**. Registrera exakt:
 
 ```text
-https://workspace.example/settings/callback
+https://workspace.example/auth/google/callback
 ```
 
-Sätt client-id som `AGENT_WORKSPACE_WEB_OIDC_CLIENT_ID` och, för confidential clients, client secret som `AGENT_WORKSPACE_WEB_OIDC_CLIENT_SECRET`.
+som Authorized redirect URI. Sätt client-id och secret som `AGENT_WORKSPACE_GOOGLE_CLIENT_ID` och `AGENT_WORKSPACE_GOOGLE_CLIENT_SECRET`.
+
+Agent Workspace utfärdar därefter egna MCP-access tokens. Generera den signerande Ed25519-nyckeln:
+
+```bash
+openssl genpkey -algorithm ED25519 -outform DER | openssl base64 -A
+```
+
+och lagra resultatet som `AGENT_WORKSPACE_AUTH_SIGNING_KEY`. Den publika nyckeln exponeras automatiskt via `/jwks`; den privata nyckeln lämnar aldrig servermiljön.
+
+OAuth-servern exponerar bland annat:
+
+```text
+/.well-known/oauth-authorization-server
+/.well-known/oauth-protected-resource/mcp
+/authorize
+/token
+/register
+/jwks
+```
+
+Dynamic Client Registration stöds för kompatibla MCP-klienter. Om en klient använder Client ID Metadata Documents måste dess HTTPS-origin först anges i `AGENT_WORKSPACE_OAUTH_CLIENT_METADATA_ORIGINS`.
 
 ### Legacy environment credentials
 
@@ -132,10 +153,13 @@ Applikationscontainern lagrar inga projektfiler permanent. Workspace-data ligger
 5. Ange health path `/health`.
 6. Deploya.
 7. Verifiera `/health` = 200 och `/ready` = 200.
-8. Registrera OIDC web client med callback `/settings/callback` och verifiera inloggning till `/settings`.
-9. Verifiera att en allowlistad användare kan spara/testa sin egen Modal-token och att en ej allowlistad användare nekas.
-10. Verifiera OAuth protected-resource metadata och därefter `/mcp` med giltigt token.
-11. Verifiera att MCP-exekvering använder respektive användares personliga Modal-konto.
+8. Registrera Google Web OAuth client med callback `/auth/google/callback`.
+9. Verifiera RFC 8414 metadata, JWKS och RFC 9728 protected-resource metadata.
+10. Verifiera ett fullständigt MCP Authorization Code + PKCE-flöde via Google och att lokalt utfärdad token accepteras av `/mcp`.
+11. Verifiera inloggning till `/settings` med samma Google-identitet.
+12. Verifiera att en allowlistad användare kan spara/testa sin egen Modal-token och att en ej allowlistad användare nekas.
+13. Verifiera två användare mot två skilda Modal-konton.
+14. Verifiera refresh-tokenrotation och reconnect efter service-restart.
 
 ## Säkerhetsgräns
 
