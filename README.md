@@ -294,3 +294,36 @@ Internet → Coolify Traefik → Agent Workspace :3000 → external PostgreSQL
 ```
 
 No Nginx layer is required inside the Agent Workspace container. PostgreSQL is not bundled with the application image; point `DATABASE_URL` at the separate database.
+
+
+## Prebuilt Modal runtime images
+
+Workspace startup does not install Java, Node, Maven, Playwright or Chromium. Six prebuilt runtime images are published to GitHub Container Registry by `.github/workflows/runtime-images.yml`:
+
+```text
+java17-node20
+java17-node22
+java21-node20
+java21-node22
+java25-node20
+java25-node22
+```
+
+The published tags follow:
+
+```text
+ghcr.io/erland/agent-workspace-runtime:<runtime-profile>-v<runtime-images/version.txt>
+```
+
+GitHub Actions publishes these images using the repository `GITHUB_TOKEN`; no Modal credentials are stored in GitHub. The GHCR package must be public so users' separate Modal accounts can resolve it anonymously. After the package is first created, verify its package visibility in GitHub and set it to **Public** if necessary.
+
+Agent Workspace passes the registry reference to Modal with `images.fromRegistry()`. Modal may build/cache its internal immutable Image in each user's Modal context; subsequent sandboxes for that user can reuse the same runtime recipe rather than reinstalling the toolchain.
+
+Runtime image selection can be overridden for forks or staged rollouts:
+
+```text
+AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX=ghcr.io/OWNER/agent-workspace-runtime
+AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION=1
+```
+
+When the runtime recipe changes, increment `runtime-images/version.txt` and update the application runtime image version in the same change. Do not repurpose an existing version intentionally.
