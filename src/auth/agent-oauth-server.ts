@@ -203,7 +203,8 @@ export class AgentOAuthServer {
   async verifyLocalAccessToken(token: string) {
     return jwtVerify(token, this.publicKey, {
       issuer: this.config.issuer,
-      audience: this.config.mcpUrl
+      audience: this.config.mcpUrl,
+      currentDate: this.now()
     });
   }
 
