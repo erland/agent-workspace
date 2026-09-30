@@ -11,9 +11,11 @@ RUN npm run build
 RUN npm prune --omit=dev
 
 FROM node:22-bookworm-slim AS runtime
+ARG AGENT_WORKSPACE_VERSION=dev
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
-    PORT=3000
+    PORT=3000 \
+    AGENT_WORKSPACE_VERSION=${AGENT_WORKSPACE_VERSION}
 WORKDIR /app
 
 COPY --from=build /app/package.json /app/package-lock.json ./
