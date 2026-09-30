@@ -22,6 +22,11 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Generate lockfile candidate
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          echo "LOCKFILE_BASE64=$(base64 -w0 package-lock.json)"
+
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
