@@ -259,7 +259,15 @@ npm run verify:dev014
 
 ## Coolify deployment (DEV-015)
 
-Production deployment uses the repository `Dockerfile` and an external PostgreSQL database. The application host does not run user code and does not need Docker socket, Java, Maven or Chromium.
+Production releases publish the application `Dockerfile` as a versioned GHCR image. A GitHub Release tagged, for example, `v1.2.0` publishes:
+
+```text
+ghcr.io/erland/agent-workspace:v1.2.0
+```
+
+Coolify should deploy that exact immutable release tag rather than rebuilding the repository source. The release tag is also embedded as `AGENT_WORKSPACE_VERSION` in the image.
+
+The deployment uses an external PostgreSQL database. The application host does not run user code and does not need Docker socket, Java, Maven or Chromium.
 
 Health endpoints:
 

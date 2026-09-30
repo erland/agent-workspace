@@ -35,7 +35,17 @@ Apphosten behöver därför **inte**:
 
 ## Build och start
 
-Bygg från repositoryts `Dockerfile`. Imagen kör migrationer före serverstart och startar därefter `dist/mcp/remote.js`.
+Vid publicering av en GitHub Release bygger workflowen `.github/workflows/release-image.yml` repositoryts `Dockerfile` och publicerar en versionslåst applikationsimage till GHCR:
+
+```text
+ghcr.io/erland/agent-workspace:<release-tag>
+```
+
+Exempel: releasen `v1.2.0` skapar `ghcr.io/erland/agent-workspace:v1.2.0`.
+
+Release-taggen byggs även in som `AGENT_WORKSPACE_VERSION` i imagen. Workflowen checkar ut exakt release-taggen, så imagen motsvarar den publicerade releasen.
+
+För produktionsdeploy ska Coolify använda den färdigbyggda GHCR-imagen i stället för att bygga källkoden själv. Imagen kör migrationer före serverstart och startar därefter `dist/mcp/remote.js`.
 
 Standardport är `3000`. Den porten är endast applikationens interna lyssningsport. Coolify ska routa den publika HTTPS-domänen via Traefik till containerport `3000`.
 
@@ -181,21 +191,22 @@ Applikationscontainern lagrar inga projektfiler permanent. Workspace-data ligger
 ## Coolify-konfiguration
 
 1. Säkerställ att den separata PostgreSQL-databasen är nåbar från Coolify-hostens Docker-nätverk eller via dess nätverksadress.
-2. Skapa Application från Git-repot och välj Dockerfile build pack.
-3. Lägg in environment variables/secrets ovan, inklusive `DATABASE_URL` till den separata databasen.
+2. Skapa en Docker Image-baserad Application i Coolify och ange `ghcr.io/erland/agent-workspace:<release-tag>`.
+3. Lägg in environment variables/secrets ovan, inklusive `DATABASE_URL` till den separata databasen. `AGENT_WORKSPACE_VERSION` behöver normalt inte sättas manuellt eftersom release-taggen redan är inbyggd i imagen.
 4. Ange applikationens interna port som `3000` och koppla önskad `https://`-domän till applikationen.
 5. Lägg inte till någon host-port mapping för `3000`.
 6. Låt Coolifys Traefik-proxy hantera TLS och publik ingress på 80/443.
 7. Ange health path `/health`.
-8. Deploya.
-9. Verifiera att `/health` = 200 och `/ready` = 200 via den publika HTTPS-domänen.
-10. Registrera Google Web OAuth client med callback `/auth/google/callback`.
-11. Verifiera RFC 8414 metadata, JWKS och RFC 9728 protected-resource metadata.
-12. Verifiera ett fullständigt MCP Authorization Code + PKCE-flöde via Google och att lokalt utfärdad token accepteras av `/mcp`.
-13. Verifiera inloggning till `/settings` med samma Google-identitet.
-14. Verifiera att en allowlistad användare kan spara/testa sin egen Modal-token och att en ej allowlistad användare nekas.
-15. Verifiera två användare mot två skilda Modal-konton.
-16. Verifiera refresh-tokenrotation och reconnect efter service-restart.
+8. Publicera önskad GitHub Release och kontrollera att workflowen **Release Application Image** har publicerat motsvarande GHCR-tag.
+9. Deploya exakt den release-taggen i Coolify.
+10. Verifiera att `/health` = 200 och `/ready` = 200 via den publika HTTPS-domänen.
+11. Registrera Google Web OAuth client med callback `/auth/google/callback`.
+12. Verifiera RFC 8414 metadata, JWKS och RFC 9728 protected-resource metadata.
+13. Verifiera ett fullständigt MCP Authorization Code + PKCE-flöde via Google och att lokalt utfärdad token accepteras av `/mcp`.
+14. Verifiera inloggning till `/settings` med samma Google-identitet.
+15. Verifiera att en allowlistad användare kan spara/testa sin egen Modal-token och att en ej allowlistad användare nekas.
+16. Verifiera två användare mot två skilda Modal-konton.
+17. Verifiera refresh-tokenrotation och reconnect efter service-restart.
 
 ## Säkerhetsgräns
 
