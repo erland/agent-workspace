@@ -4,6 +4,7 @@ import { constants } from "node:fs";
 const requiredFiles = [
   "README.md",
   "Dockerfile",
+  "package-lock.json",
   ".env.example",
   "docs/functional-specification.md",
   "docs/architecture.md",
