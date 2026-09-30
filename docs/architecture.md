@@ -87,6 +87,24 @@ V1 stödjer bara Modal. Datamodellen ska inte kräva att en användare har flera
 
 ## 5. Runtime-profiler
 
+Runtime toolchains are prebuilt outside Modal job execution and published as public GHCR images. Agent Workspace does not run apt/npm/Playwright installation during normal workspace creation.
+
+```text
+GitHub Actions
+   |
+   +--> ghcr.io/erland/agent-workspace-runtime:java21-node22-v1
+                                                    |
+                                                    v
+                                      Modal images.fromRegistry()
+                                                    |
+                                      per-account Modal image cache
+                                                    |
+                                                    v
+                                                Sandbox
+```
+
+No Modal credential is stored in GitHub. Runtime publication uses GitHub's repository-scoped `GITHUB_TOKEN`. Because pilot users execute in separate Modal accounts, the GHCR runtime package must allow anonymous pulls.
+
 Extern modell:
 
 ```text
@@ -109,6 +127,8 @@ explicit request
 Java metadata kan inkludera relevanta `pom.xml` properties. Node metadata kan inkludera `package.json engines.node`, `.nvmrc`, `.node-version` och Volta-konfiguration.
 
 Ett workspace får en låst runtime-profil vid creation. Upload kan rapportera mismatch men får inte tyst byta profil.
+
+Each profile resolves to a versioned registry tag such as `ghcr.io/erland/agent-workspace-runtime:java21-node22-v1`. The runtime image already contains JDK, Node/npm, Maven, unzip, Playwright and Chromium. `bootstrapCommands` is intentionally empty in production runtime profiles.
 
 ## 6. Workspace state
 
@@ -201,3 +221,57 @@ Workspace rows are ownership-scoped by `user_id` and contain enough provider met
 Production `agent-workspace` is a single Node 22 application container plus external PostgreSQL. The application container contains only the control plane. It never mounts Docker socket and does not contain Java, Maven, Chromium or user-project build tooling. User code execution remains behind `SandboxProvider` (Modal in v1).
 
 `/health` is an unauthenticated liveness endpoint. `/ready` verifies PostgreSQL connectivity. The MCP endpoint remains OAuth protected at `/mcp`.
+
+
+## 12. Personal Modal credential settings
+
+Pilot users may connect their own Modal account without Modal third-party OAuth by entering a normal Modal API Token ID + Token Secret in the authenticated `/settings` page.
+
+Agent Workspace is the OAuth authorization server for both MCP and settings. Google is an upstream OpenID Connect identity provider used only to authenticate the human. After Google login, Agent Workspace issues its own access/refresh tokens for the MCP resource and uses the same upstream identity in the settings session.
+
+MCP authorization uses RFC 9728 protected-resource metadata plus RFC 8414 authorization-server metadata. Authorization Code + PKCE S256 is mandatory. Access tokens are short-lived Ed25519-signed JWTs with audience bound to the exact MCP resource. Authorization codes and refresh tokens are opaque, stored only as SHA-256 hashes, and consumed once; refresh is rotation-based.
+
+Public MCP clients can use Dynamic Client Registration. Client ID Metadata Documents are accepted only from explicitly configured trusted origins, avoiding arbitrary server-side metadata fetching.
+
+Credential storage:
+
+```text
+app_user
+  └── execution_account
+       └── credential_ref = secret:modal:<user-id>
+                |
+                v
+        execution_credential
+        AES-256-GCM ciphertext
+                |
+                v
+        ModalSandboxProvider
+```
+
+The encryption master key is supplied only through `AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY`. The encrypted store remains behind `ExecutionAccountCredentialStore`, allowing later replacement with an external secret manager without changing domain or MCP layers.
+
+Legacy `env:` credential references remain readable for development/backward compatibility. New user-managed credentials are persistent encrypted records.
+
+
+## 13. Authentication topology
+
+```text
+MCP client                         Browser
+    |                                 |
+    | RFC 9728 / RFC 8414             | /settings/login
+    v                                 v
+Agent Workspace OAuth Authorization Server
+    |
+    | Google OAuth/OIDC
+    v
+Google account
+    |
+    v
+Agent Workspace identity (Google issuer + subject)
+    |
+    +--> local JWT access token --> /mcp
+    |
+    +--> signed web session ------> /settings
+```
+
+Google credentials are never accepted directly by `/mcp`. This keeps resource/audience/scope enforcement under Agent Workspace control while retaining Google as the single human identity source.

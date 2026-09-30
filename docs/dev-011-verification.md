@@ -67,9 +67,9 @@ The live smoke creates an independent `ModalClient` for each execution account, 
 
 The public Modal SDK documentation confirms how to consume OAuth refresh credentials, but it does not document a self-service third-party OAuth application registration flow, authorization endpoint setup, or provider-side revocation workflow in enough detail to complete account-linking without Modal-issued integration credentials.
 
-Therefore DEV-011 must remain `verification_pending` until:
+DEV-011 remains `verification_pending` for the future third-party OAuth onboarding path until:
 
 1. Modal issues/approves an OAuth client for Agent Workspace (or documents a public registration path), and
 2. two distinct Modal test users complete authorization and `npm run verify:dev011` passes.
 
-This is an external feasibility dependency, not a reason to fall back to shared service-account credentials. For local development, the existing API-token/profile flow remains supported.
+This is no longer a prerequisite for per-user isolation in the pilot. DEV-018 provides a user-managed personal Modal API-token flow with encrypted server-side storage, so distinct pilot users can execute in distinct Modal accounts. DEV-011 remains valuable for eliminating manual token creation/copying in a later onboarding flow.

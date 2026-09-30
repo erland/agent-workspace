@@ -15,6 +15,11 @@ export interface ExecutionAccountCredentialStore {
   getModalCredentials(credentialRef: string): Promise<ModalExecutionCredentials>;
 }
 
+export interface MutableExecutionAccountCredentialStore extends ExecutionAccountCredentialStore {
+  putModalToken(userId: string, tokenId: string, tokenSecret: string): Promise<string>;
+  deleteCredentials(credentialRef: string): Promise<void>;
+}
+
 export type ModalExecutionCredentials =
   | {
       kind: "oauth";

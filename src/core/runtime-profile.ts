@@ -1,5 +1,3 @@
-import type { Command } from "./sandbox-provider.js";
-
 export const SUPPORTED_JAVA_VERSIONS = ["17", "21", "25"] as const;
 export const SUPPORTED_NODE_VERSIONS = ["20", "22"] as const;
 
@@ -12,7 +10,7 @@ export interface RuntimeProfile {
   java: JavaVersion;
   node: NodeVersion;
   imageRef: string;
-  bootstrapCommands: readonly Command[];
+  bootstrapCommands: readonly [];
 }
 
 export interface RuntimeRequest {
@@ -24,42 +22,20 @@ export const DEFAULT_JAVA_VERSION: JavaVersion = "21";
 export const DEFAULT_NODE_VERSION: NodeVersion = "22";
 export const DEFAULT_RUNTIME_PROFILE_ID: RuntimeProfileId = "java21-node22";
 
+export const DEFAULT_RUNTIME_IMAGE_PREFIX = "ghcr.io/erland/agent-workspace-runtime";
+export const DEFAULT_RUNTIME_IMAGE_VERSION = "1";
+
 function createProfile(java: JavaVersion, node: NodeVersion): RuntimeProfile {
   const id = `java${java}-node${node}` as RuntimeProfileId;
+  const prefix = process.env.AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX ?? DEFAULT_RUNTIME_IMAGE_PREFIX;
+  const version = process.env.AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION ?? DEFAULT_RUNTIME_IMAGE_VERSION;
 
   return {
     id,
     java,
     node,
-    // Start from the requested JDK. Node and Maven are bootstrapped by provider-controlled
-    // commands. This is intentionally simple for v1; published prebuilt images can replace
-    // the bootstrap later without changing the workspace/domain API.
-    imageRef: `eclipse-temurin:${java}-jdk-noble`,
-    bootstrapCommands: [
-      {
-        argv: [
-          "bash",
-          "-lc",
-          [
-            "set -euo pipefail",
-            "export DEBIAN_FRONTEND=noninteractive",
-            // Modal's domain allowlist governs outbound TLS traffic on port 443.
-            // Ubuntu's stock sources may still use http://, so normalize all apt
-            // source files to HTTPS before the first apt-get update.
-            "find /etc/apt -type f \\( -name '*.list' -o -name '*.sources' \\) -exec sed -i 's|http://|https://|g' {} +",
-            "apt-get update",
-            "apt-get install -y --no-install-recommends ca-certificates curl gnupg maven unzip",
-            `curl -fsSL https://deb.nodesource.com/setup_${node}.x | bash -`,
-            "apt-get install -y --no-install-recommends nodejs",
-            "mkdir -p /opt/agent-workspace/browser-tools",
-            "npm install --prefix /opt/agent-workspace/browser-tools playwright@1.55.0",
-            "/opt/agent-workspace/browser-tools/node_modules/.bin/playwright install --with-deps chromium",
-            "rm -rf /var/lib/apt/lists/*"
-          ].join(" && ")
-        ],
-        timeoutMs: 5 * 60 * 1000
-      }
-    ]
+    imageRef: `${prefix}:${id}-v${version}`,
+    bootstrapCommands: []
   };
 }
 

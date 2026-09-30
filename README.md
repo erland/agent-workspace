@@ -8,9 +8,41 @@ The repository is implemented step-by-step according to `docs/development-plan.m
 
 The v1 implementation and local acceptance are complete, and deterministic CI is green. Repository/artifact readiness is **READY_WITH_WARNINGS**.
 
-Full production deployment readiness is **NOT_READY** until the remaining external gates are evidenced: DEV-011 Modal account-linking feasibility, DEV-015 real deployment verification, and DEV-016 remote acceptance against the deployed OAuth-protected MCP endpoint.
+Full production deployment readiness is **NOT_READY** until DEV-018 deployed settings/personal-credential acceptance, DEV-015 real deployment verification, and DEV-016 remote acceptance against the deployed OAuth-protected MCP endpoint are evidenced. DEV-011 third-party Modal OAuth remains a future onboarding improvement, not a prerequisite for per-user pilot isolation.
 
 See `docs/release-readiness.md` for the canonical readiness decision.
+
+## Authentication and personal Modal credentials
+
+Agent Workspace can act as its own OAuth authorization server for both the remote MCP endpoint and the `/settings` UI. Google is used only as the upstream identity provider. Agent Workspace issues resource-bound access tokens for `/mcp`, so the Google token is never reused as an MCP bearer token.
+
+The flow is:
+
+```text
+Google account
+    ↓
+Agent Workspace /authorize
+    ↓
+Agent Workspace access/refresh tokens
+    ├── /mcp
+    └── /settings session
+```
+
+The OAuth server publishes RFC 8414 metadata and JWKS, requires PKCE S256, binds access tokens to the MCP resource, rotates one-time refresh tokens, supports Dynamic Client Registration for compatible MCP clients, and can accept Client ID Metadata Documents from explicitly trusted origins.
+
+Pilot users configure their own Modal API Token ID + Token Secret at `/settings`. Modal credential material is verified before the account becomes connected and is stored AES-256-GCM encrypted in PostgreSQL; `execution_account` contains only a `credentialRef`.
+
+Required production settings:
+
+```text
+AGENT_WORKSPACE_GOOGLE_CLIENT_ID=...
+AGENT_WORKSPACE_GOOGLE_CLIENT_SECRET=...
+AGENT_WORKSPACE_AUTH_SIGNING_KEY=...          # Base64 PKCS#8 DER Ed25519 key
+AGENT_WORKSPACE_WEB_SESSION_SECRET=...
+AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY=... # Base64, exactly 32 decoded bytes
+```
+
+Register `https://<public-host>/auth/google/callback` as the Google OAuth redirect URI.
 
 
 ## DEV-001 development setup
@@ -251,3 +283,47 @@ The command runs unit tests, typecheck, production build, MCP contract tests, au
 DEV-011 remains a documented exception while Modal third-party OAuth/account-linking feasibility is deferred. This does not block continued release-candidate preparation, but it does block claiming that the complete multi-user production account-linking flow has been verified.
 
 See `docs/dev-017-verification.md` for the release checklist and exact limitation.
+
+
+## Recommended Coolify topology
+
+Production deployment should expose only Coolify's HTTPS reverse proxy publicly. The Node service listens on container port `3000` and should not use a host mapping such as `3000:3000`.
+
+```text
+Internet → Coolify Traefik → Agent Workspace :3000 → external PostgreSQL
+```
+
+No Nginx layer is required inside the Agent Workspace container. PostgreSQL is not bundled with the application image; point `DATABASE_URL` at the separate database.
+
+
+## Prebuilt Modal runtime images
+
+Workspace startup does not install Java, Node, Maven, Playwright or Chromium. Six prebuilt runtime images are published to GitHub Container Registry by `.github/workflows/runtime-images.yml`:
+
+```text
+java17-node20
+java17-node22
+java21-node20
+java21-node22
+java25-node20
+java25-node22
+```
+
+The published tags follow:
+
+```text
+ghcr.io/erland/agent-workspace-runtime:<runtime-profile>-v<runtime-images/version.txt>
+```
+
+GitHub Actions publishes these images using the repository `GITHUB_TOKEN`; no Modal credentials are stored in GitHub. The GHCR package must be public so users' separate Modal accounts can resolve it anonymously. After the package is first created, verify its package visibility in GitHub and set it to **Public** if necessary.
+
+Agent Workspace passes the registry reference to Modal with `images.fromRegistry()`. Modal may build/cache its internal immutable Image in each user's Modal context; subsequent sandboxes for that user can reuse the same runtime recipe rather than reinstalling the toolchain.
+
+Runtime image selection can be overridden for forks or staged rollouts:
+
+```text
+AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX=ghcr.io/OWNER/agent-workspace-runtime
+AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION=1
+```
+
+When the runtime recipe changes, increment `runtime-images/version.txt` and update the application runtime image version in the same change. Do not repurpose an existing version intentionally.

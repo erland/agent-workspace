@@ -12,7 +12,10 @@ const requiredFiles = [
   "docs/security-baseline.md",
   "docs/coolify-deployment.md",
   "docs/dev-017-verification.md",
-  "docs/release-readiness.md"
+  "docs/release-readiness.md",
+  "runtime-images/Dockerfile",
+  "runtime-images/version.txt",
+  ".github/workflows/runtime-images.yml"
 ];
 
 for (const path of requiredFiles) {
@@ -43,14 +46,34 @@ const envExample = await readFile(".env.example", "utf8");
 for (const name of [
   "DATABASE_URL",
   "AGENT_WORKSPACE_PUBLIC_BASE_URL",
-  "AGENT_WORKSPACE_OAUTH_ISSUER",
   "AGENT_WORKSPACE_OAUTH_AUDIENCE",
-  "AGENT_WORKSPACE_OAUTH_JWKS_URI",
-  "AGENT_WORKSPACE_OAUTH_SCOPE"
+  "AGENT_WORKSPACE_OAUTH_SCOPE",
+  "AGENT_WORKSPACE_GOOGLE_CLIENT_ID",
+  "AGENT_WORKSPACE_GOOGLE_CLIENT_SECRET",
+  "AGENT_WORKSPACE_AUTH_SIGNING_KEY",
+  "AGENT_WORKSPACE_WEB_SESSION_SECRET",
+  "AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY"
 ]) {
   if (!envExample.includes(`${name}=`)) {
     throw new Error(`.env.example is missing ${name}`);
   }
+}
+
+const runtimeProfile = await readFile("src/core/runtime-profile.ts", "utf8");
+const runtimeVersion = (await readFile("runtime-images/version.txt", "utf8")).trim();
+if (!runtimeVersion || !runtimeProfile.includes(`DEFAULT_RUNTIME_IMAGE_VERSION = "${runtimeVersion}"`)) {
+  throw new Error("runtime-images/version.txt must match DEFAULT_RUNTIME_IMAGE_VERSION");
+}
+if (!runtimeProfile.includes("bootstrapCommands: []")) {
+  throw new Error("Runtime profiles must not reinstall the fixed toolchain during workspace startup");
+}
+
+const runtimeWorkflow = await readFile(".github/workflows/runtime-images.yml", "utf8");
+if (!runtimeWorkflow.includes("packages: write")) {
+  throw new Error("Runtime image workflow must have packages: write permission");
+}
+if (runtimeWorkflow.includes("MODAL_TOKEN_ID") || runtimeWorkflow.includes("MODAL_TOKEN_SECRET")) {
+  throw new Error("Runtime image workflow must not require Modal credentials");
 }
 
 const status = await readFile(".system-builder/work-status.yaml", "utf8");
@@ -62,4 +85,4 @@ if (status.includes("id: DEV-011\n  verification: PASSED")) {
 }
 
 console.log("DEV-017 release-readiness static checks passed.");
-console.log("Note: DEV-011 remains deferred and is still required before claiming the complete production account-linking flow is verified.");
+console.log("Note: DEV-011 remains deferred only for Modal third-party OAuth onboarding; DEV-018 external deployment verification remains required for the personal-token pilot path.");

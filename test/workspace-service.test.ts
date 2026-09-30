@@ -52,8 +52,8 @@ describe("WorkspaceService", () => {
     assert.equal(workspace.status, "READY");
     assert.equal(workspace.runtimeProfile, "java21-node22");
     assert.equal(workspace.expiresAt, "2026-09-29T12:30:00.000Z");
-    assert.equal(provider.creates[0]?.imageRef, "eclipse-temurin:21-jdk-noble");
-    assert.equal(provider.commands.length, 1);
+    assert.equal(provider.creates[0]?.imageRef, "ghcr.io/erland/agent-workspace-runtime:java21-node22-v1");
+    assert.equal(provider.commands.length, 0);
   });
 
   it("supports an explicit runtime and lifetime", async () => {
@@ -71,7 +71,7 @@ describe("WorkspaceService", () => {
 
     assert.equal(workspace.runtimeProfile, "java25-node20");
     assert.equal(workspace.expiresAt, "2026-09-29T12:10:00.000Z");
-    assert.equal(provider.creates[0]?.imageRef, "eclipse-temurin:25-jdk-noble");
+    assert.equal(provider.creates[0]?.imageRef, "ghcr.io/erland/agent-workspace-runtime:java25-node20-v1");
   });
 
   it("destroys a workspace and terminates the provider sandbox", async () => {
@@ -174,11 +174,11 @@ describe("WorkspaceService prototype start", () => {
       override async exec(_handle: WorkspaceHandle, command: Command): Promise<ExecutionResult> {
         this.commands.push(command);
         this.call += 1;
-        // create runtime bootstrap is call 1
-        if (this.call === 2) {
+        // Runtime toolchain is prebuilt, so the first exec is prototype inspection.
+        if (this.call === 1) {
           return { exitCode: 0, stdout: JSON.stringify({ hasPackageLock: true, scripts: { dev: "vite" } }), stderr: "" };
         }
-        if (this.call === 5) return { exitCode: 0, stdout: "2468", stderr: "" };
+        if (this.call === 4) return { exitCode: 0, stdout: "2468", stderr: "" };
         return { exitCode: 0, stdout: "", stderr: "" };
       }
     }

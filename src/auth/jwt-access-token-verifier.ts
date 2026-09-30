@@ -37,8 +37,8 @@ export function authInfoFromPayload(token: string, payload: JWTPayload): AuthInf
     scopes,
     expiresAt: payload.exp,
     extra: {
-      issuer: payload.iss,
-      subject: payload.sub,
+      issuer: typeof payload.identity_issuer === "string" ? payload.identity_issuer : payload.iss,
+      subject: typeof payload.identity_subject === "string" ? payload.identity_subject : payload.sub,
       ...(typeof payload.email === "string" ? { email: payload.email } : {}),
       ...(typeof payload.name === "string" ? { displayName: payload.name } : {})
     }

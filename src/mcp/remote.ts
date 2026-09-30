@@ -3,11 +3,18 @@ import { Readable } from "node:stream";
 
 import { loadRemoteOAuthConfig } from "../auth/oauth-config.js";
 import { JwtAccessTokenVerifier } from "../auth/jwt-access-token-verifier.js";
+import { AgentOAuthServer, loadAgentOAuthServerConfig } from "../auth/agent-oauth-server.js";
+import { LocalAccessTokenVerifier } from "../auth/local-access-token-verifier.js";
+import { PostgresOAuthStore } from "../auth/oauth-store.js";
 import { EnvironmentExecutionAccountCredentialStore } from "../execution/environment-credential-store.js";
+import { EncryptedExecutionAccountCredentialStore } from "../execution/encrypted-credential-store.js";
+import { RoutingExecutionAccountCredentialStore } from "../execution/routing-credential-store.js";
+import { ModalCredentialManager } from "../execution/modal-credential-manager.js";
 import { DefaultExecutionProviderFactory } from "../execution/execution-provider-factory.js";
 import { IdentityService } from "../persistence/identity-service.js";
 import { createPostgresPool, PgSqlClient } from "../persistence/postgres/pool.js";
 import {
+  PostgresEncryptedCredentialRepository,
   PostgresExecutionAccountRepository,
   PostgresExternalIdentityRepository,
   PostgresUserRepository,
@@ -19,6 +26,8 @@ import { DEFAULT_SECURITY_POLICY } from "../security/security-policy.js";
 import { JsonLineAuditEventSink } from "../audit/audit-events.js";
 import { ExpiredWorkspaceCleanupJob } from "../workspace/expired-workspace-cleanup-job.js";
 import { handleHealthRequest } from "../http/health.js";
+import { createSettingsHandler } from "../http/settings.js";
+import { SandboxModalCredentialVerifier } from "../providers/modal/modal-credential-verifier.js";
 
 const config = loadRemoteOAuthConfig();
 const SERVICE_VERSION = process.env.npm_package_version ?? process.env.AGENT_WORKSPACE_VERSION ?? "unknown";
@@ -29,12 +38,30 @@ const users = new PostgresUserRepository(db);
 const identities = new PostgresExternalIdentityRepository(db);
 const executionAccounts = new PostgresExecutionAccountRepository(db);
 const workspaces = new PostgresWorkspaceRepository(db);
+const encryptedCredentialRecords = new PostgresEncryptedCredentialRepository(db);
 const identityService = new IdentityService(users, identities, executionAccounts);
+const oauthStore = new PostgresOAuthStore(db);
+const environmentCredentialStore = new EnvironmentExecutionAccountCredentialStore();
+const persistentCredentialStore = process.env.AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY
+  ? EncryptedExecutionAccountCredentialStore.fromEnvironment(encryptedCredentialRecords)
+  : undefined;
+const mutableCredentialStore = persistentCredentialStore
+  ? new RoutingExecutionAccountCredentialStore(environmentCredentialStore, persistentCredentialStore)
+  : undefined;
+const executionCredentialStore = mutableCredentialStore ?? environmentCredentialStore;
+const modalAppName = process.env.AGENT_WORKSPACE_MODAL_APP_NAME ?? "agent-workspace";
 const providerFactory = new DefaultExecutionProviderFactory(
-  new EnvironmentExecutionAccountCredentialStore(),
-  process.env.AGENT_WORKSPACE_MODAL_APP_NAME ?? "agent-workspace"
+  executionCredentialStore,
+  modalAppName
 );
-const remote = createRemoteMcpHandler(config, new JwtAccessTokenVerifier(config), {
+const authServerConfig = loadAgentOAuthServerConfig(config);
+const authServer = authServerConfig
+  ? new AgentOAuthServer(authServerConfig, oauthStore, identityService)
+  : undefined;
+const tokenVerifier = authServer
+  ? new LocalAccessTokenVerifier(authServer)
+  : new JwtAccessTokenVerifier(config);
+const remote = createRemoteMcpHandler(config, tokenVerifier, {
   identityService,
   users,
   executionAccounts,
@@ -43,6 +70,21 @@ const remote = createRemoteMcpHandler(config, new JwtAccessTokenVerifier(config)
   rateLimiter: new InMemoryFixedWindowRateLimiter({ limitPerMinute: DEFAULT_SECURITY_POLICY.requestRateLimitPerMinute }),
   audit: new JsonLineAuditEventSink()
 });
+
+if (authServer && !mutableCredentialStore) {
+  throw new Error("AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY is required when Agent Workspace auth/settings are enabled");
+}
+const settingsHandler = authServer && mutableCredentialStore
+  ? createSettingsHandler({
+      auth: authServer,
+      identityService,
+      modalCredentials: new ModalCredentialManager(
+        executionAccounts,
+        mutableCredentialStore,
+        new SandboxModalCredentialVerifier(modalAppName)
+      )
+    })
+  : undefined;
 
 const cleanupJob = new ExpiredWorkspaceCleanupJob(workspaces, executionAccounts, providerFactory);
 const cleanupTimer = setInterval(() => {
@@ -60,13 +102,25 @@ server.listen(config.port, config.host, () => {
 async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
     const request = await toWebRequest(req, config.publicBaseUrl);
-    const health = await handleHealthRequest(request, {
+    const authResponse = authServer ? await authServer.handle(request) : undefined;
+    const settings = authResponse
+      ? undefined
+      : settingsHandler
+        ? await settingsHandler(request)
+        : (new URL(request.url).pathname.startsWith("/settings")
+            ? new Response("Settings login is not configured", { status: 503 })
+            : undefined);
+    const health = authResponse || settings ? undefined : await handleHealthRequest(request, {
       version: SERVICE_VERSION,
       checkDatabase: async () => { await pool.query("select 1"); }
     });
-    const response = health ?? await remote.fetch(request);
+    const response = authResponse ?? settings ?? health ?? await remote.fetch(request);
     res.statusCode = response.status;
-    response.headers.forEach((value, key) => res.setHeader(key, value));
+    const setCookies = (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.() ?? [];
+    response.headers.forEach((value, key) => {
+      if (key.toLowerCase() !== "set-cookie") res.setHeader(key, value);
+    });
+    if (setCookies.length > 0) res.setHeader("set-cookie", setCookies);
     if (response.body) Readable.fromWeb(response.body as never).pipe(res);
     else res.end();
   } catch (error) {

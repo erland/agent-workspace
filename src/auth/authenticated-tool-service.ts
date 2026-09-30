@@ -10,6 +10,8 @@ import type { ToolFailure, ToolResult } from "../mcp/tool-service.js";
 import type { AuthenticatedPrincipal } from "./principal.js";
 import type { UserRateLimiter } from "../security/rate-limiter.js";
 import type { AuditEventSink } from "../audit/audit-events.js";
+import { isModalAuthenticationError } from "../providers/modal/modal-auth-error.js";
+import type { PersistedExecutionAccount } from "../persistence/models.js";
 
 export interface AuthenticatedToolServiceDependencies {
   identityService: IdentityService;
@@ -73,11 +75,13 @@ export class AuthenticatedAgentWorkspaceToolService {
 
   private async withWorkspaceService<T>(action: string, workspaceId: string | undefined, operation: (service: WorkspaceService) => Promise<T>): Promise<ToolResult<T>> {
     let userId = "unknown";
+    let executionAccount: PersistedExecutionAccount | undefined;
     try {
       const user = await this.user();
       userId = user.id;
       this.deps.rateLimiter?.check(user.id, action);
       const account = await this.deps.identityService.getExecutionAccount(user.id);
+      executionAccount = account;
       if (!account || account.status !== "CONNECTED") throw new Error("Execution account is not connected");
       const provider = await this.deps.providerFactory.createForAccount(account);
       const service = new WorkspaceService(provider, { userId: user.id, repository: this.deps.workspaces });
@@ -85,6 +89,13 @@ export class AuthenticatedAgentWorkspaceToolService {
       await this.audit(userId, action, "SUCCEEDED", undefined, workspaceId);
       return { ok: true, result };
     } catch (error) {
+      if (executionAccount && isModalAuthenticationError(error)) {
+        await this.deps.executionAccounts.upsert({
+          ...executionAccount,
+          status: "REVOKED",
+          updatedAt: (this.deps.now ?? (() => new Date()))().toISOString()
+        });
+      }
       await this.audit(userId, action, "FAILED", this.failure(error).error.code, workspaceId);
       return this.failure(error);
     }
