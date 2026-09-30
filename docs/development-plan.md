@@ -569,18 +569,23 @@ Implementation now includes the production Dockerfile, `/health` and `/ready`, P
 Goal: allow an allowlisted authenticated user to configure and use their own Modal API credentials without third-party Modal OAuth.
 
 Implementation:
-- OIDC web login with Authorization Code + PKCE for `/settings`.
-- signed HttpOnly/Secure application session and CSRF-protected forms.
-- AES-256-GCM encrypted PostgreSQL credential store behind `ExecutionAccountCredentialStore`.
+- Agent Workspace OAuth authorization server shared by `/mcp` and `/settings`.
+- Google OAuth/OIDC as the upstream human identity provider.
+- RFC 9728/RFC 8414 discovery, Authorization Code + mandatory PKCE S256, local JWKS and resource-bound Ed25519 JWT access tokens.
+- persistent Dynamic Client Registration plus opt-in trusted-origin Client ID Metadata Documents.
+- one-time hashed authorization codes and rotating hashed refresh tokens.
+- signed HttpOnly/Secure application session and CSRF-protected settings forms.
+- AES-256-GCM encrypted PostgreSQL Modal credential store behind `ExecutionAccountCredentialStore`.
 - per-user `ExecutionAccount.credentialRef`.
 - save-and-test, connection test and disconnect actions.
-- legacy `env:` credentials retained for development/backward compatibility.
+- legacy `env:` Modal credentials and external OAuth verifier remain available for backward compatibility.
 
 Required verification:
 - [x] automated encryption/decryption, tamper and wrong-key tests are implemented.
 - [x] automated save/invalid/disconnect/user-isolation tests are implemented.
 - [x] full CI passes on the DEV-018 branch (GitHub Actions run 36757092150).
-- [ ] deployed OIDC login to `/settings` is verified.
+- [ ] deployed Google login to `/settings` is verified.
+- [ ] deployed MCP OAuth discovery + Authorization Code/PKCE + refresh flow is verified with the actual MCP client.
 - [ ] an allowlisted user saves a real personal Modal token and connection verification passes.
 - [ ] a second user is verified to execute through a distinct Modal account.
 - [ ] disconnect is verified in the deployed environment.
