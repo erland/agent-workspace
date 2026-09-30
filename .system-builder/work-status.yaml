@@ -5,7 +5,7 @@ phase: implementation
 active_work:
   selected_step: DEV-017
   in_progress: DEV-017
-  state: implementation
+  state: verification_pending
 completed_steps:
 - id: DEV-001
   verification: PASSED
@@ -60,15 +60,16 @@ deferred_steps:
 release_constraints:
 - DEV-011 remains required before claiming the complete multi-user production account-linking flow is verified.
 verification:
-  last_result: DEV-001-010_AND_DEV-012-016_PASSED_BY_USER_DEV-011_DEFERRED
+  last_result: DEV-017_IMPLEMENTED_VERIFICATION_PENDING
   passed:
   - User reports that all verification commands through DEV-016 pass in the local environment except DEV-011.
+  - DEV-017 release-readiness harness, static checks and documentation are implemented.
   required_failures: []
   deferred:
   - DEV-011 Modal OAuth/account-linking feasibility verification.
 next:
-  recommended: DEV-017
-  reason: Reconcile release documentation, operations/package readiness and add a reproducible release-readiness verification without misrepresenting deferred DEV-011 as complete.
+  recommended: DEV-017-VERIFY
+  reason: Run `npm install && npm run verify:dev017` from a clean checkout. Mark DEV-017 complete only after PASS; DEV-011 remains deferred.
 planning_handoff:
   complete: true
   development_started: true
