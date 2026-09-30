@@ -12,20 +12,37 @@ Full production deployment readiness is **NOT_READY** until DEV-018 deployed set
 
 See `docs/release-readiness.md` for the canonical readiness decision.
 
-## Personal Modal credentials
+## Authentication and personal Modal credentials
 
-Pilot users can configure their own Modal API Token ID + Token Secret at `/settings`. The settings page uses OIDC Authorization Code + PKCE, applies the same email allowlist as the MCP endpoint, verifies Modal credentials before connecting the account, and stores credential material AES-256-GCM encrypted in PostgreSQL. The execution-account row contains only a `credentialRef`.
+Agent Workspace can act as its own OAuth authorization server for both the remote MCP endpoint and the `/settings` UI. Google is used only as the upstream identity provider. Agent Workspace issues resource-bound access tokens for `/mcp`, so the Google token is never reused as an MCP bearer token.
 
-Required settings when enabling this flow:
+The flow is:
 
 ```text
-AGENT_WORKSPACE_WEB_OIDC_CLIENT_ID=...
-AGENT_WORKSPACE_WEB_OIDC_CLIENT_SECRET=...   # when required by the IdP
+Google account
+    ↓
+Agent Workspace /authorize
+    ↓
+Agent Workspace access/refresh tokens
+    ├── /mcp
+    └── /settings session
+```
+
+The OAuth server publishes RFC 8414 metadata and JWKS, requires PKCE S256, binds access tokens to the MCP resource, rotates one-time refresh tokens, supports Dynamic Client Registration for compatible MCP clients, and can accept Client ID Metadata Documents from explicitly trusted origins.
+
+Pilot users configure their own Modal API Token ID + Token Secret at `/settings`. Modal credential material is verified before the account becomes connected and is stored AES-256-GCM encrypted in PostgreSQL; `execution_account` contains only a `credentialRef`.
+
+Required production settings:
+
+```text
+AGENT_WORKSPACE_GOOGLE_CLIENT_ID=...
+AGENT_WORKSPACE_GOOGLE_CLIENT_SECRET=...
+AGENT_WORKSPACE_AUTH_SIGNING_KEY=...          # Base64 PKCS#8 DER Ed25519 key
 AGENT_WORKSPACE_WEB_SESSION_SECRET=...
 AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY=... # Base64, exactly 32 decoded bytes
 ```
 
-Register `https://<public-host>/settings/callback` as the OIDC redirect URI.
+Register `https://<public-host>/auth/google/callback` as the Google OAuth redirect URI.
 
 
 ## DEV-001 development setup
