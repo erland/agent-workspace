@@ -6,6 +6,7 @@ import type {
 } from "./execution-account.js";
 import type { ExecutionAccountRepository } from "../persistence/repositories.js";
 import type { PersistedExecutionAccount } from "../persistence/models.js";
+import { isModalAuthenticationError } from "../providers/modal/modal-auth-error.js";
 
 export interface ModalCredentialVerifier {
   verify(credentials: Extract<ModalExecutionCredentials, { kind: "token" }>): Promise<void>;
@@ -13,6 +14,7 @@ export interface ModalCredentialVerifier {
 
 export interface ModalConnectionStatus {
   connected: boolean;
+  needsRenewal: boolean;
   updatedAt?: string;
 }
 
@@ -27,9 +29,12 @@ export class ModalCredentialManager {
 
   async status(userId: string): Promise<ModalConnectionStatus> {
     const account = await this.executionAccounts.findByUserId(userId);
-    return account?.status === "CONNECTED"
-      ? { connected: true, updatedAt: account.updatedAt }
-      : { connected: false };
+    if (!account) return { connected: false, needsRenewal: false };
+    return {
+      connected: account.status === "CONNECTED",
+      needsRenewal: account.status === "REVOKED",
+      updatedAt: account.updatedAt
+    };
   }
 
   async saveAndTest(userId: string, tokenId: string, tokenSecret: string): Promise<void> {
@@ -58,7 +63,18 @@ export class ModalCredentialManager {
     const account = await this.requireConnected(userId);
     const credentials = await this.credentialStore.getModalCredentials(account.credentialRef);
     if (credentials.kind !== "token") throw new Error("Configured Modal credentials are not API token credentials");
-    await this.verifier.verify(credentials);
+    try {
+      await this.verifier.verify(credentials);
+    } catch (error) {
+      if (isModalAuthenticationError(error)) {
+        await this.executionAccounts.upsert({
+          ...account,
+          status: "REVOKED",
+          updatedAt: this.now().toISOString()
+        });
+      }
+      throw error;
+    }
   }
 
   async disconnect(userId: string): Promise<void> {
