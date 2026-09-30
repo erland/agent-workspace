@@ -49,7 +49,7 @@ completed_steps:
 pending_steps:
 - id: DEV-018
   verification: EXTERNAL_VERIFICATION_PENDING
-  reason: Automated tests and CI pass, but deployed OIDC/settings, real personal Modal token, two-user account isolation and disconnect still require external verification.
+  reason: Shared Google-backed Agent Workspace OAuth plus personal Modal credentials are implemented. Deployed MCP OAuth discovery/PKCE/refresh, settings login, real personal Modal token, two-user account isolation and disconnect still require external verification.
 - id: DEV-015
   verification: EXTERNAL_VERIFICATION_PENDING
   reason: Local DEV-015 tests passed, but the canonical verification requires a clean deployment to a real Coolify-like environment with PostgreSQL/OAuth configuration and health/auth/provider connectivity checks.
@@ -80,13 +80,13 @@ verification:
   deferred:
   - DEV-011 Modal OAuth/account-linking feasibility verification.
   pending_external:
-  - DEV-018 deployed OIDC/settings/personal Modal credential verification.
+  - DEV-018 deployed Google-backed MCP OAuth/settings/personal Modal credential verification.
   - DEV-015 deployment verification.
   - DEV-016 deployed remote MCP acceptance.
 release_readiness:
   artifact: READY_WITH_WARNINGS
   production: NOT_READY
-  rationale: Personal Modal credential support is implemented but DEV-018 deployed acceptance is pending; DEV-015 and DEV-016 production gates also remain pending.
+  rationale: Shared MCP/settings auth and personal Modal credential support are implemented but DEV-018 deployed acceptance is pending; DEV-015 and DEV-016 production gates also remain pending.
 next:
   recommended: DEV-018-VERIFY
   reason: Complete CI and deployed OIDC/settings/personal Modal credential acceptance before returning to DEV-015/016 deployment verification.
