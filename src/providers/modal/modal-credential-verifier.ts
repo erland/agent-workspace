@@ -1,5 +1,6 @@
 import type { ModalCredentialVerifier } from "../../execution/modal-credential-manager.js";
 import type { ModalExecutionCredentials } from "../../execution/execution-account.js";
+import type { WorkspaceHandle } from "../../core/sandbox-provider.js";
 import { ModalSandboxProvider } from "./modal-sandbox-provider.js";
 
 export class SandboxModalCredentialVerifier implements ModalCredentialVerifier {
@@ -7,7 +8,7 @@ export class SandboxModalCredentialVerifier implements ModalCredentialVerifier {
 
   async verify(credentials: Extract<ModalExecutionCredentials, { kind: "token" }>): Promise<void> {
     const provider = new ModalSandboxProvider({ appName: this.appName, credentials });
-    let handle;
+    let handle: WorkspaceHandle | undefined;
     try {
       handle = await provider.createWorkspace({
         imageRef: "alpine:3.20",
