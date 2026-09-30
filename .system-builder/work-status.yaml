@@ -1,11 +1,11 @@
 schema_version: 1
 project: agent-workspace
 mode: CREATE
-phase: implementation
+phase: release_readiness
 active_work:
   selected_step: null
   in_progress: null
-  state: ready_for_merge_review
+  state: development_complete_release_not_ready
 completed_steps:
 - id: DEV-001
   verification: PASSED
@@ -30,51 +30,61 @@ completed_steps:
   evidence: User verified all six Java/Node runtime profiles locally.
 - id: DEV-008
   verification: PASSED
-  evidence: User reran the DEV-008 prototype readiness flow successfully after the readiness-script regression fix.
+  evidence: User verified prototype readiness locally after the readiness-script regression fix.
 - id: DEV-009
   verification: PASSED
-  evidence: User verified the DEV-009 screenshot flow locally.
+  evidence: User verified the screenshot flow locally against Modal.
 - id: DEV-010
   verification: PASSED
-  evidence: User verified the DEV-010 MCP flow locally.
+  evidence: User verified the MCP development flow locally.
 - id: DEV-012
   verification: PASSED
-  evidence: User verified the DEV-012 persistence flow locally.
+  evidence: User verified the PostgreSQL persistence flow locally.
 - id: DEV-013
   verification: PASSED
-  evidence: User verified the DEV-013 remote-auth flow locally.
+  evidence: User verified the remote-auth test flow locally.
 - id: DEV-014
   verification: PASSED
-  evidence: User verified the DEV-014 security verification flow locally.
+  evidence: User verified DEV-014 locally and subsequently passed the DEV-016 authenticated Modal acceptance path covering representative npm, Maven, prototype, screenshot and cleanup flows.
+pending_steps:
 - id: DEV-015
-  verification: PASSED
-  evidence: User verified the DEV-015 test flow in the local environment.
+  verification: EXTERNAL_VERIFICATION_PENDING
+  reason: Local DEV-015 tests passed, but the canonical verification requires a clean deployment to a real Coolify-like environment with PostgreSQL/OAuth configuration and health/auth/provider connectivity checks.
 - id: DEV-016
-  verification: PASSED
-  evidence: User verified the DEV-016 acceptance flow in the local environment.
+  verification: REMOTE_ACCEPTANCE_PENDING
+  reason: Local MCP/Modal acceptance passed, but the canonical verification requires final remote acceptance through the deployed OAuth-protected MCP endpoint after DEV-015 deployment verification.
 - id: DEV-017
-  verification: PASSED
-  evidence: User ran `npm run verify:dev017` locally and confirmed PASS.
+  verification: NOT_READY
+  reason: Release readiness cannot be PASS while required DEV-015/DEV-016 production gates remain pending and DEV-011 account-linking feasibility remains deferred.
 deferred_steps:
 - id: DEV-011
   verification: DEFERRED
-  reason: The Modal third-party OAuth/account-linking feasibility flow currently fails because it depends on Modal-issued OAuth integration credentials and two authorized Modal identities.
-  decision: User explicitly chose to defer DEV-011 for now. It must not be represented as PASSED and remains a known production/release limitation.
+  reason: Modal third-party OAuth/account-linking feasibility requires a Modal-issued OAuth integration and two authorized Modal identities.
+  decision: User explicitly chose to defer DEV-011 for now. It remains required before claiming the complete multi-user production account-linking flow is verified.
 release_constraints:
-- DEV-011 remains required before claiming the complete multi-user production account-linking flow is verified.
+- DEV-011 must be verified before claiming complete multi-user Modal account linking is production ready.
+- DEV-015 must be verified in a real deployment environment.
+- DEV-016 must be repeated through the deployed remote OAuth-protected MCP endpoint.
 verification:
-  last_result: DEV-017_PASSED
+  last_result: DEVELOPMENT_AND_LOCAL_ACCEPTANCE_PASSED_RELEASE_GATES_PENDING
   passed:
-  - User reports that all verification commands through DEV-016 pass in the local environment except DEV-011.
-  - DEV-017 release-readiness harness, static checks and documentation are implemented.
-  - User ran `npm run verify:dev017` locally and confirmed PASS.
+  - User ran all local verification commands through DEV-016; all passed except the intentionally deferred DEV-011 flow.
+  - DEV-017 local release-readiness command passed.
+  - GitHub CI passed on merged main commit d3d55106bee3b393b5390151c2ef6fcbff87aab0.
   required_failures: []
   deferred:
   - DEV-011 Modal OAuth/account-linking feasibility verification.
+  pending_external:
+  - DEV-015 deployment verification.
+  - DEV-016 deployed remote MCP acceptance.
+release_readiness:
+  artifact: READY_WITH_WARNINGS
+  production: NOT_READY
+  rationale: Source, CI, local acceptance and packaging are green. Full production readiness still requires DEV-011, DEV-015 and DEV-016 external gates.
 next:
-  recommended: MERGE-READINESS-REVIEW
-  reason: DEV-017 passed locally. Review PR status, remaining known limitation DEV-011 and repository mergeability before merging.
+  recommended: DEV-015-DEPLOYMENT-VERIFY
+  reason: If production release is pursued, verify a real Coolify-like deployment first; DEV-011 remains explicitly deferred by user decision.
 planning_handoff:
   complete: true
   development_started: true
-  source_of_truth: project_zip
+  source_of_truth: github
