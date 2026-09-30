@@ -583,7 +583,7 @@ Implementation:
 Required verification:
 - [x] automated encryption/decryption, tamper and wrong-key tests are implemented.
 - [x] automated save/invalid/disconnect/user-isolation tests are implemented.
-- [x] full CI passes on the DEV-018 branch (GitHub Actions run 36757092150).
+- [x] full CI passes on the shared-auth DEV-018 branch (GitHub Actions run 36762061458).
 - [ ] deployed Google login to `/settings` is verified.
 - [ ] deployed MCP OAuth discovery + Authorization Code/PKCE + refresh flow is verified with the actual MCP client.
 - [ ] an allowlisted user saves a real personal Modal token and connection verification passes.
