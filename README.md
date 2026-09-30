@@ -8,7 +8,7 @@ The repository is implemented step-by-step according to `docs/development-plan.m
 
 The v1 implementation and local acceptance are complete, and deterministic CI is green. Repository/artifact readiness is **READY_WITH_WARNINGS**.
 
-Full production deployment readiness is **NOT_READY** until the remaining external gates are evidenced: DEV-011 Modal account-linking feasibility, DEV-015 real deployment verification, and DEV-016 remote acceptance against the deployed OAuth-protected MCP endpoint.
+Full production deployment readiness is **NOT_READY** until DEV-018 deployed settings/personal-credential acceptance, DEV-015 real deployment verification, and DEV-016 remote acceptance against the deployed OAuth-protected MCP endpoint are evidenced. DEV-011 third-party Modal OAuth remains a future onboarding improvement, not a prerequisite for per-user pilot isolation.
 
 See `docs/release-readiness.md` for the canonical readiness decision.
 
