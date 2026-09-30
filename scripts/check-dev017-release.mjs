@@ -11,7 +11,8 @@ const requiredFiles = [
   "docs/development-plan.md",
   "docs/security-baseline.md",
   "docs/coolify-deployment.md",
-  "docs/dev-017-verification.md"
+  "docs/dev-017-verification.md",
+  "docs/release-readiness.md"
 ];
 
 for (const path of requiredFiles) {
