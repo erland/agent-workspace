@@ -4,8 +4,13 @@
 
 ## Trust boundaries
 
-- ChatGPT/Claude/MCP clients authenticate to `agent-workspace`; their bearer token stays on the server side.
-- Modal execution credentials are resolved server-side from an opaque `credentialRef` and are never injected into a Sandbox.
+- Google authenticates the human identity only. Google access/ID tokens are never accepted as MCP bearer tokens.
+- Agent Workspace acts as the OAuth authorization server for MCP and issues its own short-lived, resource-bound Ed25519 JWT access tokens.
+- OAuth authorization codes and refresh tokens are opaque, stored only as SHA-256 hashes, and consumed once; refresh tokens rotate on use.
+- Authorization Code requires PKCE S256. MCP access tokens are audience-bound to the exact `/mcp` resource.
+- Dynamic Client Registration creates public clients only (`token_endpoint_auth_method=none`); Client ID Metadata Documents are fetched only from explicitly trusted HTTPS origins.
+- The settings session is signed, HttpOnly, Secure and SameSite=Lax; state/nonce and CSRF protections are separate.
+- Modal execution credentials are resolved server-side from an opaque `credentialRef` and are never injected into a Sandbox. Personal Modal API credentials are AES-256-GCM encrypted at rest.
 - Uploaded project code receives no application database credentials, OAuth refresh tokens, provider credentials or server environment by design.
 - A Sandbox is disposable and bounded by lifetime, CPU, memory and network policy.
 
