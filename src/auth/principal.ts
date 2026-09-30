@@ -30,3 +30,12 @@ function readNonEmptyString(value: unknown, name: string): string {
   if (typeof value !== "string" || value.length === 0) throw new Error(`${name} is required`);
   return value;
 }
+
+export function isPrincipalAllowed(
+  principal: AuthenticatedPrincipal,
+  allowedEmails: readonly string[]
+): boolean {
+  if (allowedEmails.length === 0) return true;
+  if (!principal.email) return false;
+  return allowedEmails.includes(principal.email.trim().toLowerCase());
+}

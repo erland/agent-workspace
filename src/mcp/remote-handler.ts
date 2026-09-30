@@ -1,6 +1,6 @@
 import { createMcpHandler, requireBearerAuth, type AuthInfo } from "@modelcontextprotocol/server";
 
-import { principalFromAuthInfo } from "../auth/principal.js";
+import { isPrincipalAllowed, principalFromAuthInfo } from "../auth/principal.js";
 import { protectedResourceMetadata, protectedResourceMetadataUrl, type RemoteOAuthConfig } from "../auth/oauth-config.js";
 import type { OAuthTokenVerifier } from "@modelcontextprotocol/server";
 import { AuthenticatedAgentWorkspaceToolService, type AuthenticatedToolServiceDependencies } from "../auth/authenticated-tool-service.js";
@@ -35,6 +35,8 @@ export function createRemoteMcpHandler(
       if (url.pathname !== new URL(config.mcpUrl).pathname) return new Response("Not Found", { status: 404 });
       const auth = await gate(request);
       if (auth instanceof Response) return auth;
+      const principal = principalFromAuthInfo(auth);
+      if (!isPrincipalAllowed(principal, config.allowedEmails ?? [])) return new Response("Forbidden", { status: 403 });
       return handler.fetch(request, { authInfo: auth });
     },
     close: () => handler.close()

@@ -41,6 +41,7 @@ AGENT_WORKSPACE_OAUTH_JWKS_URI=https://issuer.example/.well-known/jwks.json
 ```text
 AGENT_WORKSPACE_OAUTH_AUDIENCE=https://workspace.example/mcp
 AGENT_WORKSPACE_OAUTH_SCOPE=agent-workspace
+AGENT_WORKSPACE_ALLOWED_EMAILS=user1@example.com,user2@example.com
 AGENT_WORKSPACE_MODAL_APP_NAME=agent-workspace
 HOST=0.0.0.0
 PORT=3000
@@ -48,6 +49,12 @@ AGENT_WORKSPACE_VERSION=<release/version>
 ```
 
 `AGENT_WORKSPACE_OAUTH_AUDIENCE` defaultar till den publika `/mcp`-URL:en. `HOST` och `PORT` har defaults.
+
+### Pilot-allowlist
+
+Sätt `AGENT_WORKSPACE_ALLOWED_EMAILS` till en kommaseparerad lista med de e-postadresser som får använda MCP-tjänsten under pilotfasen, till exempel `anna@example.com,bertil@example.com`. Matchning är case-insensitive och whitespace trimmas. När variabeln är satt får en giltigt autentiserad användare som saknar e-postclaim eller vars e-postadress inte finns i listan HTTP `403 Forbidden`. Om variabeln lämnas tom är allowlist-spärren avstängd.
+
+Detta är särskilt rekommenderat så länge DEV-011 är uppskjuten och flera tillåtna användare kan dela samma manuellt konfigurerade Modal execution account.
 
 ## Execution credentials
 

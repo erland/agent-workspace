@@ -5,6 +5,7 @@ export interface RemoteOAuthConfig {
   audience: string;
   jwksUri: string;
   requiredScope: string;
+  allowedEmails?: string[];
   port: number;
   host: string;
 }
@@ -20,6 +21,7 @@ export function loadRemoteOAuthConfig(env: NodeJS.ProcessEnv = process.env): Rem
     audience: env.AGENT_WORKSPACE_OAUTH_AUDIENCE ?? mcpUrl,
     jwksUri: requiredUrl(env.AGENT_WORKSPACE_OAUTH_JWKS_URI, "AGENT_WORKSPACE_OAUTH_JWKS_URI"),
     requiredScope: env.AGENT_WORKSPACE_OAUTH_SCOPE ?? "agent-workspace",
+    allowedEmails: parseEmailAllowlist(env.AGENT_WORKSPACE_ALLOWED_EMAILS),
     port: positiveInteger(env.PORT, 3000, "PORT"),
     host: env.HOST ?? "0.0.0.0"
   };
@@ -57,4 +59,9 @@ function positiveInteger(value: string | undefined, fallback: number, name: stri
 
 function ensureTrailingSlash(value: string): string {
   return value.endsWith("/") ? value : `${value}/`;
+}
+
+function parseEmailAllowlist(value: string | undefined): string[] {
+  if (!value) return [];
+  return [...new Set(value.split(",").map((email) => email.trim().toLowerCase()).filter(Boolean))];
 }

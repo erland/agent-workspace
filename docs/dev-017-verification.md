@@ -6,9 +6,9 @@ Make the current v1 implementation reproducibly reviewable as a release candidat
 
 ## Current verification baseline
 
-The user has run the verification flows through DEV-016 in the local environment. DEV-001 through DEV-010 and DEV-012 through DEV-016 passed. DEV-011 did not pass and is intentionally deferred for now.
+The user has run the local verification commands through DEV-016. The local flows passed except DEV-011, which is intentionally deferred.
 
-DEV-011 is therefore a known release constraint, not a completed step.
+A green local DEV-015/DEV-016 command does not by itself satisfy their canonical production gates: DEV-015 still requires a real deployment verification, and DEV-016 still requires remote acceptance through the deployed OAuth-protected MCP endpoint. DEV-011 remains a known release constraint, not a completed production gate.
 
 ## Automated release-readiness verification
 
@@ -34,13 +34,15 @@ The static release check verifies that core documentation/deployment artifacts e
 
 ## Manual release checklist
 
-Before calling the project fully production-release ready:
+Before calling the project fully production-release ready (see `docs/release-readiness.md`):
 
 - confirm the DEV-017 command passes from a clean checkout,
 - review README, architecture, functional specification, deployment and security documentation against the actual implementation,
 - confirm deployment configuration and secret handling are documented,
 - confirm known limitations are explicit,
-- resolve and verify DEV-011 before claiming the complete multi-user Modal account-linking flow is production verified.
+- resolve and verify DEV-011 before claiming the complete multi-user Modal account-linking flow is production verified,
+- complete DEV-015 deployment verification,
+- complete DEV-016 remote deployed acceptance.
 
 ## DEV-011 exception
 
