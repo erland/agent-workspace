@@ -1,0 +1,25 @@
+schema_version: 1
+project:
+  name: agent-workspace
+  mode: CREATE
+  complexity: medium
+  phase: planning_handoff_complete
+  description: >-
+    Multi-user MCP/API workspace service for AI assistants to build/test npm and Maven
+    projects and run browser prototypes in isolated user-owned sandbox accounts.
+  language: TypeScript
+  runtime: Node 22
+  deployment_target: Coolify
+  execution_provider_v1: MODAL
+canonical_documents:
+  functional_specification: docs/functional-specification.md
+  architecture: docs/architecture.md
+  risk_feasibility: docs/risk-feasibility.md
+  development_plan: docs/development-plan.md
+  decisions: docs/decisions.md
+runtime_defaults:
+  java: "21"
+  node: "22"
+runtime_supported:
+  java: ["17", "21", "25"]
+  node: ["20", "22"]

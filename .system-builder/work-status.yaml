@@ -1,0 +1,113 @@
+schema_version: 1
+project: agent-workspace
+mode: CREATE
+phase: implementation
+active_work:
+  selected_step: DEV-008-READINESS-REGRESSION-FIX
+  in_progress: DEV-008-READINESS-REGRESSION-FIX
+  state: verification_pending
+completed_steps:
+- id: DEV-001
+  verification: PASSED
+  evidence: 'User ran `npm run verify:dev001`: 4/4 tests passed, TypeScript typecheck
+    passed, build passed, Modal sandbox was created, `node --version` returned v22.23.3,
+    and the sandbox terminated successfully.'
+- id: DEV-002
+  verification: PASSED
+  evidence: User ran `npm run verify:dev002`; tests, typecheck, build and live Modal
+    workspace smoke passed after runtime/network fixes.
+- id: DEV-003
+  verification: PASSED
+  evidence: 'User live upload smoke passed against Modal: ZIP validation/extraction
+    and cleanup succeeded.'
+- id: DEV-004
+  verification: PASSED
+  evidence: User live upload smoke detected npm project/runtime metadata and mismatch
+    warning as designed.
+- id: DEV-005
+  verification: PASSED
+  evidence: User ran `npm run verify:dev005`; 90/90 tests, typecheck, build, upload
+    smoke and npm PASS/FAIL smoke all passed.
+- id: DEV-006
+  verification: PASSED
+  evidence: User ran `npm run verify:dev006`; Maven PASS case succeeded and intentional
+    failing test was normalized/reported, with workspace cleanup.
+blockers:
+- id: DEV-008-READINESS-VERIFY
+  reason: User ran `npm run verify:dev008`; unit tests, typecheck and build passed,
+    but live prototype smoke failed because the generated readiness shell script joined
+    `set -euo pipefail` and the `for` loop with a space, producing a bash syntax error
+    near `do`.
+  resolution: Version 0.1.0-dev.16.6 joins readiness script lines with newlines. Run
+    `npm run verify:dev008` and confirm the prototype reaches RUNNING and the workspace
+    is destroyed afterward.
+- id: DEV-011-MODAL-OAUTH
+  reason: Modal user account linking still requires a Modal-issued third-party OAuth
+    client and two authorized Modal identities.
+  resolution: Obtain/confirm Modal third-party OAuth integration credentials and run
+    `npm run verify:dev011`.
+- id: DEV-012-POSTGRES-VERIFY
+  reason: Live PostgreSQL migration/repository smoke has not yet been run by the user.
+  resolution: Start PostgreSQL, set DATABASE_URL and run `npm run verify:dev012`.
+- id: DEV-013-REMOTE-AUTH-VERIFY
+  reason: Full dependency-backed remote MCP auth verification has not yet been run
+    on a normal development machine.
+  resolution: Run `npm install && npm run verify:dev013` and later configure the production
+    IdP.
+- id: DEV-014-LIVE-SECURITY-VERIFY
+  reason: The Modal outbound dependency allowlist and cleanup/resource controls require
+    live Modal verification.
+  resolution: Run `npm install && npm run verify:dev014`, then exercise representative
+    npm/Maven/prototype flows against Modal.
+- id: DEV-015-COOLIFY-VERIFY
+  reason: Clean container build/deploy and health/auth/provider checks require a Docker/Coolify
+    environment with PostgreSQL and OAuth configuration.
+  resolution: Build/deploy the Dockerfile, verify `/health` and `/ready`, then verify
+    OAuth MCP and execution-provider connectivity.
+- id: DEV-016-ACCEPTANCE-VERIFY
+  reason: The pre-deployment acceptance harness is implemented but has not yet been
+    run with the user's authenticated Modal profile; final remote acceptance also
+    depends on DEV-015 deployment verification.
+  resolution: Run `npm install && npm run verify:dev016`; after deployment, repeat
+    acceptance through the remote OAuth-protected MCP endpoint.
+verification:
+  last_result: PENDING_DEV008_READINESS_FIX_VERIFICATION
+  passed:
+  - 'User confirmed regression fix 2: `npm run typecheck` now passes; the DEV-002
+    run also showed 89/89 tests passing and `npm run build` passing before the live
+    smoke failed.'
+  - Runtime/network fix pins all Java profiles to `eclipse-temurin:<java>-jdk-noble`
+    and allows `archive.ubuntu.com` plus `security.ubuntu.com`
+  - Runtime/network fix v2 rewrites Ubuntu/Debian apt source URLs from HTTP to HTTPS
+    before `apt-get update`, matching Modal domain-allowlist TLS egress behavior
+  - Static source checks confirm no remaining explicit `HeadersInit` references and
+    all reported test providers now implement `readFile`
+  - DEV-001 fully verified by user
+  - DEV-016 acceptance harness implemented for capabilities/runtime, npm PASS/FAIL,
+    Maven PASS/FAIL, prototype start, three screenshots and cleanup
+  - DEV-016 can run pre-deployment using a real MCP client over stdio and the user's
+    Modal profile
+  - User verified DEV-002 after HTTPS/Noble runtime network fix.
+  - User verified DEV-005 end-to-end including npm PASS and intentional FAIL handling
+    against Modal.
+  - User verified DEV-006 end-to-end including Maven PASS and intentional FAIL handling
+    against Modal.
+  - DEV-008 regression test regex now escapes the literal parenthesis in `$(seq ...)`, preventing Node from failing to parse the test file.
+  - DEV-008 readiness fix changes shell script assembly from space-joined lines to
+    newline-joined lines; exact equivalent script passes `bash -n`.
+  required_failures:
+  - DEV-008 live prototype smoke must be rerun on version 0.1.0-dev.16.6.
+  - DEV-016 live Modal acceptance has not yet been run for this package
+  - final remote/deployed acceptance cannot be completed until DEV-015 deployment
+    is verified
+  - inherited DEV-002 through DEV-015 external verification remains pending unless
+    separately run by the user
+next:
+  recommended: DEV-008-READINESS-VERIFY
+  reason: Rerun `npm run verify:dev008` on version 0.1.0-dev.16.6. The prior failure
+    was isolated to shell syntax in readiness polling, and the generated equivalent
+    now passes bash syntax validation.
+planning_handoff:
+  complete: true
+  development_started: true
+  source_of_truth: project_zip
