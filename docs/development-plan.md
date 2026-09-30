@@ -578,6 +578,7 @@ Implementation:
 - AES-256-GCM encrypted PostgreSQL Modal credential store behind `ExecutionAccountCredentialStore`.
 - per-user `ExecutionAccount.credentialRef`.
 - save-and-test, connection test and disconnect actions.
+- explicit renewal state when Modal reports authentication failure; settings shows "Modal-token behöver förnyas" and successful replacement restores CONNECTED.
 - legacy `env:` Modal credentials and external OAuth verifier remain available for backward compatibility.
 
 Required verification:
