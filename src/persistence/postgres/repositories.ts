@@ -1,10 +1,12 @@
 import type {
+  EncryptedCredentialRepository,
   ExecutionAccountRepository,
   ExternalIdentityRepository,
   UserRepository,
   WorkspaceRepository
 } from "../repositories.js";
 import type {
+  EncryptedCredentialRecord,
   ExternalIdentityRecord,
   PersistedExecutionAccount,
   PersistedWorkspace,
@@ -101,6 +103,58 @@ export class PostgresExecutionAccountRepository implements ExecutionAccountRepos
   }
 }
 
+export class PostgresEncryptedCredentialRepository implements EncryptedCredentialRepository {
+  constructor(private readonly db: SqlClient) {}
+
+  async upsert(record: EncryptedCredentialRecord): Promise<void> {
+    await this.db.query(
+      `insert into execution_credential
+         (ref, user_id, provider, iv, ciphertext, auth_tag, created_at, updated_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8)
+       on conflict (ref) do update set
+         user_id = excluded.user_id,
+         provider = excluded.provider,
+         iv = excluded.iv,
+         ciphertext = excluded.ciphertext,
+         auth_tag = excluded.auth_tag,
+         updated_at = excluded.updated_at`,
+      [
+        record.ref,
+        record.userId,
+        record.provider,
+        record.iv,
+        record.ciphertext,
+        record.authTag,
+        record.createdAt,
+        record.updatedAt
+      ]
+    );
+  }
+
+  async findByRef(ref: string): Promise<EncryptedCredentialRecord | undefined> {
+    const result = await this.db.query<EncryptedCredentialRow>(
+      `select ref, user_id, provider, iv, ciphertext, auth_tag, created_at, updated_at
+       from execution_credential where ref = $1`,
+      [ref]
+    );
+    const row = result.rows[0];
+    return row ? {
+      ref: row.ref,
+      userId: row.user_id,
+      provider: row.provider,
+      iv: row.iv,
+      ciphertext: row.ciphertext,
+      authTag: row.auth_tag,
+      createdAt: toIso(row.created_at),
+      updatedAt: toIso(row.updated_at)
+    } : undefined;
+  }
+
+  async deleteByRef(ref: string): Promise<void> {
+    await this.db.query(`delete from execution_credential where ref = $1`, [ref]);
+  }
+}
+
 export class PostgresWorkspaceRepository implements WorkspaceRepository {
   constructor(private readonly db: SqlClient) {}
 
@@ -171,6 +225,10 @@ type UserRow = {
 };
 type ExternalIdentityRow = {
   id: string; user_id: string; issuer: string; subject: string; email: string | null; created_at: string | Date;
+};
+type EncryptedCredentialRow = {
+  ref: string; user_id: string; provider: "modal"; iv: string; ciphertext: string; auth_tag: string;
+  created_at: string | Date; updated_at: string | Date;
 };
 type ExecutionAccountRow = {
   id: string; user_id: string; provider: "modal"; provider_account_id: string | null;
