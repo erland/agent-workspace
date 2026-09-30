@@ -43,10 +43,13 @@ const envExample = await readFile(".env.example", "utf8");
 for (const name of [
   "DATABASE_URL",
   "AGENT_WORKSPACE_PUBLIC_BASE_URL",
-  "AGENT_WORKSPACE_OAUTH_ISSUER",
   "AGENT_WORKSPACE_OAUTH_AUDIENCE",
-  "AGENT_WORKSPACE_OAUTH_JWKS_URI",
-  "AGENT_WORKSPACE_OAUTH_SCOPE"
+  "AGENT_WORKSPACE_OAUTH_SCOPE",
+  "AGENT_WORKSPACE_GOOGLE_CLIENT_ID",
+  "AGENT_WORKSPACE_GOOGLE_CLIENT_SECRET",
+  "AGENT_WORKSPACE_AUTH_SIGNING_KEY",
+  "AGENT_WORKSPACE_WEB_SESSION_SECRET",
+  "AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY"
 ]) {
   if (!envExample.includes(`${name}=`)) {
     throw new Error(`.env.example is missing ${name}`);
@@ -62,4 +65,4 @@ if (status.includes("id: DEV-011\n  verification: PASSED")) {
 }
 
 console.log("DEV-017 release-readiness static checks passed.");
-console.log("Note: DEV-011 remains deferred and is still required before claiming the complete production account-linking flow is verified.");
+console.log("Note: DEV-011 remains deferred only for Modal third-party OAuth onboarding; DEV-018 external deployment verification remains required for the personal-token pilot path.");
