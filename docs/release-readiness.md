@@ -2,7 +2,7 @@
 
 ## Release candidate
 
-Current source: merged `main` at `d3d55106bee3b393b5390151c2ef6fcbff87aab0`.
+Current base: merged `main` at `dda4d2062bf8fc64c67b7f51387fb02bca343d29`. PR #3 adds DEV-018 personal Modal credential settings.
 
 This report separates repository/artifact readiness from full production deployment readiness, as required by the System Builder release-readiness standard.
 
@@ -30,7 +30,8 @@ The v1 implementation covers:
 | Local Modal runtime/build/prototype acceptance | yes | PASS | User verification through DEV-016 |
 | Reproducible npm dependencies | yes | PASS | committed `package-lock.json`, `npm ci` in CI/Docker |
 | Documentation/repository hygiene | yes | PASS | DEV-017 checks + post-merge reconciliation |
-| DEV-011 Modal account-linking feasibility | yes for full multi-user production flow | DEFERRED | Requires Modal-issued third-party OAuth integration and two identities |
+| DEV-011 Modal third-party OAuth onboarding | no for personal-token pilot; yes only for third-party OAuth claim | DEFERRED | Personal API tokens now provide per-user Modal isolation; Modal-issued OAuth integration is still unavailable |
+| DEV-018 personal Modal credential settings | yes for production pilot | PENDING | Automated coverage implemented; deployed OIDC/settings/two-user Modal acceptance not yet evidenced |
 | DEV-015 real deployment verification | yes for production deployment | PENDING | Clean Coolify-like deployment with PostgreSQL/OAuth/provider connectivity not yet evidenced |
 | DEV-016 deployed remote MCP acceptance | yes for production deployment | PENDING | Must run after DEV-015 against deployed OAuth-protected MCP endpoint |
 
@@ -50,7 +51,7 @@ This does not constitute final acceptance of the deployed production path.
 
 The implemented security baseline includes resource limits, TTL cleanup, rate limiting, ZIP limits, bounded/redacted logs, server-side credential handling, audit events and Modal outbound-domain restrictions.
 
-Production credential lifecycle and account-linking feasibility remain incomplete until DEV-011 is verified.
+Personal Modal credentials are encrypted at rest behind the credential-store abstraction. Production acceptance still requires DEV-018 deployed OIDC/settings verification. DEV-011 only blocks claiming third-party Modal OAuth onboarding, not per-user Modal isolation through personal API tokens.
 
 ## Packaging / deployment
 
@@ -68,7 +69,8 @@ Post-merge machine state is reconciled by this closeout change so it no longer c
 
 ## Known limitations
 
-- DEV-011 is intentionally deferred.
+- DEV-011 third-party Modal OAuth onboarding is intentionally deferred; manual creation of a personal Modal API token is still required.
+- DEV-018 deployed settings/personal-token acceptance is pending.
 - Full production deployment verification is pending.
 - Final remote MCP acceptance against the deployed service is pending.
 
@@ -78,9 +80,11 @@ For continued development work: none.
 
 For full production-release readiness:
 
-1. DEV-011 Modal third-party OAuth/account-linking feasibility.
+1. DEV-018 deployed OIDC/settings/personal Modal credential acceptance.
 2. DEV-015 deployment verification.
 3. DEV-016 deployed remote acceptance.
+
+DEV-011 is not a blocker for the personal-token pilot path; it remains required only before claiming automated third-party Modal OAuth account linking.
 
 ## Decision
 
@@ -90,4 +94,4 @@ The source tree, deterministic CI, local acceptance, packaging and documentation
 
 ### Full production deployment readiness: NOT_READY
 
-The required DEV-011, DEV-015 and DEV-016 external gates are not all complete. They must not be represented as PASS until actual evidence exists.
+The required DEV-018, DEV-015 and DEV-016 external gates are not all complete. They must not be represented as PASS until actual evidence exists. DEV-011 remains deferred for automated Modal OAuth onboarding.
