@@ -1,4 +1,5 @@
 import type {
+  EncryptedCredentialRecord,
   EncryptedCredentialRepository,
   ExecutionAccountRepository,
   ExternalIdentityRepository,
@@ -6,7 +7,6 @@ import type {
   WorkspaceRepository
 } from "../repositories.js";
 import type {
-  EncryptedCredentialRecord,
   ExternalIdentityRecord,
   PersistedExecutionAccount,
   PersistedWorkspace,
