@@ -579,7 +579,7 @@ Implementation:
 Required verification:
 - [x] automated encryption/decryption, tamper and wrong-key tests are implemented.
 - [x] automated save/invalid/disconnect/user-isolation tests are implemented.
-- [ ] full CI passes on the DEV-018 branch.
+- [x] full CI passes on the DEV-018 branch (GitHub Actions run 36757092150).
 - [ ] deployed OIDC login to `/settings` is verified.
 - [ ] an allowlisted user saves a real personal Modal token and connection verification passes.
 - [ ] a second user is verified to execute through a distinct Modal account.
