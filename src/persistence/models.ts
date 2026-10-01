@@ -25,6 +25,8 @@ export interface PersistedExecutionAccount extends ExecutionAccount {
   updatedAt: string;
 }
 
-export interface PersistedWorkspace extends Workspace {
+export interface PersistedWorkspace extends Omit<Workspace, "providerId" | "providerWorkspaceId"> {
   userId: string;
+  providerId?: string;
+  providerWorkspaceId?: string;
 }
