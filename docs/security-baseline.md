@@ -29,9 +29,9 @@
 
 ## Network policy
 
-Default Sandbox egress uses a dependency-domain allowlist. It is intentionally not a general unrestricted Internet environment. The baseline includes common npm/Maven/runtime/bootstrap domains. Custom/private package sources require a future explicit policy extension.
+Default Sandbox egress combines a dependency-domain allowlist with an empty CIDR allowlist. Modal's controls are additive: the domain allowlist permits the listed TLS destinations while the empty CIDR allowlist prevents direct-IP/non-domain egress. The baseline includes common npm/Maven/runtime/bootstrap domains. Custom/private package sources require an explicit policy extension.
 
-Modal exposes both outbound domain and CIDR controls. DEV-014 uses the domain allowlist at Sandbox creation. A later hardening increment may add a reviewed public-CIDR policy if live testing shows it is needed to prevent direct-IP egress while preserving dependency resolution.
+A live Modal smoke test is included to verify the effective behavior against allowlisted TLS, non-allowlisted TLS, direct public IP, RFC1918 and link-local metadata destinations. That live test requires real Modal credentials and remains external verification until executed.
 
 ## Logging and audit
 
@@ -68,11 +68,12 @@ The runtime-image hardening finding has now been addressed at the recommended mi
 
 Digest pinning remains an optional future strengthening if stronger supply-chain immutability is required.
 
-The review also left three verification items that are not treated as confirmed code defects:
+The repository now also contains automated dependency/container scanning and a deployment-security checklist. During introduction of these scans, two additional hardening issues were found and fixed: the runtime image now runs as a non-root user, and the application runtime image no longer ships unused npm/corepack/yarn tooling that carried high-severity vulnerabilities.
 
-- verify with a live Modal sandbox that the configured domain allowlist also prevents unwanted direct-IP/private-network/metadata endpoint egress,
-- verify Coolify/PostgreSQL exposure, trusted proxy behavior and secret handling in the deployed environment,
-- run current dependency and container-image vulnerability checks as part of release/security verification.
+Two external verification items remain:
+
+- run the live Modal egress smoke with real credentials,
+- verify Coolify/PostgreSQL exposure, proxy behavior and secret handling against the deployed environment.
 
 The existing PKCE flow, resource/audience binding, settings CSRF protection, AES-256-GCM credential storage, workspace ownership filtering and ZIP validation are not targeted for redesign by this remediation plan.
 
@@ -111,6 +112,6 @@ The planned implementation order is:
 1. **Workspace lifecycle hardening** – implemented in the current remediation increment: atomic quota reservation, compensating failed creation and stale `CREATING` cleanup.
 2. **Resource bounds** – implemented and regression-verified: viewport/byte-bounded screenshots plus OAuth registration request, metadata and rate limits.
 3. **Runtime-image hardening** – implemented and statically regression-verified: existing versioned GHCR tags cannot be republished by the workflow.
-4. **Security verification** – **in progress**: live Modal egress checks, deployment verification and dependency/container scanning.
+4. **Security verification** – repository controls implemented and CI-scanned; live Modal egress and deployed Coolify/PostgreSQL verification remain external/pending.
 
 Each increment should keep this document aligned with the controls that are actually implemented and verified, rather than documenting intended protections as if they were already enforced.
