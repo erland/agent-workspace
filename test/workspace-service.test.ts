@@ -138,8 +138,43 @@ describe("WorkspaceService", () => {
     assert.equal(fulfilled.length, 1);
     assert.equal(rejected.length, 1);
     assert.match(String((rejected[0] as PromiseRejectedResult).reason), /active workspace limit exceeded/);
+    assert.equal(provider.creates.length, 1);
+    assert.equal(provider.terminated.length, 0);
+  });
+
+  it("releases a pre-allocation reservation when provider creation fails", async () => {
+    class FailOnceProvider extends FakeProvider {
+      override async createWorkspace(options: CreateWorkspaceOptions): Promise<WorkspaceHandle> {
+        this.creates.push(options);
+        if (this.creates.length === 1) throw new Error("provider create failed");
+        return { providerId: "fake", providerWorkspaceId: "provider-retry" };
+      }
+    }
+
+    const provider = new FailOnceProvider();
+    const repository = new InMemoryWorkspaceRepository();
+    let nextId = 0;
+    const service = new WorkspaceService(provider, {
+      userId: "user-provider-failure",
+      repository,
+      idFactory: () => `ws_provider_failure_${++nextId}`,
+      schedule: () => ({}),
+      securityPolicy: {
+        ...DEFAULT_SECURITY_POLICY,
+        maxActiveWorkspacesPerUser: 1
+      }
+    });
+
+    await assert.rejects(() => service.create(), /provider create failed/);
+    assert.equal(
+      await repository.findByIdForUser("ws_provider_failure_1", "user-provider-failure"),
+      undefined
+    );
+
+    const retried = await service.create();
+    assert.equal(retried.status, "READY");
+    assert.equal(retried.id, "ws_provider_failure_2");
     assert.equal(provider.creates.length, 2);
-    assert.equal(provider.terminated.length, 1);
   });
 
   it("terminates and marks a reserved workspace destroyed when READY persistence fails", async () => {
