@@ -10,6 +10,7 @@ import type {
   RefreshTokenRecord
 } from "../src/auth/oauth-store.js";
 import type { IdentityService } from "../src/persistence/identity-service.js";
+import type { UserRateLimiter } from "../src/security/rate-limiter.js";
 
 class MemoryOAuthStore implements OAuthStore {
   clients = new Map<string, OAuthClientRecord>();
