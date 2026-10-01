@@ -23,9 +23,9 @@ export interface ExecutionAccountRepository {
 
 export interface WorkspaceRepository {
   upsert(workspace: PersistedWorkspace): Promise<void>;
+  reserveWorkspace(workspace: PersistedWorkspace, maxActiveWorkspaces: number): Promise<boolean>;
   findByIdForUser(workspaceId: string, userId: string): Promise<PersistedWorkspace | undefined>;
-  listExpiredReady(nowIso: string, limit?: number): Promise<PersistedWorkspace[]>;
-  countReadyForUser(userId: string): Promise<number>;
+  listExpiredActive(nowIso: string, limit?: number): Promise<PersistedWorkspace[]>;
 }
 
 
