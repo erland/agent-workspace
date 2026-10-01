@@ -26,7 +26,7 @@ describe("remote archive downloader", () => {
     const requested: string[] = [];
     const downloader = new RemoteArchiveDownloader({
       lookup: publicLookup() as any,
-      fetchImpl: (async (input: URL | RequestInfo) => {
+      fetchImpl: (async (input: any) => {
         const url = String(input);
         requested.push(url);
         if (requested.length === 1) {
