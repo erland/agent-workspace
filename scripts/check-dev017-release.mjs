@@ -77,6 +77,17 @@ if (runtimeWorkflow.includes("MODAL_TOKEN_ID") || runtimeWorkflow.includes("MODA
   throw new Error("Runtime image workflow must not require Modal credentials");
 }
 
+for (const required of [
+  "Refuse overwrite of existing runtime tag",
+  "gh api --paginate",
+  "metadata.container.tags",
+  "Increment runtime-images/version.txt"
+]) {
+  if (!runtimeWorkflow.includes(required)) {
+    throw new Error(`Runtime image workflow is missing immutable-tag protection: ${required}`);
+  }
+}
+
 const releaseWorkflow = await readFile(".github/workflows/release-image.yml", "utf8");
 for (const required of [
   "release:",
