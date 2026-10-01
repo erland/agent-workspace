@@ -9,6 +9,7 @@ import {
   ScreenshotOutputSchema,
   WorkspaceCreateInputSchema,
   WorkspaceIdInputSchema,
+  WorkspaceUploadZipFromUrlInputSchema,
   WorkspaceUploadZipInputSchema
 } from "./schemas.js";
 
@@ -24,7 +25,26 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
     if (input.lifetimeMinutes !== undefined) normalizedInput.lifetimeMinutes = input.lifetimeMinutes;
     return tools.createWorkspace(normalizedInput);
   });
-  registerJsonTool(server, "workspace_upload_zip", "Upload a base64 encoded ZIP project into a workspace.", WorkspaceUploadZipInputSchema, async (input: z.infer<typeof WorkspaceUploadZipInputSchema>) => tools.uploadZip(input));
+
+  server.registerTool(
+    "workspace_upload_zip",
+    {
+      description: "Upload a ZIP project into a workspace. ChatGPT may provide archive as a native file parameter; archiveBase64 remains available as a portable fallback.",
+      inputSchema: WorkspaceUploadZipInputSchema,
+      outputSchema: JsonObjectOutputSchema,
+      _meta: { "openai/fileParams": ["archive"] }
+    },
+    async (input: z.infer<typeof WorkspaceUploadZipInputSchema>) => jsonToolResult(await tools.uploadZip(input))
+  );
+
+  registerJsonTool(
+    server,
+    "workspace_upload_zip_from_url",
+    "Download a ZIP project from a public HTTPS URL and upload it into a workspace. Intended for MCP hosts that do not support native file parameters.",
+    WorkspaceUploadZipFromUrlInputSchema,
+    async (input: z.infer<typeof WorkspaceUploadZipFromUrlInputSchema>) => tools.uploadZipFromUrl(input)
+  );
+
   registerJsonTool(server, "project_verify", "Build and test the uploaded npm or Maven project.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.verifyProject(input));
   registerJsonTool(server, "prototype_start", "Install dependencies and start an uploaded npm web prototype.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.startPrototype(input));
 
@@ -68,12 +88,13 @@ function registerJsonTool<TInput>(
   inputSchema: any,
   handler: (input: TInput) => Promise<ToolResult<unknown>>
 ): void {
-  server.registerTool(name, { description, inputSchema, outputSchema: JsonObjectOutputSchema }, async (input: TInput) => {
-    const response = await handler(input);
-    if (!response.ok) return errorResult(response);
-    const structured = { result: response.result };
-    return { structuredContent: structured, content: [{ type: "text" as const, text: JSON.stringify(structured) }] };
-  });
+  server.registerTool(name, { description, inputSchema, outputSchema: JsonObjectOutputSchema }, async (input: TInput) => jsonToolResult(await handler(input)));
+}
+
+function jsonToolResult(response: ToolResult<unknown>) {
+  if (!response.ok) return errorResult(response);
+  const structured = { result: response.result };
+  return { structuredContent: structured, content: [{ type: "text" as const, text: JSON.stringify(structured) }] };
 }
 
 function errorResult(response: { ok: false; error: unknown }) {
