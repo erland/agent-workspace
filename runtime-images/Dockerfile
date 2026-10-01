@@ -4,7 +4,8 @@ FROM eclipse-temurin:${JAVA_VERSION}-jdk-noble
 ARG NODE_MAJOR=22
 ARG PLAYWRIGHT_VERSION=1.55.0
 
-ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBIAN_FRONTEND=noninteractive \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/agent-workspace/ms-playwright
 
 RUN set -eux; \
     find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -i 's|http://|https://|g' {} +; \
@@ -20,7 +21,12 @@ RUN set -eux; \
     npm --version; \
     mvn --version; \
     /opt/agent-workspace/browser-tools/node_modules/.bin/playwright --version; \
-    rm -rf /var/lib/apt/lists/* /root/.npm/_cacache
+    rm -rf /var/lib/apt/lists/* /root/.npm/_cacache; \
+    groupadd --system agent-workspace; \
+    useradd --system --gid agent-workspace --create-home --home-dir /home/agent-workspace agent-workspace; \
+    mkdir -p /workspace; \
+    chown -R agent-workspace:agent-workspace /workspace
 
 WORKDIR /workspace
+USER agent-workspace
 CMD ["sleep", "3600"]
