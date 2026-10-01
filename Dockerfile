@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:22.23.3-trixie-slim AS build
+FROM node:22.23.3-alpine3.24 AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -10,7 +10,7 @@ COPY src ./src
 RUN npm run build
 RUN npm prune --omit=dev
 
-FROM node:22.23.3-trixie-slim AS runtime
+FROM node:22.23.3-alpine3.24 AS runtime
 ARG AGENT_WORKSPACE_VERSION=dev
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
