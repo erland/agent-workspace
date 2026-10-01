@@ -82,7 +82,7 @@ The repository security workflow performs:
 - Trivy default runtime-image scan on normal CI events,
 - full six-profile runtime-image matrix scan weekly and on manual dispatch.
 
-High/critical findings fail the security workflow unless they are unfixed findings explicitly ignored by the scanner configuration. Any suppression added later must include a documented rationale and expiry/review date.
+High/critical findings fail the security workflow whether or not an upstream fix is currently available. The workflow must not use Trivy's global `ignore-unfixed` behavior. If a temporary exception is ever required, it must be narrowly scoped to explicit vulnerability IDs with rationale/owner and an expiry/review date. The current baseline has no Trivy vulnerability exception file.
 
 ## Completion criteria
 
