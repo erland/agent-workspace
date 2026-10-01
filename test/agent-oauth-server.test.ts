@@ -25,7 +25,7 @@ class MemoryOAuthStore implements OAuthStore {
   async consumeRefreshToken(tokenHash: string) { const x = this.refresh.get(tokenHash); this.refresh.delete(tokenHash); return x ? structuredClone(x) : undefined; }
 }
 
-function server(store = new MemoryOAuthStore()) {
+function server(store = new MemoryOAuthStore(), registrationRateLimiter?: UserRateLimiter) {
   const { privateKey } = generateKeyPairSync("ed25519");
   const config: AgentOAuthServerConfig = {
     issuer: "https://workspace.example/",
@@ -40,7 +40,16 @@ function server(store = new MemoryOAuthStore()) {
     clientMetadataOrigins: []
   };
   const identityService = {} as IdentityService;
-  return { auth: new AgentOAuthServer(config, store, identityService, () => new Date("2026-09-30T18:00:00Z")), store };
+  return {
+    auth: new AgentOAuthServer(
+      config,
+      store,
+      identityService,
+      () => new Date("2026-09-30T18:00:00Z"),
+      registrationRateLimiter
+    ),
+    store
+  };
 }
 
 describe("Agent Workspace OAuth server", () => {
