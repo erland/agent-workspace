@@ -18,6 +18,7 @@ const requiredFiles = [
   "runtime-images/version.txt",
   ".github/workflows/runtime-images.yml",
   ".github/workflows/security-scan.yml",
+  ".trivyignore-app.yaml",
   ".github/workflows/release-image.yml"
 ];
 
@@ -95,6 +96,21 @@ for (const required of [
 
 if (securityWorkflow.includes("ignore-unfixed: true")) {
   throw new Error("Security scan workflow must not globally ignore unfixed vulnerabilities");
+}
+
+if (!securityWorkflow.includes("trivyignores: .trivyignore-app.yaml")) {
+  throw new Error("Application image scan must use the scoped Trivy exception file");
+}
+
+const appTrivyIgnore = await readFile(".trivyignore-app.yaml", "utf8");
+const ignoredVulnerabilities = appTrivyIgnore.split("\n  - id: ").slice(1);
+if (ignoredVulnerabilities.length === 0) {
+  throw new Error("Scoped Trivy exception file must contain explicit vulnerability IDs");
+}
+for (const entry of ignoredVulnerabilities) {
+  if (!entry.includes("expired_at:") || !entry.includes("statement:")) {
+    throw new Error("Every Trivy vulnerability exception must have an expiry date and statement");
+  }
 }
 
 for (const required of [
