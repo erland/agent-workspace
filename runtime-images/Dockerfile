@@ -16,6 +16,8 @@ RUN set -eux; \
     curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -; \
     apt-get install -y --no-install-recommends nodejs; \
     npm install -g "npm@${NPM_VERSION}"; \
+    npm install --prefix "$(npm root -g)/npm" --omit=dev --no-save \
+      "brace-expansion@5.0.11" "undici@6.28.1"; \
     mkdir -p /opt/agent-workspace/browser-tools; \
     npm install --prefix /opt/agent-workspace/browser-tools "playwright@${PLAYWRIGHT_VERSION}"; \
     /opt/agent-workspace/browser-tools/node_modules/.bin/playwright install --with-deps chromium; \
