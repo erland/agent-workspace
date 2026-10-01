@@ -99,7 +99,7 @@ Live Modal smoke tests remain environment-dependent and are run only when approp
 The runtime-image baseline at the time of this review is:
 
 ```text
-runtime-images/version.txt = 1
+runtime-images/version.txt = 2
 ```
 
 Any runtime-image recipe change must increment that version until stronger immutable-image enforcement is implemented.
