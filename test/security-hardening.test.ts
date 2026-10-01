@@ -56,6 +56,7 @@ describe("DEV-014 security hardening", () => {
     });
     await service.create();
     await assert.rejects(() => service.create(), /active workspace limit exceeded/);
+    assert.equal(provider.creates.length, 1);
   });
 
   it("redacts bearer and provider credential material from errors/log text", () => {
@@ -110,7 +111,7 @@ describe("DEV-014 security hardening", () => {
     const accounts = new InMemoryExecutionAccountRepository();
     await accounts.upsert({ id: "ea1", userId: "u1", provider: "modal", credentialRef: "ref", status: "CONNECTED", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" });
     await workspaces.upsert({
-      id: "ws-creating", userId: "u1", providerId: "fake", providerWorkspaceId: "sb-creating", runtimeProfile: "java21-node22",
+      id: "ws-creating", userId: "u1", runtimeProfile: "java21-node22",
       status: "CREATING", createdAt: "2026-01-01T00:00:00Z", expiresAt: "2026-01-01T00:01:00Z"
     });
 
@@ -118,7 +119,7 @@ describe("DEV-014 security hardening", () => {
     const result = await job.run();
 
     assert.deepEqual(result, { processed: 1, failed: 0 });
-    assert.equal(provider.terminated.length, 1);
+    assert.equal(provider.terminated.length, 0);
     const persisted = await workspaces.findByIdForUser("ws-creating", "u1");
     assert.equal(persisted?.status, "EXPIRED");
   });
