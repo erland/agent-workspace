@@ -70,7 +70,7 @@ try {
 
   assert.ok(await workspaces.findByIdForUser(`ws-${suffix}-alice`, alice.id));
   assert.equal(await workspaces.findByIdForUser(`ws-${suffix}-alice`, bob.id), undefined);
-  const expired = await workspaces.listExpiredReady(now.toISOString());
+  const expired = await workspaces.listExpiredActive(now.toISOString());
   assert.ok(expired.some((workspace) => workspace.id === `ws-${suffix}-alice`));
   assert.ok(!expired.some((workspace) => workspace.id === `ws-${suffix}-bob`));
 

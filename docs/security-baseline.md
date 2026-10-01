@@ -42,13 +42,19 @@ Workspace TTL is enforced both by timers and persisted expiry metadata. The remo
 
 ## Security review baseline – 2026-10-01
 
-A focused security review of the current implementation identified no verified critical or high-severity findings. The following hardening items remain open and are the tracked scope for the next security increments:
+A focused security review of the current implementation identified no verified critical or high-severity findings. The workspace lifecycle findings have now been addressed:
 
-1. Make the per-user workspace quota atomic across concurrent create requests and count both `CREATING` and `READY` reservations.
-2. Make workspace creation compensating/fail-safe so a provider sandbox is terminated if persistence or later setup fails before the workspace reaches `READY`.
-3. Add dedicated resource limits and abuse controls to unauthenticated OAuth Dynamic Client Registration at `POST /register`.
-4. Add a hard screenshot byte-size bound in addition to the current viewport bounds, preferably preventing oversized artifacts before they are read into the control-plane process and base64 encoded.
-5. Prevent accidental replacement of an existing versioned runtime-image tag; consider digest pinning later if stronger supply-chain immutability is required.
+- per-user workspace capacity is reserved atomically and both `CREATING` and `READY` consume quota,
+- PostgreSQL serializes same-user reservations with a transaction-scoped advisory lock around the atomic count+insert statement,
+- any failure after provider allocation attempts to terminate the sandbox and a reserved workspace is moved to `DESTROYED`,
+- stale `CREATING` reservations are included in expiry cleanup so a crashed creator cannot consume quota indefinitely,
+- the expiry timer is installed only after the workspace has successfully reached `READY`.
+
+The following hardening items remain open for later security increments:
+
+1. Add dedicated resource limits and abuse controls to unauthenticated OAuth Dynamic Client Registration at `POST /register`.
+2. Add a hard screenshot byte-size bound in addition to the current viewport bounds, preferably preventing oversized artifacts before they are read into the control-plane process and base64 encoded.
+3. Prevent accidental replacement of an existing versioned runtime-image tag; consider digest pinning later if stronger supply-chain immutability is required.
 
 The review also left three verification items that are not treated as confirmed code defects:
 
@@ -90,7 +96,7 @@ Any runtime-image recipe change must increment that version until stronger immut
 
 The planned implementation order is:
 
-1. **Workspace lifecycle hardening** – atomic quota reservation plus compensation on failed creation.
+1. **Workspace lifecycle hardening** – implemented in the current remediation increment: atomic quota reservation, compensating failed creation and stale `CREATING` cleanup.
 2. **Resource bounds** – screenshot byte limits plus OAuth registration metadata/rate limits.
 3. **Runtime-image hardening** – prevent reuse/overwrite of an existing runtime-image version.
 4. **Security verification** – live Modal egress checks, deployment verification and dependency/container scanning.

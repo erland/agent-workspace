@@ -9,6 +9,8 @@ import type {
   WorkspaceHandle
 } from "../src/core/sandbox-provider.js";
 import { WorkspaceService } from "../src/workspace/workspace-service.js";
+import { InMemoryWorkspaceRepository } from "../src/persistence/in-memory.js";
+import { DEFAULT_SECURITY_POLICY } from "../src/security/security-policy.js";
 
 class FakeProvider implements SandboxProvider {
   public creates: CreateWorkspaceOptions[] = [];
@@ -111,6 +113,56 @@ describe("WorkspaceService", () => {
     const service = new WorkspaceService(provider, { schedule: () => ({}) });
 
     await assert.rejects(() => service.create({ lifetimeMinutes: 61 }), /may not exceed 60/);
+  });
+
+
+  it("enforces the active workspace quota atomically for concurrent creates", async () => {
+    const provider = new FakeProvider();
+    const repository = new InMemoryWorkspaceRepository();
+    let nextId = 0;
+    const service = new WorkspaceService(provider, {
+      userId: "user-concurrent",
+      repository,
+      idFactory: () => `ws_concurrent_${++nextId}`,
+      schedule: () => ({}),
+      securityPolicy: {
+        ...DEFAULT_SECURITY_POLICY,
+        maxActiveWorkspacesPerUser: 1
+      }
+    });
+
+    const results = await Promise.allSettled([service.create(), service.create()]);
+    const fulfilled = results.filter((result) => result.status === "fulfilled");
+    const rejected = results.filter((result) => result.status === "rejected");
+
+    assert.equal(fulfilled.length, 1);
+    assert.equal(rejected.length, 1);
+    assert.match(String((rejected[0] as PromiseRejectedResult).reason), /active workspace limit exceeded/);
+    assert.equal(provider.creates.length, 2);
+    assert.equal(provider.terminated.length, 1);
+  });
+
+  it("terminates and marks a reserved workspace destroyed when READY persistence fails", async () => {
+    class FailingReadyRepository extends InMemoryWorkspaceRepository {
+      override async upsert(workspace: Parameters<InMemoryWorkspaceRepository["upsert"]>[0]): Promise<void> {
+        if (workspace.status === "READY") throw new Error("database unavailable");
+        return super.upsert(workspace);
+      }
+    }
+
+    const provider = new FakeProvider();
+    const repository = new FailingReadyRepository();
+    const service = new WorkspaceService(provider, {
+      userId: "user-persist-failure",
+      repository,
+      idFactory: () => "ws_persist_failure",
+      schedule: () => ({})
+    });
+
+    await assert.rejects(() => service.create(), /database unavailable/);
+    assert.equal(provider.terminated.length, 1);
+    const persisted = await repository.findByIdForUser("ws_persist_failure", "user-persist-failure");
+    assert.equal(persisted?.status, "DESTROYED");
   });
 });
 

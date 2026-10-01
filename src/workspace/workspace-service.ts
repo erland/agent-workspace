@@ -123,14 +123,12 @@ export class WorkspaceService {
 
   public async create(request: CreateWorkspaceRequest = {}): Promise<Workspace> {
     await this.cleanupExpired();
-    await this.enforceActiveWorkspaceLimit();
     const profile = resolveRuntimeProfile(request.runtime);
     const lifetimeMinutes = request.lifetimeMinutes ?? this.defaultLifetimeMinutes;
     this.validateLifetime(lifetimeMinutes);
 
     const createdAt = this.now();
     const expiresAt = new Date(createdAt.getTime() + lifetimeMinutes * 60_000);
-
     const handle = await this.provider.createWorkspace({
       imageRef: profile.imageRef,
       timeoutMs: lifetimeMinutes * 60_000,
@@ -140,7 +138,26 @@ export class WorkspaceService {
       networkPolicy: this.securityPolicy.networkPolicy
     });
 
+    const workspace: Workspace = {
+      id: this.idFactory(),
+      userId: this.userId,
+      providerId: handle.providerId,
+      providerWorkspaceId: handle.providerWorkspaceId,
+      runtimeProfile: profile.id,
+      status: "CREATING",
+      createdAt: createdAt.toISOString(),
+      expiresAt: expiresAt.toISOString()
+    };
+
+    let reserved = false;
     try {
+      reserved = await this.reserveWorkspace(workspace, handle);
+      if (!reserved) {
+        throw new Error(
+          `User active workspace limit exceeded (${this.securityPolicy.maxActiveWorkspacesPerUser})`
+        );
+      }
+
       for (const command of profile.bootstrapCommands) {
         const result = await this.provider.exec(handle, command);
         if (result.exitCode !== 0) {
@@ -149,34 +166,28 @@ export class WorkspaceService {
           );
         }
       }
+
+      workspace.status = "READY";
+      await this.persist(workspace);
+
+      const expiryTimer = this.schedule?.(() => {
+        void this.expire(workspace.id);
+      }, lifetimeMinutes * 60_000);
+      expiryTimer?.unref?.();
+      const record = this.records.get(workspace.id);
+      if (record && expiryTimer !== undefined) record.expiryTimer = expiryTimer;
+
+      return cloneWorkspace(workspace);
     } catch (error) {
       await this.provider.terminate(handle).catch(() => undefined);
+      if (reserved) {
+        workspace.status = "DESTROYED";
+        workspace.destroyedAt = this.now().toISOString();
+        await this.persist(workspace).catch(() => undefined);
+        this.records.delete(workspace.id);
+      }
       throw error;
     }
-
-    const workspace: Workspace = {
-      id: this.idFactory(),
-      userId: this.userId,
-      providerId: handle.providerId,
-      providerWorkspaceId: handle.providerWorkspaceId,
-      runtimeProfile: profile.id,
-      status: "READY",
-      createdAt: createdAt.toISOString(),
-      expiresAt: expiresAt.toISOString()
-    };
-
-    const expiryTimer = this.schedule?.(() => {
-      void this.expire(workspace.id);
-    }, lifetimeMinutes * 60_000);
-    expiryTimer?.unref?.();
-    const record: WorkspaceRecord =
-      expiryTimer === undefined
-        ? { workspace, handle }
-        : { workspace, handle, expiryTimer };
-    this.records.set(workspace.id, record);
-    await this.persist(workspace);
-
-    return cloneWorkspace(workspace);
   }
 
   public async get(workspaceId: string): Promise<Workspace> {
@@ -354,7 +365,10 @@ export class WorkspaceService {
 
   private async expire(workspaceId: string): Promise<void> {
     const record = this.records.get(workspaceId);
-    if (record === undefined || record.workspace.status !== "READY") {
+    if (
+      record === undefined ||
+      (record.workspace.status !== "CREATING" && record.workspace.status !== "READY")
+    ) {
       return;
     }
 
@@ -369,7 +383,7 @@ export class WorkspaceService {
 
   public async cleanupExpired(limit = 100): Promise<number> {
     if (!this.repository) return 0;
-    const expired = await this.repository.listExpiredReady(this.now().toISOString(), limit);
+    const expired = await this.repository.listExpiredActive(this.now().toISOString(), limit);
     let count = 0;
     for (const workspace of expired) {
       if (workspace.userId !== this.userId) continue;
@@ -406,13 +420,23 @@ export class WorkspaceService {
     await this.repository?.upsert(cloneWorkspace(workspace));
   }
 
-  private async enforceActiveWorkspaceLimit(): Promise<void> {
-    const persisted = this.repository
-      ? await this.repository.countReadyForUser(this.userId)
-      : [...this.records.values()].filter((record) => record.workspace.status === "READY").length;
-    if (persisted >= this.securityPolicy.maxActiveWorkspacesPerUser) {
-      throw new Error(`User active workspace limit exceeded (${this.securityPolicy.maxActiveWorkspacesPerUser})`);
+  private async reserveWorkspace(workspace: Workspace, handle: WorkspaceHandle): Promise<boolean> {
+    if (this.repository) {
+      const reserved = await this.repository.reserveWorkspace(
+        cloneWorkspace(workspace),
+        this.securityPolicy.maxActiveWorkspacesPerUser
+      );
+      if (!reserved) return false;
+    } else {
+      const active = [...this.records.values()].filter(
+        (record) =>
+          record.workspace.status === "CREATING" || record.workspace.status === "READY"
+      ).length;
+      if (active >= this.securityPolicy.maxActiveWorkspacesPerUser) return false;
     }
+
+    this.records.set(workspace.id, { workspace, handle });
+    return true;
   }
 
   private isExpired(workspace: Workspace): boolean {

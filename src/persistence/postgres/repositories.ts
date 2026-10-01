@@ -186,6 +186,41 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
     );
   }
 
+  async reserveWorkspace(workspace: PersistedWorkspace, maxActiveWorkspaces: number): Promise<boolean> {
+    const result = await this.db.query<{ id: string }>(
+      `with quota_lock as materialized (
+         select pg_advisory_xact_lock(hashtextextended($1, 0))
+       ),
+       active as (
+         select count(*)::int as count
+         from workspace cross join quota_lock
+         where user_id = $1 and status in ('CREATING','READY')
+       )
+       insert into workspace
+         (id, user_id, provider_id, provider_workspace_id, runtime_profile, status,
+          created_at, expires_at, destroyed_at, project_json, prototype_json)
+       select $2,$1,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb
+       from active
+       where active.count < $12
+       returning id`,
+      [
+        workspace.userId,
+        workspace.id,
+        workspace.providerId,
+        workspace.providerWorkspaceId,
+        workspace.runtimeProfile,
+        workspace.status,
+        workspace.createdAt,
+        workspace.expiresAt,
+        workspace.destroyedAt ?? null,
+        workspace.project ? JSON.stringify(workspace.project) : null,
+        workspace.prototype ? JSON.stringify(workspace.prototype) : null,
+        maxActiveWorkspaces
+      ]
+    );
+    return result.rows.length === 1;
+  }
+
   async findByIdForUser(workspaceId: string, userId: string): Promise<PersistedWorkspace | undefined> {
     const result = await this.db.query<WorkspaceRow>(
       `select id, user_id, provider_id, provider_workspace_id, runtime_profile, status,
@@ -197,20 +232,12 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
     return row ? mapWorkspace(row) : undefined;
   }
 
-  async countReadyForUser(userId: string): Promise<number> {
-    const result = await this.db.query<{ count: string | number }>(
-      `select count(*) as count from workspace where user_id = $1 and status = 'READY'`,
-      [userId]
-    );
-    return Number(result.rows[0]?.count ?? 0);
-  }
-
-  async listExpiredReady(nowIso: string, limit = 100): Promise<PersistedWorkspace[]> {
+  async listExpiredActive(nowIso: string, limit = 100): Promise<PersistedWorkspace[]> {
     const result = await this.db.query<WorkspaceRow>(
       `select id, user_id, provider_id, provider_workspace_id, runtime_profile, status,
               created_at, expires_at, destroyed_at, project_json, prototype_json
        from workspace
-       where status = 'READY' and expires_at <= $1
+       where status in ('CREATING','READY') and expires_at <= $1
        order by expires_at asc
        limit $2`,
       [nowIso, limit]

@@ -101,4 +101,24 @@ describe("DEV-014 security hardening", () => {
     const persisted = await workspaces.findByIdForUser("ws1", "u1");
     assert.equal(persisted?.status, "EXPIRED");
   });
+
+
+  it("cleanup also expires stale CREATING reservations", async () => {
+    const provider = new FakeProvider();
+    const workspaces = new InMemoryWorkspaceRepository();
+    const accounts = new InMemoryExecutionAccountRepository();
+    await accounts.upsert({ id: "ea1", userId: "u1", provider: "modal", credentialRef: "ref", status: "CONNECTED", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" });
+    await workspaces.upsert({
+      id: "ws-creating", userId: "u1", providerId: "fake", providerWorkspaceId: "sb-creating", runtimeProfile: "java21-node22",
+      status: "CREATING", createdAt: "2026-01-01T00:00:00Z", expiresAt: "2026-01-01T00:01:00Z"
+    });
+
+    const job = new ExpiredWorkspaceCleanupJob(workspaces, accounts, new FakeFactory(provider), () => new Date("2026-01-01T01:00:00Z"));
+    const result = await job.run();
+
+    assert.deepEqual(result, { processed: 1, failed: 0 });
+    assert.equal(provider.terminated.length, 1);
+    const persisted = await workspaces.findByIdForUser("ws-creating", "u1");
+    assert.equal(persisted?.status, "EXPIRED");
+  });
 });
