@@ -53,10 +53,10 @@ jobs:
           set -euo pipefail
           endpoint="/users/${OWNER}/packages/container/${PACKAGE_NAME}/versions?per_page=100"
           tmp="$(mktemp)"
-          status=0
-          if ! gh api --paginate "${endpoint}" > "${tmp}" 2>gh-api-error.txt; then
-            status=$?
-          fi
+          set +e
+          gh api --paginate "${endpoint}" > "${tmp}" 2>gh-api-error.txt
+          status=$?
+          set -e
 
           if [ "${status}" -ne 0 ]; then
             if grep -q "HTTP 404" gh-api-error.txt; then
