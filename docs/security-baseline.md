@@ -68,7 +68,7 @@ The runtime-image hardening finding has now been addressed at the recommended mi
 
 Digest pinning remains an optional future strengthening if stronger supply-chain immutability is required.
 
-The repository now also contains automated dependency/container scanning and a deployment-security checklist. During introduction of these scans, two additional hardening issues were found and fixed: the runtime image now runs as a non-root user, and the application runtime image no longer ships unused npm/corepack/yarn tooling that carried high-severity vulnerabilities.
+The repository now also contains automated dependency/container scanning and a deployment-security checklist. During introduction of these scans, additional hardening issues were found and fixed: the runtime image now runs as a non-root user; the application runtime image no longer ships unused npm/corepack/yarn tooling that carried high-severity vulnerabilities; and runtime-image OS/Playwright/npm-toolchain dependencies were updated or patched until the default runtime image passed the high/critical Trivy gate. These runtime recipe changes are published as runtime image version 2.
 
 Two external verification items remain:
 
