@@ -15,9 +15,9 @@ export type ToolResult<T> = ToolSuccess<T> | ToolFailure;
 
 export interface WorkspaceUploadZipToolInput {
   workspaceId: string;
-  filename?: string;
-  archive?: OpenAIFileParameter;
-  archiveBase64?: string;
+  filename?: string | undefined;
+  archive?: OpenAIFileParameter | undefined;
+  archiveBase64?: string | undefined;
 }
 
 export interface AgentWorkspaceTools {
