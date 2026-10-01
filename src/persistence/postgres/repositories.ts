@@ -165,6 +165,9 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
           created_at, expires_at, destroyed_at, project_json, prototype_json)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb)
        on conflict (id) do update set
+         provider_id = excluded.provider_id,
+         provider_workspace_id = excluded.provider_workspace_id,
+         runtime_profile = excluded.runtime_profile,
          status = excluded.status,
          expires_at = excluded.expires_at,
          destroyed_at = excluded.destroyed_at,
@@ -199,15 +202,13 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
        insert into workspace
          (id, user_id, provider_id, provider_workspace_id, runtime_profile, status,
           created_at, expires_at, destroyed_at, project_json, prototype_json)
-       select $2,$1,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb
+       select $2,$1,null,null,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb
        from active
-       where active.count < $12
+       where active.count < $10
        returning id`,
       [
         workspace.userId,
         workspace.id,
-        workspace.providerId,
-        workspace.providerWorkspaceId,
         workspace.runtimeProfile,
         workspace.status,
         workspace.createdAt,
@@ -219,6 +220,18 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
       ]
     );
     return result.rows.length === 1;
+  }
+
+  async deleteReservation(workspaceId: string, userId: string): Promise<void> {
+    await this.db.query(
+      `delete from workspace
+       where id = $1
+         and user_id = $2
+         and status = 'CREATING'
+         and provider_id is null
+         and provider_workspace_id is null`,
+      [workspaceId, userId]
+    );
   }
 
   async findByIdForUser(workspaceId: string, userId: string): Promise<PersistedWorkspace | undefined> {
@@ -262,7 +275,7 @@ type ExecutionAccountRow = {
   credential_ref: string; status: PersistedExecutionAccount["status"]; created_at: string | Date; updated_at: string | Date;
 };
 type WorkspaceRow = {
-  id: string; user_id: string; provider_id: string; provider_workspace_id: string;
+  id: string; user_id: string; provider_id: string | null; provider_workspace_id: string | null;
   runtime_profile: PersistedWorkspace["runtimeProfile"]; status: PersistedWorkspace["status"];
   created_at: string | Date; expires_at: string | Date; destroyed_at: string | Date | null;
   project_json: NonNullable<PersistedWorkspace["project"]> | string | null;
@@ -309,8 +322,8 @@ function mapWorkspace(row: WorkspaceRow): PersistedWorkspace {
   return {
     id: row.id,
     userId: row.user_id,
-    providerId: row.provider_id,
-    providerWorkspaceId: row.provider_workspace_id,
+    ...(row.provider_id ? { providerId: row.provider_id } : {}),
+    ...(row.provider_workspace_id ? { providerWorkspaceId: row.provider_workspace_id } : {}),
     runtimeProfile: row.runtime_profile,
     status: row.status,
     createdAt: toIso(row.created_at),
