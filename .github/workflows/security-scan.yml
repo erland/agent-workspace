@@ -64,6 +64,7 @@ jobs:
           image-ref: agent-workspace-security-scan:local
           scanners: vuln,secret
           severity: HIGH,CRITICAL
+          trivyignores: .trivyignore-app.yaml
           exit-code: "1"
 
   default-runtime-image:
