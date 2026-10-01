@@ -17,7 +17,12 @@ export interface SettingsDependencies {
 export function createSettingsHandler(deps: SettingsDependencies) {
   return async function handleSettingsRequest(request: Request): Promise<Response | undefined> {
     const url = new URL(request.url);
-    if (!url.pathname.startsWith("/settings")) return undefined;
+    if (url.pathname !== "/" && !url.pathname.startsWith("/settings")) return undefined;
+
+    if (request.method === "GET" && url.pathname === "/") {
+      const session = deps.auth.settingsSession(request);
+      return html(renderHome(session));
+    }
 
     if (request.method === "GET" && url.pathname === "/settings/login") {
       return deps.auth.beginSettingsLogin();
@@ -116,6 +121,53 @@ function html(body: string): Response {
       "referrer-policy": "no-referrer"
     }
   });
+}
+
+function renderHome(
+  session: { principal: AuthenticatedPrincipal; csrf: string } | undefined
+): string {
+  const identity = session
+    ? escapeHtml(session.principal.displayName ?? session.principal.email ?? "Inloggad användare")
+    : undefined;
+  const csrf = session ? escapeHtml(session.csrf) : "";
+
+  return `<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent Workspace</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:72px auto;padding:0 20px;color:#171717}
+main{border:1px solid #ddd;border-radius:16px;padding:28px}
+h1{margin-top:0}
+p{line-height:1.5}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}
+a.button,button{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:44px;padding:10px 16px;border:1px solid #888;border-radius:8px;background:#fff;color:#171717;text-decoration:none;cursor:pointer;font:inherit}
+.muted{color:#666}
+form{margin:0}
+@media (max-width:600px){
+  body{margin:24px auto;padding:0 14px}
+  main{padding:20px}
+  .actions{display:block}
+  .actions a,.actions form,.actions button{width:100%}
+  .actions form{margin-top:10px}
+}
+</style>
+</head>
+<body>
+<main>
+<h1>Agent Workspace</h1>
+<p>Kör AI-assistenters utvecklingsjobb i isolerade workspaces.</p>
+${session
+  ? `<p class="muted">Inloggad som ${identity}.</p>
+<div class="actions">
+<a class="button" href="/settings">Öppna inställningar</a>
+<form method="post" action="/settings/logout"><input type="hidden" name="csrf" value="${csrf}"><button>Logga ut</button></form>
+</div>`
+  : `<div class="actions"><a class="button" href="/settings/login">Logga in med Google</a></div>`}
+</main>
+</body></html>`;
 }
 
 function renderSettings(input: {
