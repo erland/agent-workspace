@@ -105,7 +105,7 @@ The planned implementation order is:
 
 1. **Workspace lifecycle hardening** – implemented in the current remediation increment: atomic quota reservation, compensating failed creation and stale `CREATING` cleanup.
 2. **Resource bounds** – implemented and regression-verified: viewport/byte-bounded screenshots plus OAuth registration request, metadata and rate limits.
-3. **Runtime-image hardening** – prevent reuse/overwrite of an existing runtime-image version.
+3. **Runtime-image hardening** – **in progress**: prevent reuse/overwrite of an existing runtime-image version.
 4. **Security verification** – live Modal egress checks, deployment verification and dependency/container scanning.
 
 Each increment should keep this document aligned with the controls that are actually implemented and verified, rather than documenting intended protections as if they were already enforced.
