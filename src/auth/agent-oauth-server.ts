@@ -202,7 +202,7 @@ export class AgentOAuthServer {
   }
 
   logoutSettings(): Response {
-    const headers = new Headers({ location: "/settings" });
+    const headers = new Headers({ location: "/" });
     headers.append("set-cookie", cookie("aw_session", "", 0));
     return new Response(null, { status: 302, headers });
   }
