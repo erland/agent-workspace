@@ -23,7 +23,7 @@ export const DEFAULT_NODE_VERSION: NodeVersion = "22";
 export const DEFAULT_RUNTIME_PROFILE_ID: RuntimeProfileId = "java21-node22";
 
 export const DEFAULT_RUNTIME_IMAGE_PREFIX = "ghcr.io/erland/agent-workspace-runtime";
-export const DEFAULT_RUNTIME_IMAGE_VERSION = "1";
+export const DEFAULT_RUNTIME_IMAGE_VERSION = "2";
 
 function createProfile(java: JavaVersion, node: NodeVersion): RuntimeProfile {
   const id = `java${java}-node${node}` as RuntimeProfileId;
