@@ -22,7 +22,13 @@ class ScreenshotProvider implements SandboxProvider {
   constructor(private readonly result: ExecutionResult, private readonly bytes: Uint8Array = PNG) {}
   async createWorkspace(_options: CreateWorkspaceOptions): Promise<WorkspaceHandle> { return { providerId:"fake", providerWorkspaceId:"fake" }; }
   async uploadArchive(_handle: WorkspaceHandle, _archive: Uint8Array): Promise<void> {}
-  async exec(_handle: WorkspaceHandle, command: Command): Promise<ExecutionResult> { this.commands.push(command); return this.result; }
+  async exec(_handle: WorkspaceHandle, command: Command): Promise<ExecutionResult> {
+    this.commands.push(command);
+    if (command.argv[0] === "stat") {
+      return { exitCode: 0, stdout: String(this.bytes.byteLength), stderr: "" };
+    }
+    return this.result;
+  }
   async readFile(_handle: WorkspaceHandle, path: string): Promise<Uint8Array> { this.readPaths.push(path); return this.bytes; }
   async terminate(_handle: WorkspaceHandle): Promise<void> {}
 }
@@ -40,6 +46,8 @@ describe("ScreenshotService", () => {
     assert.equal(result.height, 900);
     assert.deepEqual(result.bytes, PNG);
     assert.match(provider.commands[0]?.argv.join(" ") ?? "", /chromium\.launch/);
+    assert.match(provider.commands[0]?.argv.join(" ") ?? "", /fullPage:false/);
+    assert.deepEqual(provider.commands[1]?.argv, ["stat", "-c", "%s", "/tmp/agent-workspace-screenshot.png"]);
     assert.deepEqual(provider.readPaths, ["/tmp/agent-workspace-screenshot.png"]);
   });
 
@@ -59,6 +67,15 @@ describe("ScreenshotService", () => {
     const result = await new ScreenshotService(provider).capture(handle, { url:"http://127.0.0.1:4173", viewport:"mobile" });
     assert.equal(result.status, "FAILED");
     if (result.status === "FAILED") assert.match(result.failureSummary, /browser failed/);
+    assert.equal(provider.readPaths.length, 0);
+  });
+
+  it("rejects oversized screenshot output before reading it into the control plane", async () => {
+    const oversized = new Uint8Array(1024);
+    const provider = new ScreenshotProvider({ exitCode:0, stdout:"", stderr:"" }, oversized);
+    const result = await new ScreenshotService(provider, { maxScreenshotBytes: 100 }).capture(handle, { url:"http://127.0.0.1:4173" });
+    assert.equal(result.status, "FAILED");
+    if (result.status === "FAILED") assert.match(result.failureSummary, /exceeds maximum size/);
     assert.equal(provider.readPaths.length, 0);
   });
 
