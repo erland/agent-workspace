@@ -15,10 +15,15 @@ export class ExpiredWorkspaceCleanupJob {
     let failed = 0;
     for (const workspace of expired) {
       try {
-        const account = await this.accounts.findByUserId(workspace.userId);
-        if (!account || account.status !== "CONNECTED") throw new Error("Execution account unavailable for cleanup");
-        const provider = await this.providerFactory.createForAccount(account);
-        await provider.terminate({ providerId: workspace.providerId, providerWorkspaceId: workspace.providerWorkspaceId });
+        if (workspace.providerId && workspace.providerWorkspaceId) {
+          const account = await this.accounts.findByUserId(workspace.userId);
+          if (!account || account.status !== "CONNECTED") throw new Error("Execution account unavailable for cleanup");
+          const provider = await this.providerFactory.createForAccount(account);
+          await provider.terminate({
+            providerId: workspace.providerId,
+            providerWorkspaceId: workspace.providerWorkspaceId
+          });
+        }
       } catch {
         failed += 1;
       } finally {
