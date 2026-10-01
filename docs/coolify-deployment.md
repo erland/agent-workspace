@@ -208,6 +208,10 @@ Applikationscontainern lagrar inga projektfiler permanent. Workspace-data ligger
 16. Verifiera två användare mot två skilda Modal-konton.
 17. Verifiera refresh-tokenrotation och reconnect efter service-restart.
 
+## Säkerhetsverifiering
+
+Se `docs/security-deployment-verification.md` för den separata checklistan som måste verifieras mot den faktiska Coolify/PostgreSQL-miljön innan produktionssäkerheten kan betraktas som fullständigt verifierad.
+
 ## Säkerhetsgräns
 
 Publik trafik ska endast gå via Coolifys reverse proxy. Exponera inte Node-port `3000` direkt från hosten.
