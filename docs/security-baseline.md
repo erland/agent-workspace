@@ -39,3 +39,60 @@ Build/prototype output is bounded and redacted for common bearer/provider creden
 ## Cleanup
 
 Workspace TTL is enforced both by timers and persisted expiry metadata. The remote process periodically scans persisted READY workspaces whose TTL has elapsed. Cleanup persists `EXPIRED` even when a provider termination call reports an error, so abandoned state remains visible and cannot silently stay READY.
+
+## Security review baseline – 2026-10-01
+
+A focused security review of the current implementation identified no verified critical or high-severity findings. The following hardening items remain open and are the tracked scope for the next security increments:
+
+1. Make the per-user workspace quota atomic across concurrent create requests and count both `CREATING` and `READY` reservations.
+2. Make workspace creation compensating/fail-safe so a provider sandbox is terminated if persistence or later setup fails before the workspace reaches `READY`.
+3. Add dedicated resource limits and abuse controls to unauthenticated OAuth Dynamic Client Registration at `POST /register`.
+4. Add a hard screenshot byte-size bound in addition to the current viewport bounds, preferably preventing oversized artifacts before they are read into the control-plane process and base64 encoded.
+5. Prevent accidental replacement of an existing versioned runtime-image tag; consider digest pinning later if stronger supply-chain immutability is required.
+
+The review also left three verification items that are not treated as confirmed code defects:
+
+- verify with a live Modal sandbox that the configured domain allowlist also prevents unwanted direct-IP/private-network/metadata endpoint egress,
+- verify Coolify/PostgreSQL exposure, trusted proxy behavior and secret handling in the deployed environment,
+- run current dependency and container-image vulnerability checks as part of release/security verification.
+
+The existing PKCE flow, resource/audience binding, settings CSRF protection, AES-256-GCM credential storage, workspace ownership filtering and ZIP validation are not targeted for redesign by this remediation plan.
+
+## Regression verification baseline
+
+Before and after each security-hardening increment, the deterministic repository baseline is:
+
+```bash
+npm ci --no-audit --no-fund
+npm test
+npm run typecheck
+npm run build
+npm run test:mcp-contract
+npm run test:auth
+npm run test:security
+npm run test:deployment
+npm run check:release
+```
+
+This is the same deterministic set exercised by the repository CI workflow on pushes and pull requests.
+
+Live Modal smoke tests remain environment-dependent and are run only when appropriate credentials and an execution account are available. They are required for changes whose acceptance criterion depends on real Modal behavior, especially network-policy verification.
+
+The runtime-image baseline at the time of this review is:
+
+```text
+runtime-images/version.txt = 1
+```
+
+Any runtime-image recipe change must increment that version until stronger immutable-image enforcement is implemented.
+
+## Security remediation sequence
+
+The planned implementation order is:
+
+1. **Workspace lifecycle hardening** – atomic quota reservation plus compensation on failed creation.
+2. **Resource bounds** – screenshot byte limits plus OAuth registration metadata/rate limits.
+3. **Runtime-image hardening** – prevent reuse/overwrite of an existing runtime-image version.
+4. **Security verification** – live Modal egress checks, deployment verification and dependency/container scanning.
+
+Each increment should keep this document aligned with the controls that are actually implemented and verified, rather than documenting intended protections as if they were already enforced.
