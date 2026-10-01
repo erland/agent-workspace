@@ -10,6 +10,7 @@ import type {
   RefreshTokenRecord
 } from "../src/auth/oauth-store.js";
 import type { IdentityService } from "../src/persistence/identity-service.js";
+import type { UserRateLimiter } from "../src/security/rate-limiter.js";
 
 class MemoryOAuthStore implements OAuthStore {
   clients = new Map<string, OAuthClientRecord>();
@@ -24,7 +25,7 @@ class MemoryOAuthStore implements OAuthStore {
   async consumeRefreshToken(tokenHash: string) { const x = this.refresh.get(tokenHash); this.refresh.delete(tokenHash); return x ? structuredClone(x) : undefined; }
 }
 
-function server(store = new MemoryOAuthStore()) {
+function server(store = new MemoryOAuthStore(), registrationRateLimiter?: UserRateLimiter) {
   const { privateKey } = generateKeyPairSync("ed25519");
   const config: AgentOAuthServerConfig = {
     issuer: "https://workspace.example/",
@@ -39,7 +40,16 @@ function server(store = new MemoryOAuthStore()) {
     clientMetadataOrigins: []
   };
   const identityService = {} as IdentityService;
-  return { auth: new AgentOAuthServer(config, store, identityService, () => new Date("2026-09-30T18:00:00Z")), store };
+  return {
+    auth: new AgentOAuthServer(
+      config,
+      store,
+      identityService,
+      () => new Date("2026-09-30T18:00:00Z"),
+      registrationRateLimiter
+    ),
+    store
+  };
 }
 
 describe("Agent Workspace OAuth server", () => {
@@ -78,6 +88,48 @@ describe("Agent Workspace OAuth server", () => {
     assert.match(body.client_id, /^awc_/);
     assert.equal(body.token_endpoint_auth_method, "none");
     assert.equal((await store.findClient(body.client_id))?.redirectUris[0], "http://127.0.0.1:4567/callback");
+  });
+
+  it("rejects registration metadata above configured bounds", async () => {
+    const { auth } = server();
+
+    const manyRedirects = await auth.handle(new Request("https://workspace.example/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        redirect_uris: Array.from({ length: 11 }, (_, index) => "https://client.example/callback/" + index)
+      })
+    }));
+    assert.equal(manyRedirects?.status, 400);
+
+    const oversizedBody = await auth.handle(new Request("https://workspace.example/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        redirect_uris: ["https://client.example/callback"],
+        extra: "a".repeat(17000)
+      })
+    }));
+    assert.equal(oversizedBody?.status, 413);
+  });
+
+  it("rate limits dynamic client registration independently", async () => {
+    let calls = 0;
+    const limiter: UserRateLimiter = {
+      check() {
+        calls += 1;
+        if (calls > 1) throw new Error("limit");
+      }
+    };
+    const { auth } = server(new MemoryOAuthStore(), limiter);
+    const request = () => new Request("https://workspace.example/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ redirect_uris: ["https://client.example/callback"] })
+    });
+
+    assert.equal((await auth.handle(request()))?.status, 201);
+    assert.equal((await auth.handle(request()))?.status, 429);
   });
 
   it("requires resource binding and PKCE before redirecting to Google", async () => {

@@ -7,6 +7,8 @@ export interface SecurityPolicy {
   workspaceMemoryMiB: number;
   maxWorkspaceLifetimeMinutes: number;
   requestRateLimitPerMinute: number;
+  oauthRegistrationRateLimitPerMinute: number;
+  maxScreenshotBytes: number;
   networkPolicy: NetworkPolicy;
 }
 
@@ -31,6 +33,8 @@ export const DEFAULT_SECURITY_POLICY: SecurityPolicy = {
   workspaceMemoryMiB: 2048,
   maxWorkspaceLifetimeMinutes: 60,
   requestRateLimitPerMinute: 60,
+  oauthRegistrationRateLimitPerMinute: 20,
+  maxScreenshotBytes: 10 * 1024 * 1024,
   networkPolicy: {
     outboundDomainAllowlist: [...DEFAULT_DEPENDENCY_DOMAINS]
   }

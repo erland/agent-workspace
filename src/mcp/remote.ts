@@ -3,7 +3,11 @@ import { Readable } from "node:stream";
 
 import { loadRemoteOAuthConfig } from "../auth/oauth-config.js";
 import { JwtAccessTokenVerifier } from "../auth/jwt-access-token-verifier.js";
-import { AgentOAuthServer, loadAgentOAuthServerConfig } from "../auth/agent-oauth-server.js";
+import {
+  AgentOAuthServer,
+  OAUTH_REGISTRATION_MAX_REQUEST_BYTES,
+  loadAgentOAuthServerConfig
+} from "../auth/agent-oauth-server.js";
 import { LocalAccessTokenVerifier } from "../auth/local-access-token-verifier.js";
 import { PostgresOAuthStore } from "../auth/oauth-store.js";
 import { EnvironmentExecutionAccountCredentialStore } from "../execution/environment-credential-store.js";
@@ -56,7 +60,15 @@ const providerFactory = new DefaultExecutionProviderFactory(
 );
 const authServerConfig = loadAgentOAuthServerConfig(config);
 const authServer = authServerConfig
-  ? new AgentOAuthServer(authServerConfig, oauthStore, identityService)
+  ? new AgentOAuthServer(
+      authServerConfig,
+      oauthStore,
+      identityService,
+      () => new Date(),
+      new InMemoryFixedWindowRateLimiter({
+        limitPerMinute: DEFAULT_SECURITY_POLICY.oauthRegistrationRateLimitPerMinute
+      })
+    )
   : undefined;
 const tokenVerifier = authServer
   ? new LocalAccessTokenVerifier(authServer)
@@ -134,14 +146,18 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
 
 async function toWebRequest(req: IncomingMessage, publicBaseUrl: string): Promise<Request> {
   const url = new URL(req.url ?? "/", publicBaseUrl);
+  const maxRequestBytes =
+    req.method === "POST" && url.pathname === "/register"
+      ? OAUTH_REGISTRATION_MAX_REQUEST_BYTES
+      : MAX_HTTP_REQUEST_BYTES;
   const contentLength = Number(req.headers["content-length"] ?? 0);
-  if (Number.isFinite(contentLength) && contentLength > MAX_HTTP_REQUEST_BYTES) throw new RequestBodyTooLargeError();
+  if (Number.isFinite(contentLength) && contentLength > maxRequestBytes) throw new RequestBodyTooLargeError();
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of req) {
     const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     total += bytes.length;
-    if (total > MAX_HTTP_REQUEST_BYTES) throw new RequestBodyTooLargeError();
+    if (total > maxRequestBytes) throw new RequestBodyTooLargeError();
     chunks.push(bytes);
   }
   const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;

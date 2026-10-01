@@ -13,11 +13,17 @@ import { isPrincipalAllowed, type AuthenticatedPrincipal } from "./principal.js"
 import type { RemoteOAuthConfig } from "./oauth-config.js";
 import type { IdentityService } from "../persistence/identity-service.js";
 import type { AuthorizationCodeRecord, OAuthClientRecord, OAuthStore, RefreshTokenRecord } from "./oauth-store.js";
+import type { UserRateLimiter } from "../security/rate-limiter.js";
 
 const GOOGLE_ISSUER = "https://accounts.google.com";
 const GOOGLE_AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GOOGLE_JWKS_URI = "https://www.googleapis.com/oauth2/v3/certs";
+
+export const OAUTH_REGISTRATION_MAX_REQUEST_BYTES = 16 * 1024;
+const OAUTH_REGISTRATION_MAX_REDIRECT_URIS = 10;
+const OAUTH_REGISTRATION_MAX_REDIRECT_URI_CHARS = 2048;
+const OAUTH_REGISTRATION_MAX_CLIENT_NAME_CHARS = 200;
 
 interface PendingSettingsLogin {
   kind: "settings";
@@ -117,7 +123,8 @@ export class AgentOAuthServer {
     private readonly config: AgentOAuthServerConfig,
     private readonly store: OAuthStore,
     private readonly identityService: IdentityService,
-    private readonly now: () => Date = () => new Date()
+    private readonly now: () => Date = () => new Date(),
+    private readonly registrationRateLimiter?: UserRateLimiter
   ) {
     this.publicKey = createPublicKey(config.signingKey);
     this.jwk = {
@@ -209,13 +216,42 @@ export class AgentOAuthServer {
   }
 
   private async registerClient(request: Request): Promise<Response> {
+    try {
+      this.registrationRateLimiter?.check("global", "oauth_register");
+    } catch {
+      return oauthError("temporarily_unavailable", "Registration rate limit exceeded", 429);
+    }
+
+    let raw: string;
+    try {
+      raw = await request.text();
+    } catch {
+      return oauthError("invalid_client_metadata", "Invalid request body", 400);
+    }
+    if (Buffer.byteLength(raw, "utf8") > OAUTH_REGISTRATION_MAX_REQUEST_BYTES) {
+      return oauthError("invalid_client_metadata", "Registration metadata is too large", 413);
+    }
+
     let input: unknown;
-    try { input = await request.json(); } catch { return oauthError("invalid_client_metadata", "Invalid JSON", 400); }
+    try { input = JSON.parse(raw); } catch { return oauthError("invalid_client_metadata", "Invalid JSON", 400); }
     if (!input || typeof input !== "object") return oauthError("invalid_client_metadata", "Invalid metadata", 400);
     const metadata = input as Record<string, unknown>;
     const redirectUris = stringArray(metadata.redirect_uris);
-    if (redirectUris.length === 0 || redirectUris.some((uri) => !isSafeRedirectUri(uri))) {
-      return oauthError("invalid_redirect_uri", "At least one valid redirect_uri is required", 400);
+    if (
+      redirectUris.length === 0 ||
+      redirectUris.length > OAUTH_REGISTRATION_MAX_REDIRECT_URIS ||
+      redirectUris.some((uri) =>
+        uri.length > OAUTH_REGISTRATION_MAX_REDIRECT_URI_CHARS || !isSafeRedirectUri(uri)
+      )
+    ) {
+      return oauthError("invalid_redirect_uri", "redirect_uris are missing, invalid or exceed registration limits", 400);
+    }
+    if (
+      metadata.client_name !== undefined &&
+      (typeof metadata.client_name !== "string" ||
+        metadata.client_name.length > OAUTH_REGISTRATION_MAX_CLIENT_NAME_CHARS)
+    ) {
+      return oauthError("invalid_client_metadata", "client_name exceeds registration limits", 400);
     }
     const authMethod = metadata.token_endpoint_auth_method;
     if (authMethod !== undefined && authMethod !== "none") {
@@ -227,7 +263,7 @@ export class AgentOAuthServer {
       clientId,
       redirectUris,
       ...(typeof metadata.client_name === "string" && metadata.client_name.trim()
-        ? { clientName: metadata.client_name.trim().slice(0, 200) }
+        ? { clientName: metadata.client_name.trim() }
         : {})
     };
     await this.store.registerClient(record);

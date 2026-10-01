@@ -38,11 +38,13 @@ export interface ScreenshotServiceOptions {
   projectRoot?: string;
   timeoutMs?: number;
   maxFailureExcerptChars?: number;
+  maxScreenshotBytes?: number;
   nowMs?: () => number;
 }
 
 const DEFAULT_PROJECT_ROOT = "/workspace/project";
 const DEFAULT_TIMEOUT_MS = 60_000;
+const DEFAULT_MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024;
 const SCREENSHOT_PATH = "/tmp/agent-workspace-screenshot.png";
 const PLAYWRIGHT_MODULE = "/opt/agent-workspace/browser-tools/node_modules/playwright";
 
@@ -50,6 +52,7 @@ export class ScreenshotService {
   private readonly projectRoot: string;
   private readonly timeoutMs: number;
   private readonly maxFailureExcerptChars: number | undefined;
+  private readonly maxScreenshotBytes: number;
   private readonly nowMs: () => number;
 
   public constructor(
@@ -59,6 +62,7 @@ export class ScreenshotService {
     this.projectRoot = options.projectRoot ?? DEFAULT_PROJECT_ROOT;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.maxFailureExcerptChars = options.maxFailureExcerptChars;
+    this.maxScreenshotBytes = options.maxScreenshotBytes ?? DEFAULT_MAX_SCREENSHOT_BYTES;
     this.nowMs = options.nowMs ?? (() => Date.now());
   }
 
@@ -82,7 +86,7 @@ export class ScreenshotService {
       "browser=await chromium.launch({headless:true});",
       "const page=await browser.newPage({viewport:{width:spec.width,height:spec.height}});",
       "await page.goto(spec.url,{waitUntil:'networkidle',timeout:45000});",
-      "await page.screenshot({path:spec.path,type:'png',fullPage:true});",
+      "await page.screenshot({path:spec.path,type:'png',fullPage:false});",
       "} finally { if(browser) await browser.close(); } })().catch(err=>{console.error(err && err.stack ? err.stack : String(err)); process.exit(1);});"
     ].join("");
 
@@ -103,7 +107,25 @@ export class ScreenshotService {
     }
 
     try {
+      const sizeResult = await this.provider.exec(handle, {
+        argv: ["stat", "-c", "%s", SCREENSHOT_PATH],
+        timeoutMs: 5_000
+      });
+      if (sizeResult.exitCode !== 0) {
+        throw new Error("Could not determine screenshot output size");
+      }
+      const size = Number(sizeResult.stdout.trim());
+      if (!Number.isSafeInteger(size) || size < 0) {
+        throw new Error("Screenshot output size is invalid");
+      }
+      if (size > this.maxScreenshotBytes) {
+        throw new Error(`Screenshot output exceeds maximum size of ${this.maxScreenshotBytes} bytes`);
+      }
+
       const bytes = await this.provider.readFile(handle, SCREENSHOT_PATH);
+      if (bytes.byteLength > this.maxScreenshotBytes) {
+        throw new Error(`Screenshot output exceeds maximum size of ${this.maxScreenshotBytes} bytes`);
+      }
       if (!isPng(bytes)) {
         throw new Error("Screenshot output is not a PNG file");
       }
