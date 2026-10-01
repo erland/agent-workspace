@@ -97,7 +97,7 @@ Any runtime-image recipe change must increment that version until stronger immut
 The planned implementation order is:
 
 1. **Workspace lifecycle hardening** – implemented in the current remediation increment: atomic quota reservation, compensating failed creation and stale `CREATING` cleanup.
-2. **Resource bounds** – screenshot byte limits plus OAuth registration metadata/rate limits.
+2. **Resource bounds** – **in progress**: screenshot byte limits plus OAuth registration metadata/rate limits.
 3. **Runtime-image hardening** – prevent reuse/overwrite of an existing runtime-image version.
 4. **Security verification** – live Modal egress checks, deployment verification and dependency/container scanning.
 
