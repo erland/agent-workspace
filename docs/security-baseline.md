@@ -23,7 +23,8 @@
 - per-user/per-operation fixed-window rate limit of 60/minute in v1,
 - maximum ZIP 100 MiB compressed / 500 MiB declared uncompressed / 20,000 entries,
 - remote HTTP payload cap 145 MiB,
-- screenshot dimensions capped at 4096×4096,
+- screenshot dimensions capped at 4096×4096 and screenshot output capped at 10 MiB before control-plane readback,
+- OAuth Dynamic Client Registration capped at 16 KiB request metadata, 10 redirect URIs, 2048 characters per redirect URI and 20 registrations/minute per service instance,
 - command timeouts and bounded logs.
 
 ## Network policy
@@ -50,11 +51,17 @@ A focused security review of the current implementation identified no verified c
 - stale `CREATING` reservations are included in expiry cleanup so a crashed creator cannot consume quota indefinitely,
 - the expiry timer is installed only after the workspace has successfully reached `READY`.
 
-The following hardening items remain open for later security increments:
+The resource-bound findings have now also been addressed:
 
-1. Add dedicated resource limits and abuse controls to unauthenticated OAuth Dynamic Client Registration at `POST /register`.
-2. Add a hard screenshot byte-size bound in addition to the current viewport bounds, preferably preventing oversized artifacts before they are read into the control-plane process and base64 encoded.
-3. Prevent accidental replacement of an existing versioned runtime-image tag; consider digest pinning later if stronger supply-chain immutability is required.
+- prototype screenshots use viewport capture instead of unbounded full-page capture,
+- screenshot artifacts are limited to 10 MiB and size-checked inside the sandbox before bytes are read into the control-plane process,
+- `POST /register` is limited to 16 KiB at HTTP intake and in the OAuth handler,
+- Dynamic Client Registration accepts at most 10 redirect URIs, each at most 2048 characters, and client names at most 200 characters,
+- Dynamic Client Registration has an independent per-instance limit of 20 requests/minute.
+
+The following hardening item remains open for the next security increment:
+
+1. Prevent accidental replacement of an existing versioned runtime-image tag; consider digest pinning later if stronger supply-chain immutability is required.
 
 The review also left three verification items that are not treated as confirmed code defects:
 
@@ -97,7 +104,7 @@ Any runtime-image recipe change must increment that version until stronger immut
 The planned implementation order is:
 
 1. **Workspace lifecycle hardening** – implemented in the current remediation increment: atomic quota reservation, compensating failed creation and stale `CREATING` cleanup.
-2. **Resource bounds** – **in progress**: screenshot byte limits plus OAuth registration metadata/rate limits.
+2. **Resource bounds** – implemented and regression-verified: viewport/byte-bounded screenshots plus OAuth registration request, metadata and rate limits.
 3. **Runtime-image hardening** – prevent reuse/overwrite of an existing runtime-image version.
 4. **Security verification** – live Modal egress checks, deployment verification and dependency/container scanning.
 
