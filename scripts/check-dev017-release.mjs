@@ -93,6 +93,10 @@ for (const required of [
   }
 }
 
+if (securityWorkflow.includes("ignore-unfixed: true")) {
+  throw new Error("Security scan workflow must not globally ignore unfixed vulnerabilities");
+}
+
 for (const required of [
   "Refuse overwrite of existing runtime tag",
   "gh api --paginate",
