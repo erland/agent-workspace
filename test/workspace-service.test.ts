@@ -54,7 +54,7 @@ describe("WorkspaceService", () => {
     assert.equal(workspace.status, "READY");
     assert.equal(workspace.runtimeProfile, "java21-node22");
     assert.equal(workspace.expiresAt, "2026-09-29T12:30:00.000Z");
-    assert.equal(provider.creates[0]?.imageRef, "ghcr.io/erland/agent-workspace-runtime:java21-node22-v1");
+    assert.equal(provider.creates[0]?.imageRef, "ghcr.io/erland/agent-workspace-runtime:java21-node22-v2");
     assert.equal(provider.commands.length, 0);
   });
 
@@ -73,7 +73,7 @@ describe("WorkspaceService", () => {
 
     assert.equal(workspace.runtimeProfile, "java25-node20");
     assert.equal(workspace.expiresAt, "2026-09-29T12:10:00.000Z");
-    assert.equal(provider.creates[0]?.imageRef, "ghcr.io/erland/agent-workspace-runtime:java25-node20-v1");
+    assert.equal(provider.creates[0]?.imageRef, "ghcr.io/erland/agent-workspace-runtime:java25-node20-v2");
   });
 
   it("destroys a workspace and terminates the provider sandbox", async () => {
