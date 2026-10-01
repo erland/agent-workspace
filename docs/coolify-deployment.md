@@ -80,7 +80,7 @@ AGENT_WORKSPACE_WEB_SESSION_SECRET=<random-session-secret>
 AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY=<base64-32-byte-key>
 AGENT_WORKSPACE_MODAL_APP_NAME=agent-workspace
 AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX=ghcr.io/erland/agent-workspace-runtime
-AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION=1
+AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION=2
 HOST=0.0.0.0
 PORT=3000
 AGENT_WORKSPACE_VERSION=<release/version>
@@ -207,6 +207,10 @@ Applikationscontainern lagrar inga projektfiler permanent. Workspace-data ligger
 15. Verifiera att en allowlistad användare kan spara/testa sin egen Modal-token och att en ej allowlistad användare nekas.
 16. Verifiera två användare mot två skilda Modal-konton.
 17. Verifiera refresh-tokenrotation och reconnect efter service-restart.
+
+## Säkerhetsverifiering
+
+Se `docs/security-deployment-verification.md` för den separata checklistan som måste verifieras mot den faktiska Coolify/PostgreSQL-miljön innan produktionssäkerheten kan betraktas som fullständigt verifierad.
 
 ## Säkerhetsgräns
 

@@ -331,7 +331,7 @@ Runtime image selection can be overridden for forks or staged rollouts:
 
 ```text
 AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX=ghcr.io/OWNER/agent-workspace-runtime
-AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION=1
+AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION=2
 ```
 
 When the runtime recipe changes, increment `runtime-images/version.txt` and update the application runtime image version in the same change. The runtime-image workflow refuses to publish a tag that already exists in GHCR, so an existing `vN` cannot be repurposed accidentally; publish a new version instead.

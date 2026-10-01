@@ -1,0 +1,115 @@
+name: Security Scan
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  npm-audit:
+    name: Production npm audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  filesystem-scan:
+    name: Repository vulnerability and misconfiguration scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+  application-image:
+    name: Application image scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build application image
+        run: docker build -t agent-workspace-security-scan:local .
+
+      - name: Trivy application image scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: agent-workspace-security-scan:local
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+  default-runtime-image:
+    name: Default runtime image scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build default runtime image
+        run: |
+          docker build             --build-arg JAVA_VERSION=21             --build-arg NODE_MAJOR=22             -t agent-workspace-runtime-security-scan:java21-node22             runtime-images
+
+      - name: Trivy default runtime image scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: agent-workspace-runtime-security-scan:java21-node22
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+  runtime-matrix:
+    name: Runtime image scan java${{ matrix.java }}-node${{ matrix.node }}
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ["17", "21", "25"]
+        node: ["20", "22"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build runtime image
+        run: |
+          docker build             --build-arg JAVA_VERSION=${{ matrix.java }}             --build-arg NODE_MAJOR=${{ matrix.node }}             -t agent-workspace-runtime-security-scan:java${{ matrix.java }}-node${{ matrix.node }}             runtime-images
+
+      - name: Trivy runtime image scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: agent-workspace-runtime-security-scan:java${{ matrix.java }}-node${{ matrix.node }}
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"

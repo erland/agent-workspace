@@ -18,11 +18,17 @@ ENV NODE_ENV=production \
     AGENT_WORKSPACE_VERSION=${AGENT_WORKSPACE_VERSION}
 WORKDIR /app
 
-COPY --from=build /app/package.json /app/package-lock.json ./
+COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY db ./db
 
+# The production process only needs the Node runtime. Remove package-manager
+# toolchains inherited from the base image to reduce unused attack surface.
+USER root
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn* \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+             /usr/local/bin/yarn /usr/local/bin/yarnpkg
 USER node
 EXPOSE 3000
 
