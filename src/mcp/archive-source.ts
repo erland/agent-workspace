@@ -6,8 +6,8 @@ import { DEFAULT_ARCHIVE_LIMITS } from "../archive/archive-validator.js";
 export interface OpenAIFileParameter {
   download_url: string;
   file_id: string;
-  mime_type?: string;
-  file_name?: string;
+  mime_type?: string | undefined;
+  file_name?: string | undefined;
 }
 
 export interface RemoteArchiveDownloaderOptions {
