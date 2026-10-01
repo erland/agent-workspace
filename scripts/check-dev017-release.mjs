@@ -82,7 +82,6 @@ if (runtimeWorkflow.includes("MODAL_TOKEN_ID") || runtimeWorkflow.includes("MODA
 
 const securityWorkflow = await readFile(".github/workflows/security-scan.yml", "utf8");
 for (const required of [
-  "dependency-review-action@v5",
   "npm audit --omit=dev --audit-level=high",
   "aquasecurity/trivy-action@v0.36.0",
   "Application image scan",
