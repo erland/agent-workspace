@@ -42,6 +42,39 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Refuse overwrite of existing runtime tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_TAG: java${{ matrix.java }}-node${{ matrix.node }}-v${{ steps.version.outputs.value }}
+          PACKAGE_NAME: agent-workspace-runtime
+          OWNER: ${{ github.repository_owner }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint="/users/${OWNER}/packages/container/${PACKAGE_NAME}/versions?per_page=100"
+          tmp="$(mktemp)"
+          status=0
+          if ! gh api --paginate "${endpoint}" > "${tmp}" 2>gh-api-error.txt; then
+            status=$?
+          fi
+
+          if [ "${status}" -ne 0 ]; then
+            if grep -q "HTTP 404" gh-api-error.txt; then
+              rm -f "${tmp}" gh-api-error.txt
+            else
+              cat gh-api-error.txt >&2
+              rm -f "${tmp}" gh-api-error.txt
+              exit "${status}"
+            fi
+          else
+            if jq -e --arg tag "${IMAGE_TAG}"               '.[] | select(any(.metadata.container.tags[]?; . == $tag))'               "${tmp}" >/dev/null; then
+              echo "::error::Runtime image tag ${IMAGE_TAG} already exists in GHCR. Increment runtime-images/version.txt before publishing a changed runtime image."
+              rm -f "${tmp}" gh-api-error.txt
+              exit 1
+            fi
+            rm -f "${tmp}" gh-api-error.txt
+          fi
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
