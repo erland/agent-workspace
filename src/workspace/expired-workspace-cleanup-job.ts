@@ -10,7 +10,7 @@ export class ExpiredWorkspaceCleanupJob {
   ) {}
 
   async run(limit = 100): Promise<{ processed: number; failed: number }> {
-    const expired = await this.workspaces.listExpiredReady(this.now().toISOString(), limit);
+    const expired = await this.workspaces.listExpiredActive(this.now().toISOString(), limit);
     let processed = 0;
     let failed = 0;
     for (const workspace of expired) {
