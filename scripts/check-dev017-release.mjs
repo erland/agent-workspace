@@ -10,12 +10,14 @@ const requiredFiles = [
   "docs/architecture.md",
   "docs/development-plan.md",
   "docs/security-baseline.md",
+  "docs/security-deployment-verification.md",
   "docs/coolify-deployment.md",
   "docs/dev-017-verification.md",
   "docs/release-readiness.md",
   "runtime-images/Dockerfile",
   "runtime-images/version.txt",
   ".github/workflows/runtime-images.yml",
+  ".github/workflows/security-scan.yml",
   ".github/workflows/release-image.yml"
 ];
 
@@ -34,7 +36,8 @@ const requiredScripts = [
   "verify:dev014",
   "verify:dev015",
   "verify:dev016",
-  "verify:dev017"
+  "verify:dev017",
+  "verify:security-external"
 ];
 
 for (const name of requiredScripts) {
@@ -75,6 +78,20 @@ if (!runtimeWorkflow.includes("packages: write")) {
 }
 if (runtimeWorkflow.includes("MODAL_TOKEN_ID") || runtimeWorkflow.includes("MODAL_TOKEN_SECRET")) {
   throw new Error("Runtime image workflow must not require Modal credentials");
+}
+
+const securityWorkflow = await readFile(".github/workflows/security-scan.yml", "utf8");
+for (const required of [
+  "dependency-review-action@v5",
+  "npm audit --omit=dev --audit-level=high",
+  "aquasecurity/trivy-action@v0.36.0",
+  "Application image scan",
+  "Default runtime image scan",
+  "Runtime image scan java"
+]) {
+  if (!securityWorkflow.includes(required)) {
+    throw new Error(`Security scan workflow is missing required behavior: ${required}`);
+  }
 }
 
 for (const required of [
