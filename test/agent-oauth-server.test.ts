@@ -90,6 +90,48 @@ describe("Agent Workspace OAuth server", () => {
     assert.equal((await store.findClient(body.client_id))?.redirectUris[0], "http://127.0.0.1:4567/callback");
   });
 
+  it("rejects registration metadata above configured bounds", async () => {
+    const { auth } = server();
+
+    const manyRedirects = await auth.handle(new Request("https://workspace.example/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        redirect_uris: Array.from({ length: 11 }, (_, index) => "https://client.example/callback/" + index)
+      })
+    }));
+    assert.equal(manyRedirects?.status, 400);
+
+    const oversizedBody = await auth.handle(new Request("https://workspace.example/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        redirect_uris: ["https://client.example/callback"],
+        extra: "a".repeat(17000)
+      })
+    }));
+    assert.equal(oversizedBody?.status, 413);
+  });
+
+  it("rate limits dynamic client registration independently", async () => {
+    let calls = 0;
+    const limiter: UserRateLimiter = {
+      check() {
+        calls += 1;
+        if (calls > 1) throw new Error("limit");
+      }
+    };
+    const { auth } = server(new MemoryOAuthStore(), limiter);
+    const request = () => new Request("https://workspace.example/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ redirect_uris: ["https://client.example/callback"] })
+    });
+
+    assert.equal((await auth.handle(request()))?.status, 201);
+    assert.equal((await auth.handle(request()))?.status, 429);
+  });
+
   it("requires resource binding and PKCE before redirecting to Google", async () => {
     const { auth, store } = server();
     await store.registerClient({ clientId: "client-1", redirectUris: ["https://client.example/callback"] });
