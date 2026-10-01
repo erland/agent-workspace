@@ -46,7 +46,6 @@ jobs:
           scan-ref: .
           scanners: vuln,misconfig,secret
           severity: HIGH,CRITICAL
-          ignore-unfixed: true
           exit-code: "1"
 
   application-image:
@@ -65,7 +64,6 @@ jobs:
           image-ref: agent-workspace-security-scan:local
           scanners: vuln,secret
           severity: HIGH,CRITICAL
-          ignore-unfixed: true
           exit-code: "1"
 
   default-runtime-image:
@@ -85,7 +83,6 @@ jobs:
           image-ref: agent-workspace-runtime-security-scan:java21-node22
           scanners: vuln,secret
           severity: HIGH,CRITICAL
-          ignore-unfixed: true
           exit-code: "1"
 
   runtime-matrix:
@@ -111,5 +108,4 @@ jobs:
           image-ref: agent-workspace-runtime-security-scan:java${{ matrix.java }}-node${{ matrix.node }}
           scanners: vuln,secret
           severity: HIGH,CRITICAL
-          ignore-unfixed: true
           exit-code: "1"
