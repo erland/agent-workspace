@@ -176,8 +176,8 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
       [
         workspace.id,
         workspace.userId,
-        workspace.providerId,
-        workspace.providerWorkspaceId,
+        workspace.providerId ?? null,
+        workspace.providerWorkspaceId ?? null,
         workspace.runtimeProfile,
         workspace.status,
         workspace.createdAt,
