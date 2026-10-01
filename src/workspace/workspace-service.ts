@@ -90,6 +90,7 @@ const MAX_LIFETIME_MINUTES = 60;
 
 export class WorkspaceService {
   private readonly records = new Map<string, WorkspaceRecord>();
+  private readonly localReservations = new Set<string>();
   private readonly defaultLifetimeMinutes: number;
   private readonly maxLifetimeMinutes: number;
   private readonly archiveLimits: Partial<ArchiveValidationLimits>;
@@ -129,34 +130,47 @@ export class WorkspaceService {
 
     const createdAt = this.now();
     const expiresAt = new Date(createdAt.getTime() + lifetimeMinutes * 60_000);
-    const handle = await this.provider.createWorkspace({
-      imageRef: profile.imageRef,
-      timeoutMs: lifetimeMinutes * 60_000,
-      cpu: this.securityPolicy.workspaceCpu,
-      cpuLimit: this.securityPolicy.workspaceCpuLimit,
-      memoryMiB: this.securityPolicy.workspaceMemoryMiB,
-      networkPolicy: this.securityPolicy.networkPolicy
-    });
-
-    const workspace: Workspace = {
-      id: this.idFactory(),
+    const workspaceId = this.idFactory();
+    const reservation: PersistedWorkspace = {
+      id: workspaceId,
       userId: this.userId,
-      providerId: handle.providerId,
-      providerWorkspaceId: handle.providerWorkspaceId,
       runtimeProfile: profile.id,
       status: "CREATING",
       createdAt: createdAt.toISOString(),
       expiresAt: expiresAt.toISOString()
     };
 
-    let reserved = false;
+    const reserved = await this.reserveWorkspace(reservation);
+    if (!reserved) {
+      throw new Error(
+        `User active workspace limit exceeded (${this.securityPolicy.maxActiveWorkspacesPerUser})`
+      );
+    }
+
+    let handle: WorkspaceHandle | undefined;
+    let workspace: Workspace | undefined;
+    let providerAttached = false;
+
     try {
-      reserved = await this.reserveWorkspace(workspace, handle);
-      if (!reserved) {
-        throw new Error(
-          `User active workspace limit exceeded (${this.securityPolicy.maxActiveWorkspacesPerUser})`
-        );
-      }
+      handle = await this.provider.createWorkspace({
+        imageRef: profile.imageRef,
+        timeoutMs: lifetimeMinutes * 60_000,
+        cpu: this.securityPolicy.workspaceCpu,
+        cpuLimit: this.securityPolicy.workspaceCpuLimit,
+        memoryMiB: this.securityPolicy.workspaceMemoryMiB,
+        networkPolicy: this.securityPolicy.networkPolicy
+      });
+
+      workspace = {
+        ...reservation,
+        providerId: handle.providerId,
+        providerWorkspaceId: handle.providerWorkspaceId
+      };
+
+      await this.persist(workspace);
+      providerAttached = true;
+      this.localReservations.delete(workspaceId);
+      this.records.set(workspaceId, { workspace, handle });
 
       for (const command of profile.bootstrapCommands) {
         const result = await this.provider.exec(handle, command);
@@ -171,21 +185,28 @@ export class WorkspaceService {
       await this.persist(workspace);
 
       const expiryTimer = this.schedule?.(() => {
-        void this.expire(workspace.id);
+        void this.expire(workspaceId);
       }, lifetimeMinutes * 60_000);
       expiryTimer?.unref?.();
-      const record = this.records.get(workspace.id);
+      const record = this.records.get(workspaceId);
       if (record && expiryTimer !== undefined) record.expiryTimer = expiryTimer;
 
       return cloneWorkspace(workspace);
     } catch (error) {
-      await this.provider.terminate(handle).catch(() => undefined);
-      if (reserved) {
+      if (handle) {
+        await this.provider.terminate(handle).catch(() => undefined);
+      }
+
+      if (providerAttached && workspace) {
         workspace.status = "DESTROYED";
         workspace.destroyedAt = this.now().toISOString();
         await this.persist(workspace).catch(() => undefined);
-        this.records.delete(workspace.id);
+        this.records.delete(workspaceId);
+      } else {
+        await this.releaseReservation(workspaceId).catch(() => undefined);
       }
+
+      this.localReservations.delete(workspaceId);
       throw error;
     }
   }
@@ -390,6 +411,15 @@ export class WorkspaceService {
     let count = 0;
     for (const workspace of expired) {
       if (workspace.userId !== this.userId) continue;
+      if (!workspace.providerId || !workspace.providerWorkspaceId) {
+        await this.repository.upsert({
+          ...workspace,
+          status: "EXPIRED",
+          destroyedAt: this.now().toISOString()
+        });
+        count += 1;
+        continue;
+      }
       const record = this.hydrate(workspace);
       this.records.set(workspace.id, record);
       await this.expire(workspace.id);
@@ -410,8 +440,16 @@ export class WorkspaceService {
   }
 
   private hydrate(workspace: PersistedWorkspace): WorkspaceRecord {
+    if (!workspace.providerId || !workspace.providerWorkspaceId) {
+      throw new Error(`Workspace ${workspace.id} has no allocated provider resource`);
+    }
+    const hydrated: Workspace = {
+      ...workspace,
+      providerId: workspace.providerId,
+      providerWorkspaceId: workspace.providerWorkspaceId
+    };
     return {
-      workspace: cloneWorkspace(workspace),
+      workspace: cloneWorkspace(hydrated),
       handle: {
         providerId: workspace.providerId,
         providerWorkspaceId: workspace.providerWorkspaceId
@@ -423,23 +461,32 @@ export class WorkspaceService {
     await this.repository?.upsert(cloneWorkspace(workspace));
   }
 
-  private async reserveWorkspace(workspace: Workspace, handle: WorkspaceHandle): Promise<boolean> {
+  private async reserveWorkspace(workspace: PersistedWorkspace): Promise<boolean> {
     if (this.repository) {
-      const reserved = await this.repository.reserveWorkspace(
-        cloneWorkspace(workspace),
+      return this.repository.reserveWorkspace(
+        workspace,
         this.securityPolicy.maxActiveWorkspacesPerUser
       );
-      if (!reserved) return false;
-    } else {
-      const active = [...this.records.values()].filter(
-        (record) =>
-          record.workspace.status === "CREATING" || record.workspace.status === "READY"
-      ).length;
-      if (active >= this.securityPolicy.maxActiveWorkspacesPerUser) return false;
     }
 
-    this.records.set(workspace.id, { workspace, handle });
+    const activeRecords = [...this.records.values()].filter(
+      (record) =>
+        record.workspace.status === "CREATING" || record.workspace.status === "READY"
+    ).length;
+    if (
+      activeRecords + this.localReservations.size >=
+      this.securityPolicy.maxActiveWorkspacesPerUser
+    ) {
+      return false;
+    }
+
+    this.localReservations.add(workspace.id);
     return true;
+  }
+
+  private async releaseReservation(workspaceId: string): Promise<void> {
+    this.localReservations.delete(workspaceId);
+    await this.repository?.deleteReservation(workspaceId, this.userId);
   }
 
   private isExpired(workspace: Workspace): boolean {
