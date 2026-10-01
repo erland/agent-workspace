@@ -50,7 +50,9 @@
     "smoke:acceptance": "tsx src/smoke/e2e-acceptance-smoke.ts",
     "verify:dev016": "npm run test && npm run typecheck && npm run build && npm run smoke:acceptance",
     "check:release": "node scripts/check-dev017-release.mjs",
-    "verify:dev017": "npm run test && npm run typecheck && npm run build && npm run test:mcp-contract && npm run test:auth && npm run test:security && npm run test:deployment && npm run check:release"
+    "verify:dev017": "npm run test && npm run typecheck && npm run build && npm run test:mcp-contract && npm run test:auth && npm run test:security && npm run test:deployment && npm run check:release",
+    "smoke:modal-egress": "tsx src/smoke/modal-egress-security-smoke.ts",
+    "verify:security-external": "npm run test && npm run typecheck && npm run build && npm run smoke:modal-egress"
   },
   "dependencies": {
     "modal": "^0.10.1",
