@@ -75,8 +75,8 @@ Verify:
 
 The repository security workflow performs:
 
-- pull-request dependency review,
 - production `npm audit` at high/critical threshold,
+- optional GitHub Dependency Review once Dependency Graph is enabled for the repository,
 - Trivy repository vulnerability/misconfiguration/secret scan,
 - Trivy application-image scan,
 - Trivy default runtime-image scan on normal CI events,
