@@ -76,6 +76,19 @@ export class InMemoryWorkspaceRepository implements WorkspaceRepository {
     return true;
   }
 
+  async deleteReservation(workspaceId: string, userId: string): Promise<void> {
+    const workspace = this.values.get(workspaceId);
+    if (
+      workspace &&
+      workspace.userId === userId &&
+      workspace.status === "CREATING" &&
+      workspace.providerId === undefined &&
+      workspace.providerWorkspaceId === undefined
+    ) {
+      this.values.delete(workspaceId);
+    }
+  }
+
   async findByIdForUser(workspaceId: string, userId: string): Promise<PersistedWorkspace | undefined> {
     const workspace = this.values.get(workspaceId);
     if (!workspace || workspace.userId !== userId) return undefined;
