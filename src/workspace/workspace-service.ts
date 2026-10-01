@@ -337,7 +337,10 @@ export class WorkspaceService {
     const projectRoot = relativeRoot.length === 0
       ? "/workspace/project"
       : `/workspace/project/${relativeRoot}`;
-    return new ScreenshotService(this.provider, { projectRoot }).capture(record.handle, {
+    return new ScreenshotService(this.provider, {
+      projectRoot,
+      maxScreenshotBytes: this.securityPolicy.maxScreenshotBytes
+    }).capture(record.handle, {
       url: workspace.prototype.url,
       ...(viewport !== undefined ? { viewport } : {})
     });
