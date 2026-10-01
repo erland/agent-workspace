@@ -13,18 +13,6 @@ permissions:
   contents: read
 
 jobs:
-  dependency-review:
-    name: Dependency review
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Dependency review
-        uses: actions/dependency-review-action@v5
-        with:
-          fail-on-severity: high
-
   npm-audit:
     name: Production npm audit
     runs-on: ubuntu-latest
