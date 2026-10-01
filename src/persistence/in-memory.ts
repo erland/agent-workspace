@@ -65,20 +65,30 @@ export class InMemoryWorkspaceRepository implements WorkspaceRepository {
     this.values.set(workspace.id, structuredClone(workspace));
   }
 
+  async reserveWorkspace(workspace: PersistedWorkspace, maxActiveWorkspaces: number): Promise<boolean> {
+    const active = [...this.values.values()].filter(
+      (value) =>
+        value.userId === workspace.userId &&
+        (value.status === "CREATING" || value.status === "READY")
+    ).length;
+    if (active >= maxActiveWorkspaces) return false;
+    this.values.set(workspace.id, structuredClone(workspace));
+    return true;
+  }
+
   async findByIdForUser(workspaceId: string, userId: string): Promise<PersistedWorkspace | undefined> {
     const workspace = this.values.get(workspaceId);
     if (!workspace || workspace.userId !== userId) return undefined;
     return structuredClone(workspace);
   }
 
-  async countReadyForUser(userId: string): Promise<number> {
-    return [...this.values.values()].filter((workspace) => workspace.userId === userId && workspace.status === "READY").length;
-  }
-
-  async listExpiredReady(nowIso: string, limit = 100): Promise<PersistedWorkspace[]> {
+  async listExpiredActive(nowIso: string, limit = 100): Promise<PersistedWorkspace[]> {
     const now = Date.parse(nowIso);
     return [...this.values.values()]
-      .filter((workspace) => workspace.status === "READY" && Date.parse(workspace.expiresAt) <= now)
+      .filter((workspace) =>
+        (workspace.status === "CREATING" || workspace.status === "READY") &&
+        Date.parse(workspace.expiresAt) <= now
+      )
       .sort((a, b) => Date.parse(a.expiresAt) - Date.parse(b.expiresAt))
       .slice(0, limit)
       .map((workspace) => structuredClone(workspace));
