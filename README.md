@@ -199,7 +199,7 @@ After `npm ci`, start the local stdio MCP server with:
 npm run mcp:stdio
 ```
 
-DEV-010 exposes: `get_capabilities`, `get_profile`, `workspace_create`, `workspace_upload_zip`, `workspace_upload_zip_from_url`, `project_verify`, `prototype_start`, `prototype_screenshot`, and `workspace_destroy`.
+DEV-010 exposes: `get_capabilities`, `get_profile`, `workspace_create`, `workspace_upload_zip`, `workspace_upload_zip_from_url`, `project_verify`, `prototype_start`, `prototype_screenshot`, `prototype_screenshot_gallery`, and `workspace_destroy`.
 
 ### ZIP transport across MCP hosts
 
@@ -214,6 +214,8 @@ The provider-neutral workspace layer remains unchanged: every transport is norma
 `prototype_screenshot` returns the normal MCP image block for compatible clients and also returns a standard MCP `resource_link`. The linked PNG can be fetched through `resources/read` while the workspace is alive, which gives ChatGPT a file-reference path instead of relying on the inline image block alone. Screenshot resources remain protected by the same MCP OAuth/user isolation as the workspace and disappear when the sandbox is destroyed.
 
 For ChatGPT and other MCP Apps-compatible hosts, `prototype_screenshot` is also linked to a small inline screenshot viewer using `_meta.ui.resourceUri`. The tool result passes the PNG to the UI through result `_meta`, so the screenshot is rendered visibly in the conversation without requiring the user to request or open a link. The resource-link path remains available for model access and non-UI clients.
+
+When several captures should be compared, `prototype_screenshot_gallery` takes the artifact IDs returned by earlier `prototype_screenshot` calls and renders one selectable gallery. The gallery keeps the selected image as widget state, provides desktop/tablet/mobile-style tabs through caller-supplied labels, and can request ChatGPT fullscreen mode from either the image or the “Open larger” action. This follows the data-tool + render-tool pattern: screenshot capture remains independent from gallery presentation.
 
 
 ## DEV-011: user-specific Modal accounts

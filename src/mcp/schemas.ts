@@ -46,6 +46,17 @@ export const PrototypeScreenshotInputSchema = z.object({
   viewport: ScreenshotViewportSchema.optional()
 }).strict();
 
+export const PrototypeScreenshotGalleryInputSchema = z.object({
+  workspaceId: z.string().min(1),
+  screenshots: z.array(z.object({
+    artifactId: z.string().min(1).max(128),
+    label: z.string().min(1).max(80),
+    width: z.number().int().positive().optional(),
+    height: z.number().int().positive().optional()
+  }).strict()).min(2).max(12),
+  selectedArtifactId: z.string().min(1).max(128).optional()
+}).strict();
+
 export const JsonObjectOutputSchema = z.object({ result: z.unknown() }).strict();
 export const ScreenshotOutputSchema = z.object({
   result: z.object({
@@ -57,7 +68,26 @@ export const ScreenshotOutputSchema = z.object({
     resourceUri: z.string().optional(),
     fileName: z.string().optional(),
     byteSize: z.number().int().nonnegative().optional(),
+    artifactId: z.string().optional(),
     failureSummary: z.string().optional(),
     logExcerpt: z.string().optional()
   })
+}).strict();
+
+
+export const ScreenshotGalleryOutputSchema = z.object({
+  result: z.object({
+    status: z.literal("PASSED"),
+    selectedArtifactId: z.string(),
+    screenshots: z.array(z.object({
+      artifactId: z.string(),
+      label: z.string(),
+      mimeType: z.literal("image/png"),
+      width: z.number().int().optional(),
+      height: z.number().int().optional(),
+      resourceUri: z.string(),
+      fileName: z.string(),
+      byteSize: z.number().int().nonnegative()
+    }).strict()).min(2)
+  }).strict()
 }).strict();

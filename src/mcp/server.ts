@@ -5,7 +5,9 @@ import type { AgentWorkspaceTools, ToolResult } from "./tool-service.js";
 import {
   EmptyInputSchema,
   JsonObjectOutputSchema,
+  PrototypeScreenshotGalleryInputSchema,
   PrototypeScreenshotInputSchema,
+  ScreenshotGalleryOutputSchema,
   ScreenshotOutputSchema,
   WorkspaceCreateInputSchema,
   WorkspaceIdInputSchema,
@@ -14,6 +16,7 @@ import {
 } from "./schemas.js";
 import { SCREENSHOT_RESOURCE_TEMPLATE, screenshotResourceUri, singleTemplateValue } from "./screenshot-resource.js";
 import { SCREENSHOT_VIEWER_HTML, SCREENSHOT_VIEWER_MIME_TYPE, SCREENSHOT_VIEWER_URI } from "./screenshot-viewer.js";
+import { SCREENSHOT_GALLERY_HTML, SCREENSHOT_GALLERY_MIME_TYPE, SCREENSHOT_GALLERY_URI } from "./screenshot-gallery.js";
 
 export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpServer {
   const server = new McpServer({ name: "agent-workspace", version: "0.1.0" });
@@ -31,6 +34,30 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
         uri: SCREENSHOT_VIEWER_URI,
         mimeType: SCREENSHOT_VIEWER_MIME_TYPE,
         text: SCREENSHOT_VIEWER_HTML,
+        _meta: {
+          ui: {
+            prefersBorder: true,
+            csp: { connectDomains: [], resourceDomains: [] }
+          },
+          "openai/ui": { availableDisplayModes: ["inline", "fullscreen"] }
+        }
+      }]
+    })
+  );
+
+  server.registerResource(
+    "prototype-screenshot-gallery",
+    SCREENSHOT_GALLERY_URI,
+    {
+      title: "Prototype screenshot gallery",
+      description: "Selectable gallery for comparing prototype screenshots.",
+      mimeType: SCREENSHOT_GALLERY_MIME_TYPE
+    },
+    async () => ({
+      contents: [{
+        uri: SCREENSHOT_GALLERY_URI,
+        mimeType: SCREENSHOT_GALLERY_MIME_TYPE,
+        text: SCREENSHOT_GALLERY_HTML,
         _meta: {
           ui: {
             prefersBorder: true,
@@ -126,7 +153,8 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
             durationMs: result.durationMs,
             resourceUri,
             fileName: result.fileName,
-            byteSize: result.bytes.byteLength
+            byteSize: result.bytes.byteLength,
+            artifactId: result.artifactId
           }
         };
         const screenshotData = Buffer.from(result.bytes).toString("base64");
@@ -158,6 +186,68 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
     }
   );
 
+  server.registerTool(
+    "prototype_screenshot_gallery",
+    {
+      description: "Render two or more already captured prototype screenshots as one selectable gallery. Use this after prototype_screenshot when the user wants to compare desktop, tablet, mobile, or multiple iterations.",
+      inputSchema: PrototypeScreenshotGalleryInputSchema,
+      outputSchema: ScreenshotGalleryOutputSchema,
+      _meta: {
+        ui: { resourceUri: SCREENSHOT_GALLERY_URI },
+        "openai/outputTemplate": SCREENSHOT_GALLERY_URI
+      }
+    },
+    async (input: z.infer<typeof PrototypeScreenshotGalleryInputSchema>) => {
+      const screenshots = await Promise.all(input.screenshots.map(async (item) => {
+        const bytes = await tools.readScreenshotArtifact({
+          workspaceId: input.workspaceId,
+          artifactId: item.artifactId
+        });
+        return {
+          artifactId: item.artifactId,
+          label: item.label,
+          mimeType: "image/png" as const,
+          ...(item.width !== undefined ? { width: item.width } : {}),
+          ...(item.height !== undefined ? { height: item.height } : {}),
+          resourceUri: screenshotResourceUri(input.workspaceId, item.artifactId),
+          fileName: `prototype-${slugLabel(item.label)}-${item.artifactId}.png`,
+          byteSize: bytes.byteLength,
+          data: Buffer.from(bytes).toString("base64")
+        };
+      }));
+
+      const requested = input.selectedArtifactId;
+      const selectedArtifactId =
+        requested !== undefined && screenshots.some((item) => item.artifactId === requested)
+          ? requested
+          : screenshots[0]!.artifactId;
+
+      const structured = {
+        result: {
+          status: "PASSED" as const,
+          selectedArtifactId,
+          screenshots: screenshots.map(({ data: _data, ...item }) => item)
+        }
+      };
+
+      return {
+        structuredContent: structured,
+        content: [
+          { type: "text" as const, text: JSON.stringify(structured) },
+          ...screenshots.map((item) => ({
+            type: "resource_link" as const,
+            uri: item.resourceUri,
+            name: item.fileName,
+            title: item.label,
+            mimeType: item.mimeType,
+            size: item.byteSize
+          }))
+        ],
+        _meta: { gallery: { screenshots } }
+      };
+    }
+  );
+
   registerJsonTool(server, "workspace_destroy", "Terminate a workspace and release its sandbox resources.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.destroyWorkspace(input));
   return server;
 }
@@ -181,4 +271,10 @@ function jsonToolResult(response: ToolResult<unknown>) {
 function errorResult(response: { ok: false; error: unknown }) {
   const body = { error: response.error };
   return { isError: true as const, content: [{ type: "text" as const, text: JSON.stringify(body) }] };
+}
+
+
+function slugLabel(value: string): string {
+  const slug = value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || "screenshot";
 }
