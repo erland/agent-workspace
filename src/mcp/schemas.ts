@@ -37,6 +37,10 @@ export const WorkspaceUploadZipFromUrlInputSchema = z.object({
 export const ScreenshotViewportSchema = z.union([
   z.enum(["desktop", "tablet", "mobile"]),
   z.object({
+    device: z.enum(["iphone", "iphone-large", "ipad", "android", "android-large"]),
+    orientation: z.enum(["portrait", "landscape"]).default("portrait")
+  }).strict(),
+  z.object({
     width: z.number().int().min(1).max(4096),
     height: z.number().int().min(1).max(4096)
   }).strict()
