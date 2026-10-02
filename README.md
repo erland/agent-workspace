@@ -213,9 +213,9 @@ The provider-neutral workspace layer remains unchanged: every transport is norma
 
 `prototype_screenshot` returns the normal MCP image block for compatible clients and also returns a standard MCP `resource_link`. The linked PNG can be fetched through `resources/read` while the workspace is alive, which gives ChatGPT a file-reference path instead of relying on the inline image block alone. Screenshot resources remain protected by the same MCP OAuth/user isolation as the workspace and disappear when the sandbox is destroyed.
 
-For ChatGPT and other MCP Apps-compatible hosts, `prototype_screenshot` is also linked to a small inline screenshot viewer using `_meta.ui.resourceUri`. The tool result passes the PNG to the UI through result `_meta`, so the screenshot is rendered visibly in the conversation without requiring the user to request or open a link. The resource-link path remains available for model access and non-UI clients.
+For ChatGPT and other MCP Apps-compatible hosts, `prototype_screenshot` is capture-only: it returns screenshot metadata plus the resource/image content needed by the model and non-UI clients, but it deliberately has no UI template. This prevents each individual capture from creating its own visible widget.
 
-When several captures should be compared, `prototype_screenshot_gallery` takes the artifact IDs returned by earlier `prototype_screenshot` calls and renders one selectable gallery. The gallery keeps the selected image as widget state, provides desktop/tablet/mobile-style tabs through caller-supplied labels, and can request ChatGPT fullscreen mode from either the image or the “Open larger” action. This follows the data-tool + render-tool pattern: screenshot capture remains independent from gallery presentation.
+All visible screenshot presentation goes through `prototype_screenshot_gallery`. The gallery accepts one or more artifact IDs returned by earlier `prototype_screenshot` calls, keeps the selected image as widget state, provides desktop/tablet/mobile-style tabs when several captures are present, and can request ChatGPT fullscreen mode from either the image or the “Open larger” action. This keeps screenshot capture independent from presentation and guarantees one visible gallery widget for the final result.
 
 
 ## DEV-011: user-specific Modal accounts

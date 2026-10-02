@@ -15,35 +15,10 @@ import {
   WorkspaceUploadZipInputSchema
 } from "./schemas.js";
 import { SCREENSHOT_RESOURCE_TEMPLATE, screenshotResourceUri, singleTemplateValue } from "./screenshot-resource.js";
-import { SCREENSHOT_VIEWER_HTML, SCREENSHOT_VIEWER_MIME_TYPE, SCREENSHOT_VIEWER_URI } from "./screenshot-viewer.js";
 import { SCREENSHOT_GALLERY_HTML, SCREENSHOT_GALLERY_MIME_TYPE, SCREENSHOT_GALLERY_URI } from "./screenshot-gallery.js";
 
 export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpServer {
   const server = new McpServer({ name: "agent-workspace", version: "0.1.0" });
-
-  server.registerResource(
-    "prototype-screenshot-viewer",
-    SCREENSHOT_VIEWER_URI,
-    {
-      title: "Prototype screenshot viewer",
-      description: "Inline viewer for prototype screenshots.",
-      mimeType: SCREENSHOT_VIEWER_MIME_TYPE
-    },
-    async () => ({
-      contents: [{
-        uri: SCREENSHOT_VIEWER_URI,
-        mimeType: SCREENSHOT_VIEWER_MIME_TYPE,
-        text: SCREENSHOT_VIEWER_HTML,
-        _meta: {
-          ui: {
-            prefersBorder: true,
-            csp: { connectDomains: [], resourceDomains: [] }
-          },
-          "openai/ui": { availableDisplayModes: ["inline", "fullscreen"] }
-        }
-      }]
-    })
-  );
 
   server.registerResource(
     "prototype-screenshot-gallery",
@@ -129,11 +104,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
     {
       description: "Capture a PNG screenshot of a running prototype.",
       inputSchema: PrototypeScreenshotInputSchema,
-      outputSchema: ScreenshotOutputSchema,
-      _meta: {
-        ui: { resourceUri: SCREENSHOT_VIEWER_URI },
-        "openai/outputTemplate": SCREENSHOT_VIEWER_URI
-      }
+      outputSchema: ScreenshotOutputSchema
     },
     async (input) => {
       const normalizedInput = input.viewport === undefined
@@ -171,14 +142,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
               size: result.bytes.byteLength
             },
             { type: "image" as const, data: screenshotData, mimeType: result.mimeType }
-          ],
-          _meta: {
-            screenshot: {
-              data: screenshotData,
-              mimeType: result.mimeType,
-              fileName: result.fileName
-            }
-          }
+          ]
         };
       }
       const structured = { result: { status: result.status, durationMs: result.durationMs, failureSummary: result.failureSummary, logExcerpt: result.logExcerpt } };
@@ -189,7 +153,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
   server.registerTool(
     "prototype_screenshot_gallery",
     {
-      description: "Render two or more already captured prototype screenshots as one selectable gallery. Use this after prototype_screenshot when the user wants to compare desktop, tablet, mobile, or multiple iterations.",
+      description: "Render one or more already captured prototype screenshots in the single visible screenshot UI. Always use this after prototype_screenshot when the user wants to see captured screenshots; use labels to distinguish desktop, tablet, mobile, or iterations.",
       inputSchema: PrototypeScreenshotGalleryInputSchema,
       outputSchema: ScreenshotGalleryOutputSchema,
       _meta: {

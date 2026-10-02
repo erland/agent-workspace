@@ -54,14 +54,8 @@ describe("prototype_screenshot MCP resource contract", () => {
     try {
       const listed = await client.listTools();
       const screenshotTool = listed.tools.find((tool) => tool.name === "prototype_screenshot") as any;
-      assert.equal(
-        screenshotTool?._meta?.ui?.resourceUri,
-        "ui://agent-workspace/screenshot-viewer-v1.html"
-      );
-      assert.equal(
-        screenshotTool?._meta?.["openai/outputTemplate"],
-        "ui://agent-workspace/screenshot-viewer-v1.html"
-      );
+      assert.equal(screenshotTool?._meta?.ui?.resourceUri, undefined);
+      assert.equal(screenshotTool?._meta?.["openai/outputTemplate"], undefined);
 
       const result = await client.callTool({
         name: "prototype_screenshot",
@@ -84,23 +78,7 @@ describe("prototype_screenshot MCP resource contract", () => {
       assert.equal(structured.result.byteSize, PNG.byteLength);
       assert.equal(structured.result.artifactId, "shot_1");
 
-      const metadata = (result as any)._meta;
-      assert.equal(metadata.screenshot.mimeType, "image/png");
-      assert.equal(metadata.screenshot.fileName, "prototype-desktop-shot_1.png");
-      assert.deepEqual(
-        Buffer.from(metadata.screenshot.data, "base64"),
-        Buffer.from(PNG)
-      );
-
-      const viewer = await client.readResource({
-        uri: "ui://agent-workspace/screenshot-viewer-v1.html"
-      });
-      assert.equal(viewer.contents.length, 1);
-      const viewerContent = viewer.contents[0] as any;
-      assert.equal(viewerContent.mimeType, "text/html;profile=mcp-app");
-      assert.match(viewerContent.text, /ui\/notifications\/tool-result/);
-      assert.match(viewerContent.text, /data:.*;base64/);
-      assert.equal(viewerContent._meta?.ui?.prefersBorder, true);
+      assert.equal((result as any)._meta?.screenshot, undefined);
 
       const resource = await client.readResource({ uri: link.uri });
       assert.equal(resource.contents.length, 1);
@@ -166,6 +144,37 @@ describe("prototype_screenshot MCP resource contract", () => {
       assert.match(viewerContent.text, /requestDisplayMode/);
       assert.match(viewerContent.text, /setWidgetState/);
       assert.match(viewerContent.text, /aria-pressed/);
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("renders a single captured screenshot through the gallery widget", async () => {
+    const server = createAgentWorkspaceMcpServer(tools());
+    const client = new Client({ name: "test-client", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      const result = await client.callTool({
+        name: "prototype_screenshot_gallery",
+        arguments: {
+          workspaceId: "ws_1",
+          screenshots: [
+            { artifactId: "shot_1", label: "Desktop", width: 1440, height: 900 }
+          ]
+        }
+      });
+
+      const structured = result.structuredContent as any;
+      assert.equal(structured.result.status, "PASSED");
+      assert.equal(structured.result.screenshots.length, 1);
+      assert.equal(structured.result.selectedArtifactId, "shot_1");
+      assert.equal(result.content.filter((item) => item.type === "resource_link").length, 1);
+      assert.equal((result as any)._meta.gallery.screenshots.length, 1);
     } finally {
       await client.close();
       await server.close();

@@ -53,7 +53,7 @@ export const PrototypeScreenshotGalleryInputSchema = z.object({
     label: z.string().min(1).max(80),
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional()
-  }).strict()).min(2).max(12),
+  }).strict()).min(1).max(12),
   selectedArtifactId: z.string().min(1).max(128).optional()
 }).strict();
 
@@ -88,6 +88,6 @@ export const ScreenshotGalleryOutputSchema = z.object({
       resourceUri: z.string(),
       fileName: z.string(),
       byteSize: z.number().int().nonnegative()
-    }).strict()).min(2)
+    }).strict()).min(1)
   }).strict()
 }).strict();
