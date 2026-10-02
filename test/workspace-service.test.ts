@@ -231,6 +231,42 @@ describe("WorkspaceService ZIP upload", () => {
     assert.deepEqual(result.workspace.project?.analysis.recommendedRuntime, { java: "21", node: "22" });
   });
 
+  it("verifies an npm project inside a ZIP top-level directory", async () => {
+    class NestedNpmProvider extends FakeProvider {
+      override async exec(_handle: WorkspaceHandle, command: Command): Promise<ExecutionResult> {
+        this.commands.push(command);
+        if (command.argv[0] === "node" && command.argv[1] === "-e") {
+          return {
+            exitCode: 0,
+            stdout: JSON.stringify({ hasPackageLock: false, scripts: {} }),
+            stderr: ""
+          };
+        }
+        return { exitCode: 0, stdout: "", stderr: "" };
+      }
+    }
+
+    const provider = new NestedNpmProvider();
+    const service = new WorkspaceService(provider, {
+      idFactory: () => "ws_nested_npm",
+      schedule: () => ({})
+    });
+    await service.create();
+    await service.uploadZip("ws_nested_npm", makeStoredZip([
+      { path: "prototype/package.json", content: "{}" },
+      { path: "prototype/src/main.ts", content: "console.log('ok');" }
+    ]));
+
+    const result = await service.verifyProject("ws_nested_npm");
+
+    assert.equal(result.status, "PASSED");
+    const verificationCommands = provider.commands.filter((command) => command.workdir !== undefined);
+    assert.ok(verificationCommands.length >= 2);
+    for (const command of verificationCommands) {
+      assert.equal(command.workdir, "/workspace/project/prototype");
+    }
+  });
+
   it("does not send an invalid archive to the provider", async () => {
     class UploadProvider extends FakeProvider {
       public uploads = 0;
