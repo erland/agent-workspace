@@ -73,9 +73,12 @@ describe("PrototypeService", () => {
 
     assert.equal(result.status, "RUNNING");
     const launch = provider.commands[3]?.argv.join(" ") ?? "";
-    assert.match(launch, /0\.0\.0\.0/);
-    assert.match(launch, /__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS/);
-    assert.match(launch, /preview-example\.modal\.run/);
+    const match = launch.match(/AGENT_WORKSPACE_START_B64='([^']+)'/);
+    assert.ok(match?.[1]);
+    const spec = JSON.parse(Buffer.from(match[1], "base64").toString("utf8"));
+    assert.deepEqual(spec.argv, ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "4173"]);
+    assert.equal(spec.env.HOST, "0.0.0.0");
+    assert.equal(spec.env.__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS, "preview-example.modal.run");
   });
 
   it("uses npm install without a lock file", async () => {
