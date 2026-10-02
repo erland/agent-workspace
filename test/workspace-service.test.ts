@@ -332,8 +332,11 @@ describe("WorkspaceService prototype start", () => {
     });
 
     const launchText = provider.commands[3]?.argv.join(" ") ?? "";
-    assert.match(launchText, /0\.0\.0\.0/);
-    assert.match(launchText, /preview-example\.modal\.run/);
+    const match = launchText.match(/AGENT_WORKSPACE_START_B64='([^']+)'/);
+    assert.ok(match?.[1]);
+    const spec = JSON.parse(Buffer.from(match[1], "base64").toString("utf8"));
+    assert.equal(spec.env.HOST, "0.0.0.0");
+    assert.equal(spec.env.__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS, "preview-example.modal.run");
   });
 
   it("rejects prototype start for a Maven project", async () => {
