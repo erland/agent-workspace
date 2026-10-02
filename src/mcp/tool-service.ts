@@ -29,6 +29,7 @@ export interface AgentWorkspaceTools {
   verifyProject(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
   startPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
   screenshotPrototype(input: { workspaceId: string; viewport?: ScreenshotViewport }): Promise<ToolResult<unknown>>;
+  readScreenshotArtifact(input: { workspaceId: string; artifactId: string }): Promise<Uint8Array>;
   destroyWorkspace(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
 }
 
@@ -88,6 +89,10 @@ export class AgentWorkspaceToolService implements AgentWorkspaceTools {
       const result = await this.workspaces.screenshotPrototype(input.workspaceId, input.viewport);
       return { ok: true, result };
     } catch (error) { return this.failure(error); }
+  }
+
+  public async readScreenshotArtifact(input: { workspaceId: string; artifactId: string }): Promise<Uint8Array> {
+    return this.workspaces.readScreenshotArtifact(input.workspaceId, input.artifactId);
   }
 
   public async destroyWorkspace(input: { workspaceId: string }): Promise<ToolResult<unknown>> {

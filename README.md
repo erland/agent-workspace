@@ -209,6 +209,11 @@ For MCP hosts that do not support OpenAI file parameters, including Claude-compa
 
 The provider-neutral workspace layer remains unchanged: every transport is normalized to ZIP bytes before `WorkspaceService.uploadZip()`, so project detection, validation and Modal extraction use the same path regardless of MCP host.
 
+### Screenshot return transport
+
+`prototype_screenshot` returns the normal MCP image block for compatible clients and also returns a standard MCP `resource_link`. The linked PNG can be fetched through `resources/read` while the workspace is alive, which gives ChatGPT a file-reference path instead of relying on the inline image block alone. Screenshot resources remain protected by the same MCP OAuth/user isolation as the workspace and disappear when the sandbox is destroyed.
+
+
 ## DEV-011: user-specific Modal accounts
 
 Production design now uses one `ExecutionAccount` per Agent Workspace user. Modal OAuth refresh credentials are resolved server-side from a credential reference and used to construct a dedicated `ModalClient` for that user's operations. See `docs/dev-011-verification.md` for the live two-user feasibility test and the remaining Modal OAuth registration dependency. DEV-011 is currently explicitly deferred; it must be completed before the full multi-user Modal account-linking flow is claimed as production verified.

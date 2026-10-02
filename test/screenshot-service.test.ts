@@ -38,17 +38,19 @@ const handle = { providerId:"fake", providerWorkspaceId:"fake" };
 describe("ScreenshotService", () => {
   it("returns PNG bytes for the desktop preset", async () => {
     const provider = new ScreenshotProvider({ exitCode:0, stdout:"", stderr:"" });
-    const result = await new ScreenshotService(provider, { nowMs:()=>100 }).capture(handle, { url:"http://127.0.0.1:4173", viewport:"desktop" });
+    const result = await new ScreenshotService(provider, { nowMs:()=>100, artifactIdFactory:()=>"shot_1" }).capture(handle, { url:"http://127.0.0.1:4173", viewport:"desktop" });
     assert.equal(result.status, "PASSED");
     if (result.status !== "PASSED") return;
     assert.equal(result.mimeType, "image/png");
     assert.equal(result.width, 1440);
     assert.equal(result.height, 900);
     assert.deepEqual(result.bytes, PNG);
+    assert.equal(result.artifactId, "shot_1");
+    assert.equal(result.fileName, "prototype-desktop-shot_1.png");
     assert.match(provider.commands[0]?.argv.join(" ") ?? "", /chromium\.launch/);
     assert.match(provider.commands[0]?.argv.join(" ") ?? "", /fullPage:false/);
-    assert.deepEqual(provider.commands[1]?.argv, ["stat", "-c", "%s", "/tmp/agent-workspace-screenshot.png"]);
-    assert.deepEqual(provider.readPaths, ["/tmp/agent-workspace-screenshot.png"]);
+    assert.deepEqual(provider.commands[1]?.argv, ["stat", "-c", "%s", "/tmp/agent-workspace-screenshot-shot_1.png"]);
+    assert.deepEqual(provider.readPaths, ["/tmp/agent-workspace-screenshot-shot_1.png"]);
   });
 
   it("supports tablet, mobile and explicit viewports", () => {

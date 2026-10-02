@@ -86,6 +86,16 @@ export class AuthenticatedAgentWorkspaceToolService {
     return this.withWorkspaceService("prototype_screenshot", input.workspaceId, (service) => service.screenshotPrototype(input.workspaceId, input.viewport));
   }
 
+  async readScreenshotArtifact(input: { workspaceId: string; artifactId: string }): Promise<Uint8Array> {
+    const result = await this.withWorkspaceService(
+      "prototype_screenshot_resource",
+      input.workspaceId,
+      (service) => service.readScreenshotArtifact(input.workspaceId, input.artifactId)
+    );
+    if (!result.ok) throw new Error(result.error.message);
+    return result.result;
+  }
+
   async destroyWorkspace(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
     return this.withWorkspaceService("workspace_destroy", input.workspaceId, (service) => service.destroy(input.workspaceId));
   }
