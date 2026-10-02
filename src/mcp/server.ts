@@ -13,9 +13,34 @@ import {
   WorkspaceUploadZipInputSchema
 } from "./schemas.js";
 import { SCREENSHOT_RESOURCE_TEMPLATE, screenshotResourceUri, singleTemplateValue } from "./screenshot-resource.js";
+import { SCREENSHOT_VIEWER_HTML, SCREENSHOT_VIEWER_MIME_TYPE, SCREENSHOT_VIEWER_URI } from "./screenshot-viewer.js";
 
 export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpServer {
   const server = new McpServer({ name: "agent-workspace", version: "0.1.0" });
+
+  server.registerResource(
+    "prototype-screenshot-viewer",
+    SCREENSHOT_VIEWER_URI,
+    {
+      title: "Prototype screenshot viewer",
+      description: "Inline viewer for prototype screenshots.",
+      mimeType: SCREENSHOT_VIEWER_MIME_TYPE
+    },
+    async () => ({
+      contents: [{
+        uri: SCREENSHOT_VIEWER_URI,
+        mimeType: SCREENSHOT_VIEWER_MIME_TYPE,
+        text: SCREENSHOT_VIEWER_HTML,
+        _meta: {
+          ui: {
+            prefersBorder: true,
+            csp: { connectDomains: [], resourceDomains: [] }
+          },
+          "openai/ui": { availableDisplayModes: ["inline", "fullscreen"] }
+        }
+      }]
+    })
+  );
 
   server.registerResource(
     "prototype-screenshot",
@@ -77,7 +102,11 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
     {
       description: "Capture a PNG screenshot of a running prototype.",
       inputSchema: PrototypeScreenshotInputSchema,
-      outputSchema: ScreenshotOutputSchema
+      outputSchema: ScreenshotOutputSchema,
+      _meta: {
+        ui: { resourceUri: SCREENSHOT_VIEWER_URI },
+        "openai/outputTemplate": SCREENSHOT_VIEWER_URI
+      }
     },
     async (input) => {
       const normalizedInput = input.viewport === undefined
@@ -100,6 +129,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
             byteSize: result.bytes.byteLength
           }
         };
+        const screenshotData = Buffer.from(result.bytes).toString("base64");
         return {
           structuredContent: structured,
           content: [
@@ -112,8 +142,15 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
               mimeType: result.mimeType,
               size: result.bytes.byteLength
             },
-            { type: "image" as const, data: Buffer.from(result.bytes).toString("base64"), mimeType: result.mimeType }
-          ]
+            { type: "image" as const, data: screenshotData, mimeType: result.mimeType }
+          ],
+          _meta: {
+            screenshot: {
+              data: screenshotData,
+              mimeType: result.mimeType,
+              fileName: result.fileName
+            }
+          }
         };
       }
       const structured = { result: { status: result.status, durationMs: result.durationMs, failureSummary: result.failureSummary, logExcerpt: result.logExcerpt } };
