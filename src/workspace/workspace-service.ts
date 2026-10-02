@@ -106,7 +106,10 @@ export class WorkspaceService {
     options: WorkspaceServiceOptions = {}
   ) {
     this.defaultLifetimeMinutes = options.defaultLifetimeMinutes ?? DEFAULT_LIFETIME_MINUTES;
-    this.maxLifetimeMinutes = options.maxLifetimeMinutes ?? options.securityPolicy?.maxWorkspaceLifetimeMinutes ?? MAX_LIFETIME_MINUTES;
+    this.maxLifetimeMinutes = Math.min(
+      options.maxLifetimeMinutes ?? options.securityPolicy?.maxWorkspaceLifetimeMinutes ?? MAX_LIFETIME_MINUTES,
+      MAX_LIFETIME_MINUTES
+    );
     this.archiveLimits = options.archiveLimits ?? {};
     this.now = options.now ?? (() => new Date());
     this.idFactory = options.idFactory ?? (() => `ws_${randomUUID()}`);
