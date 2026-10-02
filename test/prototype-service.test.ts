@@ -57,6 +57,27 @@ describe("PrototypeService", () => {
     assert.match(readinessScript, /set -euo pipefail\nfor i in \$\(seq 1 /);
   });
 
+  it("binds Vite publicly and allows the exact tunnel host when requested", async () => {
+    const provider = new ScriptedProvider([
+      { exitCode: 0, stdout: JSON.stringify({ hasPackageLock: true, scripts: { dev: "vite" } }), stderr: "" },
+      { exitCode: 0, stdout: "installed", stderr: "" },
+      { exitCode: 0, stdout: "", stderr: "" },
+      { exitCode: 0, stdout: "4321", stderr: "" },
+      { exitCode: 0, stdout: "", stderr: "" }
+    ]);
+
+    const result = await new PrototypeService(provider, {
+      host: "0.0.0.0",
+      allowedHost: "preview-example.modal.run"
+    }).start(handle);
+
+    assert.equal(result.status, "RUNNING");
+    const launch = provider.commands[3]?.argv.join(" ") ?? "";
+    assert.match(launch, /0\.0\.0\.0/);
+    assert.match(launch, /__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS/);
+    assert.match(launch, /preview-example\.modal\.run/);
+  });
+
   it("uses npm install without a lock file", async () => {
     const provider = new ScriptedProvider([
       { exitCode: 0, stdout: JSON.stringify({ hasPackageLock: false, scripts: { start: "node server.js" } }), stderr: "" },
