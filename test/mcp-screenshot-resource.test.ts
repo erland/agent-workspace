@@ -52,6 +52,17 @@ describe("prototype_screenshot MCP resource contract", () => {
     await client.connect(clientTransport);
 
     try {
+      const listed = await client.listTools();
+      const screenshotTool = listed.tools.find((tool) => tool.name === "prototype_screenshot") as any;
+      assert.equal(
+        screenshotTool?._meta?.ui?.resourceUri,
+        "ui://agent-workspace/screenshot-viewer-v1.html"
+      );
+      assert.equal(
+        screenshotTool?._meta?.["openai/outputTemplate"],
+        "ui://agent-workspace/screenshot-viewer-v1.html"
+      );
+
       const result = await client.callTool({
         name: "prototype_screenshot",
         arguments: { workspaceId: "ws_1", viewport: "desktop" }
@@ -71,6 +82,24 @@ describe("prototype_screenshot MCP resource contract", () => {
       const structured = result.structuredContent as any;
       assert.equal(structured.result.resourceUri, link.uri);
       assert.equal(structured.result.byteSize, PNG.byteLength);
+
+      const metadata = (result as any)._meta;
+      assert.equal(metadata.screenshot.mimeType, "image/png");
+      assert.equal(metadata.screenshot.fileName, "prototype-desktop-shot_1.png");
+      assert.deepEqual(
+        Buffer.from(metadata.screenshot.data, "base64"),
+        Buffer.from(PNG)
+      );
+
+      const viewer = await client.readResource({
+        uri: "ui://agent-workspace/screenshot-viewer-v1.html"
+      });
+      assert.equal(viewer.contents.length, 1);
+      const viewerContent = viewer.contents[0] as any;
+      assert.equal(viewerContent.mimeType, "text/html;profile=mcp-app");
+      assert.match(viewerContent.text, /ui\/notifications\/tool-result/);
+      assert.match(viewerContent.text, /data:.*;base64/);
+      assert.equal(viewerContent._meta?.ui?.prefersBorder, true);
 
       const resource = await client.readResource({ uri: link.uri });
       assert.equal(resource.contents.length, 1);
