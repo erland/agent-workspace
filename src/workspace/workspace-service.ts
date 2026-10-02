@@ -14,7 +14,7 @@ import { NpmVerifier } from "../verification/npm-verifier.js";
 import { MavenVerifier } from "../verification/maven-verifier.js";
 import type { ProjectVerificationResult } from "../verification/verification-result.js";
 import { PrototypeService, type PrototypeStartResult } from "../prototype/prototype-service.js";
-import { ScreenshotService, type PrototypeScreenshotResult, type ScreenshotViewport } from "../prototype/screenshot-service.js";
+import { ScreenshotService, isPngScreenshot, screenshotArtifactPath, type PrototypeScreenshotResult, type ScreenshotViewport } from "../prototype/screenshot-service.js";
 import { analyzeProjectArchive, type ProjectAnalysis } from "../project/project-detector.js";
 import {
   resolveRuntimeProfile,
@@ -365,6 +365,29 @@ export class WorkspaceService {
       url: workspace.prototype.url,
       ...(viewport !== undefined ? { viewport } : {})
     });
+  }
+
+  public async readScreenshotArtifact(
+    workspaceId: string,
+    artifactId: string
+  ): Promise<Uint8Array> {
+    const workspace = await this.get(workspaceId);
+    if (workspace.status !== "READY") {
+      throw new Error(`Workspace ${workspaceId} is not ready for screenshot access: ${workspace.status}`);
+    }
+
+    const record = await this.requireRecord(workspaceId);
+    const bytes = await this.provider.readFile(record.handle, screenshotArtifactPath(artifactId));
+    if (bytes.byteLength === 0) {
+      throw new Error("Screenshot artifact is empty");
+    }
+    if (bytes.byteLength > this.securityPolicy.maxScreenshotBytes) {
+      throw new Error(`Screenshot output exceeds maximum size of ${this.securityPolicy.maxScreenshotBytes} bytes`);
+    }
+    if (!isPngScreenshot(bytes)) {
+      throw new Error("Screenshot artifact is not a PNG file");
+    }
+    return bytes;
   }
 
   public async destroy(workspaceId: string): Promise<Workspace> {
