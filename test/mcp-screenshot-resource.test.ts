@@ -44,7 +44,7 @@ function tools(): AgentWorkspaceTools {
 }
 
 describe("prototype_screenshot MCP resource contract", () => {
-  it("returns a resource_link and serves the PNG through resources/read", async () => {
+  it("returns the PNG inline without advertising a materializable resource link", async () => {
     const server = createAgentWorkspaceMcpServer(tools());
     const client = new Client({ name: "test-client", version: "1.0.0" });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -63,25 +63,20 @@ describe("prototype_screenshot MCP resource contract", () => {
         arguments: { workspaceId: "ws_1", viewport: "desktop" }
       });
 
-      const link = result.content.find((item) => item.type === "resource_link");
-      assert.ok(link && link.type === "resource_link");
-      assert.equal(link.mimeType, "image/png");
-      assert.equal(link.name, "prototype-desktop-shot_1.png");
-      assert.equal(link.uri, "agent-workspace://screenshots/ws_1/shot_1");
-      assert.equal(link.size, PNG.byteLength);
+      assert.equal(result.content.some((item) => item.type === "resource_link"), false);
 
       const image = result.content.find((item) => item.type === "image");
       assert.ok(image && image.type === "image");
       assert.equal(image.mimeType, "image/png");
 
       const structured = result.structuredContent as any;
-      assert.equal(structured.result.resourceUri, link.uri);
+      assert.equal(structured.result.resourceUri, "agent-workspace://screenshots/ws_1/shot_1");
       assert.equal(structured.result.byteSize, PNG.byteLength);
       assert.equal(structured.result.artifactId, "shot_1");
 
       assert.equal((result as any)._meta?.screenshot, undefined);
 
-      const resource = await client.readResource({ uri: link.uri });
+      const resource = await client.readResource({ uri: structured.result.resourceUri });
       assert.equal(resource.contents.length, 1);
       const content = resource.contents[0]!;
       assert.equal(content.mimeType, "image/png");
@@ -127,7 +122,7 @@ describe("prototype_screenshot MCP resource contract", () => {
       assert.equal(structured.result.status, "PASSED");
       assert.equal(structured.result.selectedArtifactId, "shot_1");
       assert.equal(structured.result.screenshots.length, 2);
-      assert.equal(result.content.filter((item) => item.type === "resource_link").length, 2);
+      assert.equal(result.content.filter((item) => item.type === "resource_link").length, 0);
 
       const metadata = (result as any)._meta;
       assert.equal(metadata.gallery.screenshots.length, 2);
@@ -174,7 +169,7 @@ describe("prototype_screenshot MCP resource contract", () => {
       assert.equal(structured.result.status, "PASSED");
       assert.equal(structured.result.screenshots.length, 1);
       assert.equal(structured.result.selectedArtifactId, "shot_1");
-      assert.equal(result.content.filter((item) => item.type === "resource_link").length, 1);
+      assert.equal(result.content.filter((item) => item.type === "resource_link").length, 0);
       assert.equal((result as any)._meta.gallery.screenshots.length, 1);
     } finally {
       await client.close();
