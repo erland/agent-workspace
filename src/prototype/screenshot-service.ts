@@ -10,7 +10,22 @@ export const VIEWPORT_PRESETS = {
 
 export type ViewportPreset = keyof typeof VIEWPORT_PRESETS;
 export interface ViewportSize { width: number; height: number; }
-export type ScreenshotViewport = ViewportPreset | ViewportSize;
+
+export const DEVICE_VIEWPORT_PRESETS = {
+  iphone: { width: 393, height: 852 },
+  "iphone-large": { width: 430, height: 932 },
+  ipad: { width: 820, height: 1180 },
+  android: { width: 412, height: 915 },
+  "android-large": { width: 480, height: 1040 }
+} as const;
+
+export type DeviceViewportPreset = keyof typeof DEVICE_VIEWPORT_PRESETS;
+export type ScreenshotOrientation = "portrait" | "landscape";
+export interface DeviceViewportRequest {
+  device: DeviceViewportPreset;
+  orientation?: ScreenshotOrientation;
+}
+export type ScreenshotViewport = ViewportPreset | ViewportSize | DeviceViewportRequest;
 
 export interface PrototypeScreenshotRequest {
   url: string;
@@ -163,6 +178,13 @@ export class ScreenshotService {
 export function resolveViewport(viewport: ScreenshotViewport | undefined): ViewportSize {
   if (viewport === undefined) return { ...VIEWPORT_PRESETS.desktop };
   if (typeof viewport === "string") return { ...VIEWPORT_PRESETS[viewport] };
+  if ("device" in viewport) {
+    const base = DEVICE_VIEWPORT_PRESETS[viewport.device];
+    const orientation = viewport.orientation ?? "portrait";
+    return orientation === "portrait"
+      ? { ...base }
+      : { width: base.height, height: base.width };
+  }
   const { width, height } = viewport;
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 4096 || height > 4096) {
     throw new Error("Viewport width/height must be integers from 1 to 4096");
@@ -187,6 +209,11 @@ function screenshotFileName(
   viewport: ViewportSize,
   artifactId: string
 ): string {
-  const label = typeof requested === "string" ? requested : `${viewport.width}x${viewport.height}`;
+  const label =
+    typeof requested === "string"
+      ? requested
+      : requested && "device" in requested
+        ? `${requested.device}-${requested.orientation ?? "portrait"}`
+        : `${viewport.width}x${viewport.height}`;
   return `prototype-${label}-${artifactId}.png`;
 }
