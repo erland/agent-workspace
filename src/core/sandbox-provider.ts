@@ -11,6 +11,7 @@ export interface CreateWorkspaceOptions {
   cpuLimit?: number;
   memoryMiB?: number;
   networkPolicy?: NetworkPolicy;
+  encryptedPorts?: readonly number[];
 }
 
 export interface WorkspaceHandle {
@@ -36,5 +37,6 @@ export interface SandboxProvider {
   uploadArchive(handle: WorkspaceHandle, archive: Uint8Array): Promise<void>;
   exec(handle: WorkspaceHandle, command: Command): Promise<ExecutionResult>;
   readFile(handle: WorkspaceHandle, path: string): Promise<Uint8Array>;
+  getTunnelUrl?(handle: WorkspaceHandle, port: number): Promise<string>;
   terminate(handle: WorkspaceHandle): Promise<void>;
 }
