@@ -102,7 +102,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
   server.registerTool(
     "prototype_screenshot",
     {
-      description: "Capture a PNG screenshot of a running prototype.",
+      description: "Capture exactly one PNG screenshot of a running prototype. Use desktop/tablet/mobile for generic views, device + orientation for named mobile/tablet profiles, or explicit width/height. Do not create additional orientations or device variants unless the user explicitly requested them.",
       inputSchema: PrototypeScreenshotInputSchema,
       outputSchema: ScreenshotOutputSchema
     },
