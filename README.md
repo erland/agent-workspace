@@ -180,7 +180,11 @@ An uploaded npm project can now be started as a local web prototype with `Worksp
 
 ## DEV-009 screenshot support
 
-A running prototype can now be captured as PNG through Playwright/Chromium with the `desktop` (1440×900), `tablet` (1024×768), and `mobile` (390×844) presets or an explicit viewport up to 4096×4096. Screenshot bytes stay provider-neutral and are returned as `image/png`; the Modal provider reads the generated PNG through the Sandbox filesystem API.
+A running prototype can now be captured as PNG through Playwright/Chromium with the `desktop` (1440×900), `tablet` (1024×768), and `mobile` (390×844) presets, stable device profiles, or an explicit viewport up to 4096×4096.
+
+Device profiles are `iphone` (393×852), `iphone-large` (430×932), `ipad` (820×1180), `android` (412×915), and `android-large` (480×1040). They default to `portrait`; `landscape` swaps width and height. These are stable UI viewport profiles rather than claims about one exact hardware model.
+
+`prototype_screenshot` captures exactly one requested viewport. Generic `mobile` or `tablet` requests are not expanded automatically into multiple devices or orientations. Additional portrait/landscape or device variants should only be requested when the user explicitly asks for them. Screenshot bytes stay provider-neutral and are returned as `image/png`; the Modal provider reads the generated PNG through the Sandbox filesystem API.
 
 Run the authenticated live smoke on your Mac with:
 
