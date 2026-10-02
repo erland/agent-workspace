@@ -199,7 +199,15 @@ After `npm ci`, start the local stdio MCP server with:
 npm run mcp:stdio
 ```
 
-DEV-010 exposes: `get_capabilities`, `get_profile`, `workspace_create`, `workspace_upload_zip`, `project_verify`, `prototype_start`, `prototype_screenshot`, and `workspace_destroy`.
+DEV-010 exposes: `get_capabilities`, `get_profile`, `workspace_create`, `workspace_upload_zip`, `workspace_upload_zip_from_url`, `project_verify`, `prototype_start`, `prototype_screenshot`, and `workspace_destroy`.
+
+### ZIP transport across MCP hosts
+
+`workspace_upload_zip` keeps the existing Base64 input as a portable fallback and also declares the optional top-level `archive` input through `_meta["openai/fileParams"]`. ChatGPT can therefore pass an attached file as a temporary download reference without embedding the ZIP bytes in the MCP JSON request.
+
+For MCP hosts that do not support OpenAI file parameters, including Claude-compatible deployments, use `workspace_upload_zip_from_url` with a public HTTPS URL (for example a short-lived presigned object-storage URL). Remote archive downloads are bounded by the same 100 MB compressed archive limit used by ZIP validation. The downloader validates every redirect, rejects credentials in URLs, and rejects localhost, private, link-local and other non-public destinations before fetching.
+
+The provider-neutral workspace layer remains unchanged: every transport is normalized to ZIP bytes before `WorkspaceService.uploadZip()`, so project detection, validation and Modal extraction use the same path regardless of MCP host.
 
 ## DEV-011: user-specific Modal accounts
 

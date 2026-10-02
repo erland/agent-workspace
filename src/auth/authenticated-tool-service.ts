@@ -5,8 +5,12 @@ import { IdentityService } from "../persistence/identity-service.js";
 import { RepositoryProfileProvider } from "../persistence/profile-provider.js";
 import type { ScreenshotViewport } from "../prototype/screenshot-service.js";
 import { WorkspaceService } from "../workspace/workspace-service.js";
+import {
+  decodeBase64Archive,
+  RemoteArchiveDownloader
+} from "../mcp/archive-source.js";
 import { normalizeToolError } from "../mcp/errors.js";
-import type { ToolFailure, ToolResult } from "../mcp/tool-service.js";
+import type { ToolFailure, ToolResult, WorkspaceUploadZipToolInput } from "../mcp/tool-service.js";
 import type { AuthenticatedPrincipal } from "./principal.js";
 import type { UserRateLimiter } from "../security/rate-limiter.js";
 import type { AuditEventSink } from "../audit/audit-events.js";
@@ -22,6 +26,7 @@ export interface AuthenticatedToolServiceDependencies {
   rateLimiter?: UserRateLimiter;
   audit?: AuditEventSink;
   now?: () => Date;
+  archiveDownloader?: RemoteArchiveDownloader;
 }
 
 export class AuthenticatedAgentWorkspaceToolService {
@@ -53,8 +58,20 @@ export class AuthenticatedAgentWorkspaceToolService {
     });
   }
 
-  async uploadZip(input: { workspaceId: string; archiveBase64: string; filename?: string }): Promise<ToolResult<unknown>> {
-    return this.withWorkspaceService("workspace_upload_zip", input.workspaceId, async (service) => service.uploadZip(input.workspaceId, decodeBase64(input.archiveBase64)));
+  async uploadZip(input: WorkspaceUploadZipToolInput): Promise<ToolResult<unknown>> {
+    return this.withWorkspaceService("workspace_upload_zip", input.workspaceId, async (service) => {
+      const archive = input.archive
+        ? await this.archiveDownloader().download(input.archive.download_url)
+        : decodeBase64Archive(requireBase64(input.archiveBase64));
+      return service.uploadZip(input.workspaceId, archive);
+    });
+  }
+
+  async uploadZipFromUrl(input: { workspaceId: string; url: string; filename?: string }): Promise<ToolResult<unknown>> {
+    return this.withWorkspaceService("workspace_upload_zip_from_url", input.workspaceId, async (service) => {
+      const archive = await this.archiveDownloader().download(input.url);
+      return service.uploadZip(input.workspaceId, archive);
+    });
   }
 
   async verifyProject(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
@@ -71,6 +88,10 @@ export class AuthenticatedAgentWorkspaceToolService {
 
   async destroyWorkspace(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
     return this.withWorkspaceService("workspace_destroy", input.workspaceId, (service) => service.destroy(input.workspaceId));
+  }
+
+  private archiveDownloader(): RemoteArchiveDownloader {
+    return this.deps.archiveDownloader ?? new RemoteArchiveDownloader();
   }
 
   private async withWorkspaceService<T>(action: string, workspaceId: string | undefined, operation: (service: WorkspaceService) => Promise<T>): Promise<ToolResult<T>> {
@@ -127,9 +148,7 @@ export class AuthenticatedAgentWorkspaceToolService {
   }
 }
 
-function decodeBase64(value: string): Uint8Array {
-  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value) || value.length % 4 !== 0) throw new Error("archiveBase64 must be valid base64");
-  const bytes = Buffer.from(value, "base64");
-  if (bytes.length === 0) throw new Error("archiveBase64 decoded to an empty archive");
-  return bytes;
+function requireBase64(value: string | undefined): string {
+  if (value === undefined) throw new Error("Exactly one of archive or archiveBase64 must be supplied");
+  return value;
 }
