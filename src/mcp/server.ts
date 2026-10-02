@@ -5,6 +5,7 @@ import type { AgentWorkspaceTools, ToolResult } from "./tool-service.js";
 import {
   EmptyInputSchema,
   JsonObjectOutputSchema,
+  PrototypePreviewOutputSchema,
   PrototypeScreenshotGalleryInputSchema,
   PrototypeScreenshotInputSchema,
   ScreenshotGalleryOutputSchema,
@@ -98,6 +99,28 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
 
   registerJsonTool(server, "project_verify", "Build and test the uploaded npm or Maven project.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.verifyProject(input));
   registerJsonTool(server, "prototype_start", "Install dependencies and start an uploaded npm web prototype.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.startPrototype(input));
+
+  server.registerTool(
+    "prototype_preview_link",
+    {
+      description: "Return the temporary public HTTPS link for a running prototype. Use only when the user asks to open, try, click through, or interact with the prototype themselves. The link expires when the 20-minute workspace sandbox expires.",
+      inputSchema: WorkspaceIdInputSchema,
+      outputSchema: PrototypePreviewOutputSchema
+    },
+    async (input: z.infer<typeof WorkspaceIdInputSchema>) => {
+      const response = await tools.previewPrototype(input);
+      if (!response.ok) return errorResult(response);
+      const structured = { result: response.result };
+      const result = response.result as any;
+      return {
+        structuredContent: structured,
+        content: [{
+          type: "text" as const,
+          text: `Interactive prototype: ${result.url}\nExpires: ${result.expiresAt}\nAccess: anyone with this temporary link can open it until the sandbox expires.`
+        }]
+      };
+    }
+  );
 
   server.registerTool(
     "prototype_screenshot",
