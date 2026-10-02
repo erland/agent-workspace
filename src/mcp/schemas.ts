@@ -54,6 +54,9 @@ export const ScreenshotOutputSchema = z.object({
     width: z.number().int().optional(),
     height: z.number().int().optional(),
     durationMs: z.number(),
+    resourceUri: z.string().optional(),
+    fileName: z.string().optional(),
+    byteSize: z.number().int().nonnegative().optional(),
     failureSummary: z.string().optional(),
     logExcerpt: z.string().optional()
   })
