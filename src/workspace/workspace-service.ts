@@ -282,7 +282,9 @@ export class WorkspaceService {
     }
 
     const record = await this.requireRecord(workspaceId);
-    return new NpmVerifier(this.provider).verify(record.handle);
+    return new NpmVerifier(this.provider, {
+      projectRoot: resolveWorkspaceProjectRoot(workspace.project.analysis.projectRoots)
+    }).verify(record.handle);
   }
 
 
@@ -301,11 +303,9 @@ export class WorkspaceService {
     }
 
     const record = await this.requireRecord(workspaceId);
-    const relativeRoot = workspace.project.analysis.projectRoots[0] ?? "";
-    const projectRoot = relativeRoot.length === 0
-      ? "/workspace/project"
-      : `/workspace/project/${relativeRoot}`;
-    return new MavenVerifier(this.provider, { projectRoot }).verify(record.handle);
+    return new MavenVerifier(this.provider, {
+      projectRoot: resolveWorkspaceProjectRoot(workspace.project.analysis.projectRoots)
+    }).verify(record.handle);
   }
 
   public async startPrototype(workspaceId: string): Promise<PrototypeStartResult> {
@@ -326,10 +326,7 @@ export class WorkspaceService {
     }
 
     const record = await this.requireRecord(workspaceId);
-    const relativeRoot = workspace.project.analysis.projectRoots[0] ?? "";
-    const projectRoot = relativeRoot.length === 0
-      ? "/workspace/project"
-      : `/workspace/project/${relativeRoot}`;
+    const projectRoot = resolveWorkspaceProjectRoot(workspace.project.analysis.projectRoots);
     const tunnelUrl = this.provider.getTunnelUrl
       ? await this.provider.getTunnelUrl(record.handle, DEFAULT_PROTOTYPE_PORT)
       : undefined;
@@ -366,10 +363,7 @@ export class WorkspaceService {
     }
 
     const record = await this.requireRecord(workspaceId);
-    const relativeRoot = workspace.project?.analysis.projectRoots[0] ?? "";
-    const projectRoot = relativeRoot.length === 0
-      ? "/workspace/project"
-      : `/workspace/project/${relativeRoot}`;
+    const projectRoot = resolveWorkspaceProjectRoot(workspace.project?.analysis.projectRoots ?? []);
     return new ScreenshotService(this.provider, {
       projectRoot,
       maxScreenshotBytes: this.securityPolicy.maxScreenshotBytes
@@ -596,4 +590,12 @@ function cloneWorkspace(workspace: Workspace): Workspace {
       ? { prototype: { ...workspace.prototype } }
       : {})
   };
+}
+
+
+function resolveWorkspaceProjectRoot(projectRoots: readonly string[]): string {
+  const relativeRoot = projectRoots[0] ?? "";
+  return relativeRoot.length === 0
+    ? "/workspace/project"
+    : `/workspace/project/${relativeRoot}`;
 }
