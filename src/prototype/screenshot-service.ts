@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { SandboxProvider, WorkspaceHandle } from "../core/sandbox-provider.js";
 import { failureExcerpt, failureSummary } from "../verification/log-bounds.js";
 
@@ -22,6 +23,8 @@ export interface PrototypeScreenshotSuccess {
   width: number;
   height: number;
   bytes: Uint8Array;
+  artifactId: string;
+  fileName: string;
   durationMs: number;
 }
 
@@ -40,12 +43,13 @@ export interface ScreenshotServiceOptions {
   maxFailureExcerptChars?: number;
   maxScreenshotBytes?: number;
   nowMs?: () => number;
+  artifactIdFactory?: () => string;
 }
 
 const DEFAULT_PROJECT_ROOT = "/workspace/project";
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024;
-const SCREENSHOT_PATH = "/tmp/agent-workspace-screenshot.png";
+const screenshotPath_PREFIX = "/tmp/agent-workspace-screenshot-";
 const PLAYWRIGHT_MODULE = "/opt/agent-workspace/browser-tools/node_modules/playwright";
 
 export class ScreenshotService {
@@ -54,6 +58,7 @@ export class ScreenshotService {
   private readonly maxFailureExcerptChars: number | undefined;
   private readonly maxScreenshotBytes: number;
   private readonly nowMs: () => number;
+  private readonly artifactIdFactory: () => string;
 
   public constructor(
     private readonly provider: SandboxProvider,
@@ -64,6 +69,7 @@ export class ScreenshotService {
     this.maxFailureExcerptChars = options.maxFailureExcerptChars;
     this.maxScreenshotBytes = options.maxScreenshotBytes ?? DEFAULT_MAX_SCREENSHOT_BYTES;
     this.nowMs = options.nowMs ?? (() => Date.now());
+    this.artifactIdFactory = options.artifactIdFactory ?? randomUUID;
   }
 
   public async capture(
@@ -72,11 +78,14 @@ export class ScreenshotService {
   ): Promise<PrototypeScreenshotResult> {
     const startedAt = this.nowMs();
     const viewport = resolveViewport(request.viewport);
+    const artifactId = this.artifactIdFactory();
+    const screenshotPath = screenshotArtifactPath(artifactId);
+    const fileName = screenshotFileName(request.viewport, viewport, artifactId);
     const payload = Buffer.from(JSON.stringify({
       url: request.url,
       width: viewport.width,
       height: viewport.height,
-      path: SCREENSHOT_PATH
+      path: screenshotPath
     }), "utf8").toString("base64");
 
     const script = [
@@ -108,7 +117,7 @@ export class ScreenshotService {
 
     try {
       const sizeResult = await this.provider.exec(handle, {
-        argv: ["stat", "-c", "%s", SCREENSHOT_PATH],
+        argv: ["stat", "-c", "%s", screenshotPath],
         timeoutMs: 5_000
       });
       if (sizeResult.exitCode !== 0) {
@@ -122,11 +131,11 @@ export class ScreenshotService {
         throw new Error(`Screenshot output exceeds maximum size of ${this.maxScreenshotBytes} bytes`);
       }
 
-      const bytes = await this.provider.readFile(handle, SCREENSHOT_PATH);
+      const bytes = await this.provider.readFile(handle, screenshotPath);
       if (bytes.byteLength > this.maxScreenshotBytes) {
         throw new Error(`Screenshot output exceeds maximum size of ${this.maxScreenshotBytes} bytes`);
       }
-      if (!isPng(bytes)) {
+      if (!isPngScreenshot(bytes)) {
         throw new Error("Screenshot output is not a PNG file");
       }
       return {
@@ -135,6 +144,8 @@ export class ScreenshotService {
         width: viewport.width,
         height: viewport.height,
         bytes,
+        artifactId,
+        fileName,
         durationMs: Math.max(0, this.nowMs() - startedAt)
       };
     } catch (error) {
@@ -159,7 +170,23 @@ export function resolveViewport(viewport: ScreenshotViewport | undefined): Viewp
   return { width, height };
 }
 
-function isPng(bytes: Uint8Array): boolean {
+export function screenshotArtifactPath(artifactId: string): string {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(artifactId)) {
+    throw new Error("Invalid screenshot artifact id");
+  }
+  return `${SCREENSHOT_PATH_PREFIX}${artifactId}.png`;
+}
+
+export function isPngScreenshot(bytes: Uint8Array): boolean {
   const sig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
   return bytes.length >= sig.length && sig.every((value, index) => bytes[index] === value);
+}
+
+function screenshotFileName(
+  requested: ScreenshotViewport | undefined,
+  viewport: ViewportSize,
+  artifactId: string
+): string {
+  const label = typeof requested === "string" ? requested : `${viewport.width}x${viewport.height}`;
+  return `prototype-${label}-${artifactId}.png`;
 }
