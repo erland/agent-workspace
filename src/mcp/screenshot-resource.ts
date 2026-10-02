@@ -4,6 +4,7 @@ export function screenshotResourceUri(workspaceId: string, artifactId: string): 
   return `agent-workspace://screenshots/${encodeURIComponent(workspaceId)}/${encodeURIComponent(artifactId)}`;
 }
 
-export function singleTemplateValue(value: string | string[]): string {
+export function singleTemplateValue(value: string | string[] | undefined): string {
+  if (value === undefined) return "";
   return Array.isArray(value) ? value[0] ?? "" : value;
 }
