@@ -213,6 +213,8 @@ The provider-neutral workspace layer remains unchanged: every transport is norma
 
 `prototype_screenshot` returns the normal MCP image block for compatible clients and also returns a standard MCP `resource_link`. The linked PNG can be fetched through `resources/read` while the workspace is alive, which gives ChatGPT a file-reference path instead of relying on the inline image block alone. Screenshot resources remain protected by the same MCP OAuth/user isolation as the workspace and disappear when the sandbox is destroyed.
 
+For ChatGPT and other MCP Apps-compatible hosts, `prototype_screenshot` is also linked to a small inline screenshot viewer using `_meta.ui.resourceUri`. The tool result passes the PNG to the UI through result `_meta`, so the screenshot is rendered visibly in the conversation without requiring the user to request or open a link. The resource-link path remains available for model access and non-UI clients.
+
 
 ## DEV-011: user-specific Modal accounts
 
