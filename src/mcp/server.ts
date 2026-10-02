@@ -156,14 +156,6 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
           structuredContent: structured,
           content: [
             { type: "text" as const, text: JSON.stringify(structured) },
-            {
-              type: "resource_link" as const,
-              uri: resourceUri,
-              name: result.fileName,
-              title: `Prototype screenshot ${result.width}x${result.height}`,
-              mimeType: result.mimeType,
-              size: result.bytes.byteLength
-            },
             { type: "image" as const, data: screenshotData, mimeType: result.mimeType }
           ]
         };
@@ -220,15 +212,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
       return {
         structuredContent: structured,
         content: [
-          { type: "text" as const, text: JSON.stringify(structured) },
-          ...screenshots.map((item) => ({
-            type: "resource_link" as const,
-            uri: item.resourceUri,
-            name: item.fileName,
-            title: item.label,
-            mimeType: item.mimeType,
-            size: item.byteSize
-          }))
+          { type: "text" as const, text: JSON.stringify(structured) }
         ],
         _meta: { gallery: { screenshots } }
       };
