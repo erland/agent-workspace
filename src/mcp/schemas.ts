@@ -8,7 +8,7 @@ export const WorkspaceIdInputSchema = z.object({ workspaceId: z.string().min(1) 
 export const WorkspaceCreateInputSchema = z.object({
   java: z.enum(["17", "21", "25"]).optional(),
   node: z.enum(["20", "22"]).optional(),
-  lifetimeMinutes: z.number().positive().max(60).optional()
+  lifetimeMinutes: z.number().positive().max(20).optional()
 }).strict();
 
 export const OpenAIFileParameterSchema = z.object({
@@ -93,5 +93,16 @@ export const ScreenshotGalleryOutputSchema = z.object({
       fileName: z.string(),
       byteSize: z.number().int().nonnegative()
     }).strict()).min(1)
+  }).strict()
+}).strict();
+
+
+export const PrototypePreviewOutputSchema = z.object({
+  result: z.object({
+    status: z.literal("AVAILABLE"),
+    url: z.string().url(),
+    expiresAt: z.string(),
+    access: z.literal("temporary-public"),
+    port: z.number().int().positive()
   }).strict()
 }).strict();
