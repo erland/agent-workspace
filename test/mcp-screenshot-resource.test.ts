@@ -18,6 +18,7 @@ function tools(): AgentWorkspaceTools {
     async uploadZipFromUrl() { return { ok: true, result: {} }; },
     async verifyProject() { return { ok: true, result: {} }; },
     async startPrototype() { return { ok: true, result: {} }; },
+    async previewPrototype() { return { ok: true, result: { status: "AVAILABLE", url: "https://preview-example.modal.run", expiresAt: "2026-09-29T12:20:00.000Z", access: "temporary-public", port: 4173 } }; },
     async screenshotPrototype() {
       return {
         ok: true,
@@ -180,4 +181,34 @@ describe("prototype_screenshot MCP resource contract", () => {
       await server.close();
     }
   });
+  it("returns a clickable interactive preview link without adding a widget", async () => {
+    const server = createAgentWorkspaceMcpServer(tools());
+    const client = new Client({ name: "test-client", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      const listed = await client.listTools();
+      const previewTool = listed.tools.find((tool) => tool.name === "prototype_preview_link") as any;
+      assert.equal(previewTool?._meta?.ui?.resourceUri, undefined);
+
+      const result = await client.callTool({
+        name: "prototype_preview_link",
+        arguments: { workspaceId: "ws_1" }
+      });
+      const structured = result.structuredContent as any;
+      assert.equal(structured.result.url, "https://preview-example.modal.run");
+      assert.equal(structured.result.expiresAt, "2026-09-29T12:20:00.000Z");
+      assert.equal(structured.result.access, "temporary-public");
+      const textContent = result.content.find((item) => item.type === "text");
+      assert.ok(textContent && textContent.type === "text");
+      assert.match(textContent.text, /https:\/\/preview-example\.modal\.run/);
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
 });
