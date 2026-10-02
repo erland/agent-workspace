@@ -26,6 +26,10 @@ export interface AgentWorkspaceCapabilities {
   browser: {
     chromium: boolean;
     screenshots: boolean;
+    viewportPresets: readonly ["desktop", "tablet", "mobile"];
+    devicePresets: readonly ["iphone", "iphone-large", "ipad", "android", "android-large"];
+    orientations: readonly ["portrait", "landscape"];
+    customViewport: boolean;
   };
   workspace: {
     defaultLifetimeMinutes: number;
@@ -52,7 +56,11 @@ export function getCapabilities(): AgentWorkspaceCapabilities {
     buildSystems: ["maven", "npm"],
     browser: {
       chromium: true,
-      screenshots: true
+      screenshots: true,
+      viewportPresets: ["desktop", "tablet", "mobile"],
+      devicePresets: ["iphone", "iphone-large", "ipad", "android", "android-large"],
+      orientations: ["portrait", "landscape"],
+      customViewport: true
     },
     workspace: {
       defaultLifetimeMinutes: 30,
