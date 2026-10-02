@@ -53,8 +53,9 @@ describe("WorkspaceService", () => {
     assert.equal(workspace.id, "ws_test");
     assert.equal(workspace.status, "READY");
     assert.equal(workspace.runtimeProfile, "java21-node22");
-    assert.equal(workspace.expiresAt, "2026-09-29T12:30:00.000Z");
+    assert.equal(workspace.expiresAt, "2026-09-29T12:20:00.000Z");
     assert.equal(provider.creates[0]?.imageRef, "ghcr.io/erland/agent-workspace-runtime:java21-node22-v2");
+    assert.deepEqual(provider.creates[0]?.encryptedPorts, [4173]);
     assert.equal(provider.commands.length, 0);
   });
 
@@ -112,7 +113,7 @@ describe("WorkspaceService", () => {
     const provider = new FakeProvider();
     const service = new WorkspaceService(provider, { schedule: () => ({}) });
 
-    await assert.rejects(() => service.create({ lifetimeMinutes: 61 }), /may not exceed 60/);
+    await assert.rejects(() => service.create({ lifetimeMinutes: 21 }), /may not exceed 20/);
   });
 
 
@@ -286,6 +287,53 @@ describe("WorkspaceService prototype start", () => {
     assert.equal(result.status, "RUNNING");
     assert.equal(workspace.prototype?.status, "RUNNING");
     assert.equal(workspace.prototype?.port, 4173);
+  });
+
+  it("returns the encrypted tunnel URL for a running prototype", async () => {
+    class PreviewProvider extends FakeProvider {
+      private call = 0;
+      override async exec(_handle: WorkspaceHandle, command: Command): Promise<ExecutionResult> {
+        this.commands.push(command);
+        this.call += 1;
+        if (this.call === 1) {
+          return { exitCode: 0, stdout: JSON.stringify({ hasPackageLock: true, scripts: { dev: "vite" } }), stderr: "" };
+        }
+        if (this.call === 4) return { exitCode: 0, stdout: "2468", stderr: "" };
+        return { exitCode: 0, stdout: "", stderr: "" };
+      }
+      async getTunnelUrl(_handle: WorkspaceHandle, port: number): Promise<string> {
+        assert.equal(port, 4173);
+        return "https://preview-example.modal.run";
+      }
+    }
+
+    const provider = new PreviewProvider();
+    const now = new Date("2026-09-29T12:00:00.000Z");
+    const service = new WorkspaceService(provider, {
+      now: () => now,
+      idFactory: () => "ws_preview",
+      schedule: () => ({})
+    });
+    await service.create();
+    await service.uploadZip("ws_preview", makeStoredZip([
+      { path: "package.json", content: JSON.stringify({ scripts: { dev: "vite" } }) }
+    ]));
+
+    const started = await service.startPrototype("ws_preview");
+    assert.equal(started.status, "RUNNING");
+    const link = await service.prototypePreviewLink("ws_preview");
+
+    assert.deepEqual(link, {
+      status: "AVAILABLE",
+      url: "https://preview-example.modal.run",
+      expiresAt: "2026-09-29T12:20:00.000Z",
+      access: "temporary-public",
+      port: 4173
+    });
+
+    const launchText = provider.commands[3]?.argv.join(" ") ?? "";
+    assert.match(launchText, /0\.0\.0\.0/);
+    assert.match(launchText, /preview-example\.modal\.run/);
   });
 
   it("rejects prototype start for a Maven project", async () => {
