@@ -12,6 +12,21 @@ function analyze(entries: Array<{ path: string; content: string }>, runtime: Run
 }
 
 describe("project/runtime detection", () => {
+  it("detects the project root when the ZIP contains one top-level directory", () => {
+    const nestedNpm = analyze([
+      { path: "my-project/package.json", content: JSON.stringify({ scripts: { build: "vite build" } }) },
+      { path: "my-project/src/main.ts", content: "console.log('ok');" }
+    ]);
+    assert.equal(nestedNpm.projectType, "NPM");
+    assert.deepEqual(nestedNpm.projectRoots, ["my-project"]);
+
+    const rootNpm = analyze([
+      { path: "package.json", content: "{}" },
+      { path: "src/main.ts", content: "console.log('ok');" }
+    ]);
+    assert.deepEqual(rootNpm.projectRoots, [""]);
+  });
+
   it("detects Maven Java 25 from maven.compiler.release", () => {
     const result = analyze([{ path: "pom.xml", content: `<project><properties><maven.compiler.release>25</maven.compiler.release></properties></project>` }]);
     assert.equal(result.projectType, "MAVEN");
