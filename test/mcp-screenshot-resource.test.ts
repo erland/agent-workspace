@@ -82,6 +82,7 @@ describe("prototype_screenshot MCP resource contract", () => {
       const structured = result.structuredContent as any;
       assert.equal(structured.result.resourceUri, link.uri);
       assert.equal(structured.result.byteSize, PNG.byteLength);
+      assert.equal(structured.result.artifactId, "shot_1");
 
       const metadata = (result as any)._meta;
       assert.equal(metadata.screenshot.mimeType, "image/png");
@@ -109,6 +110,62 @@ describe("prototype_screenshot MCP resource contract", () => {
       if ("blob" in content) {
         assert.deepEqual(Buffer.from(content.blob, "base64"), Buffer.from(PNG));
       }
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("renders multiple captured screenshots through the gallery widget", async () => {
+    const server = createAgentWorkspaceMcpServer(tools());
+    const client = new Client({ name: "test-client", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      const listed = await client.listTools();
+      const galleryTool = listed.tools.find((tool) => tool.name === "prototype_screenshot_gallery") as any;
+      assert.equal(
+        galleryTool?._meta?.ui?.resourceUri,
+        "ui://agent-workspace/screenshot-gallery-v1.html"
+      );
+
+      const result = await client.callTool({
+        name: "prototype_screenshot_gallery",
+        arguments: {
+          workspaceId: "ws_1",
+          screenshots: [
+            { artifactId: "shot_1", label: "Desktop", width: 1440, height: 900 },
+            { artifactId: "shot_1", label: "Mobile", width: 390, height: 844 }
+          ],
+          selectedArtifactId: "shot_1"
+        }
+      });
+
+      const structured = result.structuredContent as any;
+      assert.equal(structured.result.status, "PASSED");
+      assert.equal(structured.result.selectedArtifactId, "shot_1");
+      assert.equal(structured.result.screenshots.length, 2);
+      assert.equal(result.content.filter((item) => item.type === "resource_link").length, 2);
+
+      const metadata = (result as any)._meta;
+      assert.equal(metadata.gallery.screenshots.length, 2);
+      assert.deepEqual(
+        Buffer.from(metadata.gallery.screenshots[0].data, "base64"),
+        Buffer.from(PNG)
+      );
+
+      const viewer = await client.readResource({
+        uri: "ui://agent-workspace/screenshot-gallery-v1.html"
+      });
+      assert.equal(viewer.contents.length, 1);
+      const viewerContent = viewer.contents[0] as any;
+      assert.equal(viewerContent.mimeType, "text/html;profile=mcp-app");
+      assert.match(viewerContent.text, /requestDisplayMode/);
+      assert.match(viewerContent.text, /setWidgetState/);
+      assert.match(viewerContent.text, /aria-pressed/);
     } finally {
       await client.close();
       await server.close();
