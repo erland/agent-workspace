@@ -203,7 +203,7 @@ After `npm ci`, start the local stdio MCP server with:
 npm run mcp:stdio
 ```
 
-DEV-010 exposes: `get_capabilities`, `get_profile`, `workspace_create`, `workspace_upload_zip`, `workspace_upload_zip_from_url`, `project_verify`, `prototype_start`, `prototype_screenshot`, `prototype_screenshot_gallery`, and `workspace_destroy`.
+DEV-010 exposes: `get_capabilities`, `get_profile`, `workspace_create`, `workspace_upload_zip`, `workspace_upload_zip_from_url`, `project_verify`, `prototype_start`, `prototype_preview_link`, `prototype_screenshot`, `prototype_screenshot_gallery`, and `workspace_destroy`.
 
 ### ZIP transport across MCP hosts
 
@@ -220,6 +220,14 @@ The provider-neutral workspace layer remains unchanged: every transport is norma
 For ChatGPT and other MCP Apps-compatible hosts, `prototype_screenshot` is capture-only: it returns screenshot metadata plus the resource/image content needed by the model and non-UI clients, but it deliberately has no UI template. This prevents each individual capture from creating its own visible widget.
 
 All visible screenshot presentation goes through `prototype_screenshot_gallery`. The gallery accepts one or more artifact IDs returned by earlier `prototype_screenshot` calls, keeps the selected image as widget state, provides desktop/tablet/mobile-style tabs when several captures are present, and can request ChatGPT fullscreen mode from either the image or the “Open larger” action. This keeps screenshot capture independent from presentation and guarantees one visible gallery widget for the final result.
+
+### Interactive prototype preview
+
+Workspaces now expose the prototype port (4173) through a Modal encrypted HTTPS tunnel. `prototype_start` still starts and verifies the prototype inside the sandbox; `prototype_preview_link` is a separate opt-in tool that returns the clickable tunnel URL only when the user asks to try or interact with the prototype.
+
+The workspace default and maximum lifetime are both 20 minutes. The preview URL is valid only while that sandbox is alive and returns the workspace `expiresAt` timestamp. The tunnel is temporary but public to anyone who has the URL, so the tool result explicitly labels access as `temporary-public`. No Modal credentials, Agent Workspace OAuth tokens or application secrets are embedded in the link.
+
+Vite prototypes bind to `0.0.0.0` when a tunnel is available and receive the exact Modal tunnel hostname through `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS`; localhost readiness checks remain unchanged.
 
 
 ## DEV-011: user-specific Modal accounts
