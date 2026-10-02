@@ -49,7 +49,7 @@ export interface ScreenshotServiceOptions {
 const DEFAULT_PROJECT_ROOT = "/workspace/project";
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024;
-const screenshotPath_PREFIX = "/tmp/agent-workspace-screenshot-";
+const SCREENSHOT_PATH_PREFIX = "/tmp/agent-workspace-screenshot-";
 const PLAYWRIGHT_MODULE = "/opt/agent-workspace/browser-tools/node_modules/playwright";
 
 export class ScreenshotService {
