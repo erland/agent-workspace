@@ -54,6 +54,9 @@ export class ModalSandboxProvider implements SandboxProvider {
       ...(options.memoryMiB !== undefined
         ? { memoryMiB: options.memoryMiB }
         : {}),
+      ...(options.encryptedPorts !== undefined
+        ? { encryptedPorts: [...options.encryptedPorts] }
+        : {}),
       ...(options.networkPolicy?.blockNetwork !== undefined
         ? { blockNetwork: options.networkPolicy.blockNetwork }
         : {}),
@@ -126,6 +129,14 @@ export class ModalSandboxProvider implements SandboxProvider {
   public async readFile(handle: WorkspaceHandle, path: string): Promise<Uint8Array> {
     const sandbox = await this.getSandbox(handle);
     return sandbox.filesystem.readBytes(path);
+  }
+
+  public async getTunnelUrl(handle: WorkspaceHandle, port: number): Promise<string> {
+    const sandbox = await this.getSandbox(handle);
+    const tunnels = await sandbox.tunnels();
+    const tunnel = tunnels[port];
+    if (!tunnel) throw new Error(`No encrypted tunnel available for port ${port}`);
+    return tunnel.url;
   }
 
   public async terminate(handle: WorkspaceHandle): Promise<void> {

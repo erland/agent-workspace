@@ -37,6 +37,8 @@ export interface PrototypeServiceOptions {
   maxStepLogChars?: number;
   maxFailureExcerptChars?: number;
   nowMs?: () => number;
+  host?: string;
+  allowedHost?: string;
 }
 
 interface PackageInfo {
@@ -51,7 +53,7 @@ interface StartCommand {
 }
 
 const DEFAULT_PROJECT_ROOT = "/workspace/project";
-const DEFAULT_PORT = 4173;
+export const DEFAULT_PROTOTYPE_PORT = 4173;
 const DEFAULT_INSTALL_TIMEOUT_MS = 5 * 60_000;
 const DEFAULT_BUILD_TIMEOUT_MS = 3 * 60_000;
 const DEFAULT_READINESS_TIMEOUT_MS = 45_000;
@@ -67,19 +69,23 @@ export class PrototypeService {
   private readonly maxStepLogChars: number | undefined;
   private readonly maxFailureExcerptChars: number | undefined;
   private readonly nowMs: () => number;
+  private readonly host: string;
+  private readonly allowedHost: string | undefined;
 
   public constructor(
     private readonly provider: SandboxProvider,
     options: PrototypeServiceOptions = {}
   ) {
     this.projectRoot = options.projectRoot ?? DEFAULT_PROJECT_ROOT;
-    this.port = options.port ?? DEFAULT_PORT;
+    this.port = options.port ?? DEFAULT_PROTOTYPE_PORT;
     this.installTimeoutMs = options.installTimeoutMs ?? DEFAULT_INSTALL_TIMEOUT_MS;
     this.buildTimeoutMs = options.buildTimeoutMs ?? DEFAULT_BUILD_TIMEOUT_MS;
     this.readinessTimeoutMs = options.readinessTimeoutMs ?? DEFAULT_READINESS_TIMEOUT_MS;
     this.maxStepLogChars = options.maxStepLogChars;
     this.maxFailureExcerptChars = options.maxFailureExcerptChars;
     this.nowMs = options.nowMs ?? (() => Date.now());
+    this.host = options.host ?? "127.0.0.1";
+    this.allowedHost = options.allowedHost;
   }
 
   public async start(handle: WorkspaceHandle): Promise<PrototypeStartResult> {
@@ -219,15 +225,16 @@ export class PrototypeService {
         ? ["npm", "start"]
         : ["npm", "run", strategy];
       const argv = isVite
-        ? [...npmArgv, "--", "--host", "127.0.0.1", "--port", String(this.port)]
+        ? [...npmArgv, "--", "--host", this.host, "--port", String(this.port)]
         : npmArgv;
 
       return {
         strategy,
         argv,
         env: {
-          HOST: "127.0.0.1",
-          PORT: String(this.port)
+          HOST: this.host,
+          PORT: String(this.port),
+          ...(this.allowedHost ? { __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: this.allowedHost } : {})
         }
       };
     }

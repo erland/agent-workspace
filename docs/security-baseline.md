@@ -17,7 +17,7 @@
 ## Resource and abuse controls
 
 - maximum 3 active workspaces per user,
-- maximum workspace lifetime 60 minutes,
+- maximum workspace lifetime 20 minutes,
 - CPU reservation 1 physical core; CPU hard limit 2 cores,
 - memory 2048 MiB,
 - per-user/per-operation fixed-window rate limit of 60/minute in v1,
@@ -26,6 +26,10 @@
 - screenshot dimensions capped at 4096×4096 and screenshot output capped at 10 MiB before control-plane readback,
 - OAuth Dynamic Client Registration capped at 16 KiB request metadata, 10 redirect URIs, 2048 characters per redirect URI and 20 registrations/minute per service instance,
 - command timeouts and bounded logs.
+
+## Interactive preview exposure
+
+A running prototype may be exposed through a Modal encrypted HTTPS tunnel on port 4173. The tunnel lifetime is bounded by the same maximum 20-minute Sandbox lifetime. The URL is treated as a temporary public capability: anyone who obtains it can access the prototype until the Sandbox terminates. The preview contains no Agent Workspace or Modal credentials. Only the prototype port is tunneled.
 
 ## Network policy
 

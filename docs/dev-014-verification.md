@@ -7,7 +7,7 @@ DEV-014 hardens the v1 public/multi-user baseline without adding new product cap
 ## Implemented controls
 
 - Workspace resource baseline: 1 physical CPU reserved, 2 CPU hard limit, 2048 MiB memory.
-- Max workspace lifetime: 60 minutes.
+- Max workspace lifetime: 20 minutes.
 - Max active READY workspaces per user: 3.
 - Fixed-window per-user/per-operation rate limiter: 60 operations/minute in the remote server composition.
 - Existing ZIP limits retained: 100 MiB compressed, 500 MiB declared uncompressed, 20,000 entries, 1024-char paths, no symlinks/encryption/ZIP64/path traversal.

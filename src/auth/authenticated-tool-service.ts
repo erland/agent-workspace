@@ -82,6 +82,14 @@ export class AuthenticatedAgentWorkspaceToolService {
     return this.withWorkspaceService("prototype_start", input.workspaceId, (service) => service.startPrototype(input.workspaceId));
   }
 
+  async previewPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
+    return this.withWorkspaceService(
+      "prototype_preview_link",
+      input.workspaceId,
+      (service) => service.prototypePreviewLink(input.workspaceId)
+    );
+  }
+
   async screenshotPrototype(input: { workspaceId: string; viewport?: ScreenshotViewport }): Promise<ToolResult<unknown>> {
     return this.withWorkspaceService("prototype_screenshot", input.workspaceId, (service) => service.screenshotPrototype(input.workspaceId, input.viewport));
   }

@@ -46,6 +46,8 @@ describe("DEV-014 security hardening", () => {
     assert.ok(create?.networkPolicy?.outboundDomainAllowlist?.includes("archive.ubuntu.com"));
     assert.ok(create?.networkPolicy?.outboundDomainAllowlist?.includes("security.ubuntu.com"));
     assert.deepEqual(create?.networkPolicy?.outboundCidrAllowlist, []);
+    assert.deepEqual(create?.encryptedPorts, [4173]);
+    assert.equal(DEFAULT_SECURITY_POLICY.maxWorkspaceLifetimeMinutes, 20);
   });
 
   it("enforces a maximum number of active workspaces per user", async () => {

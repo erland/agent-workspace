@@ -13,7 +13,7 @@ import type { PersistedWorkspace } from "../persistence/models.js";
 import { NpmVerifier } from "../verification/npm-verifier.js";
 import { MavenVerifier } from "../verification/maven-verifier.js";
 import type { ProjectVerificationResult } from "../verification/verification-result.js";
-import { PrototypeService, type PrototypeStartResult } from "../prototype/prototype-service.js";
+import { DEFAULT_PROTOTYPE_PORT, PrototypeService, type PrototypeStartResult } from "../prototype/prototype-service.js";
 import { ScreenshotService, isPngScreenshot, screenshotArtifactPath, type PrototypeScreenshotResult, type ScreenshotViewport } from "../prototype/screenshot-service.js";
 import { analyzeProjectArchive, type ProjectAnalysis } from "../project/project-detector.js";
 import {
@@ -85,8 +85,8 @@ interface WorkspaceRecord {
   expiryTimer?: { unref?: () => void };
 }
 
-const DEFAULT_LIFETIME_MINUTES = 30;
-const MAX_LIFETIME_MINUTES = 60;
+const DEFAULT_LIFETIME_MINUTES = 20;
+const MAX_LIFETIME_MINUTES = 20;
 
 export class WorkspaceService {
   private readonly records = new Map<string, WorkspaceRecord>();
@@ -106,7 +106,10 @@ export class WorkspaceService {
     options: WorkspaceServiceOptions = {}
   ) {
     this.defaultLifetimeMinutes = options.defaultLifetimeMinutes ?? DEFAULT_LIFETIME_MINUTES;
-    this.maxLifetimeMinutes = options.maxLifetimeMinutes ?? options.securityPolicy?.maxWorkspaceLifetimeMinutes ?? MAX_LIFETIME_MINUTES;
+    this.maxLifetimeMinutes = Math.min(
+      options.maxLifetimeMinutes ?? options.securityPolicy?.maxWorkspaceLifetimeMinutes ?? MAX_LIFETIME_MINUTES,
+      MAX_LIFETIME_MINUTES
+    );
     this.archiveLimits = options.archiveLimits ?? {};
     this.now = options.now ?? (() => new Date());
     this.idFactory = options.idFactory ?? (() => `ws_${randomUUID()}`);
@@ -158,7 +161,8 @@ export class WorkspaceService {
         cpu: this.securityPolicy.workspaceCpu,
         cpuLimit: this.securityPolicy.workspaceCpuLimit,
         memoryMiB: this.securityPolicy.workspaceMemoryMiB,
-        networkPolicy: this.securityPolicy.networkPolicy
+        networkPolicy: this.securityPolicy.networkPolicy,
+        encryptedPorts: [DEFAULT_PROTOTYPE_PORT]
       });
 
       workspace = {
@@ -326,7 +330,15 @@ export class WorkspaceService {
     const projectRoot = relativeRoot.length === 0
       ? "/workspace/project"
       : `/workspace/project/${relativeRoot}`;
-    const result = await new PrototypeService(this.provider, { projectRoot }).start(record.handle);
+    const tunnelUrl = this.provider.getTunnelUrl
+      ? await this.provider.getTunnelUrl(record.handle, DEFAULT_PROTOTYPE_PORT)
+      : undefined;
+    const allowedHost = tunnelUrl ? new URL(tunnelUrl).hostname : undefined;
+    const result = await new PrototypeService(this.provider, {
+      projectRoot,
+      host: tunnelUrl ? "0.0.0.0" : "127.0.0.1",
+      ...(allowedHost ? { allowedHost } : {})
+    }).start(record.handle);
     if (result.status === "RUNNING") {
       record.workspace.prototype = {
         status: "RUNNING",
@@ -388,6 +400,35 @@ export class WorkspaceService {
       throw new Error("Screenshot artifact is not a PNG file");
     }
     return bytes;
+  }
+
+  public async prototypePreviewLink(workspaceId: string): Promise<{
+    status: "AVAILABLE";
+    url: string;
+    expiresAt: string;
+    access: "temporary-public";
+    port: number;
+  }> {
+    const workspace = await this.get(workspaceId);
+    if (workspace.status !== "READY") {
+      throw new Error(`Workspace ${workspaceId} is not ready for preview: ${workspace.status}`);
+    }
+    if (workspace.prototype?.status !== "RUNNING") {
+      throw new Error(`Workspace ${workspaceId} has no running prototype`);
+    }
+    if (!this.provider.getTunnelUrl) {
+      throw new Error("Execution provider does not support interactive prototype previews");
+    }
+
+    const record = await this.requireRecord(workspaceId);
+    const url = await this.provider.getTunnelUrl(record.handle, workspace.prototype.port);
+    return {
+      status: "AVAILABLE",
+      url,
+      expiresAt: workspace.expiresAt,
+      access: "temporary-public",
+      port: workspace.prototype.port
+    };
   }
 
   public async destroy(workspaceId: string): Promise<Workspace> {

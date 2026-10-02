@@ -30,6 +30,7 @@ export interface AgentWorkspaceCapabilities {
     devicePresets: readonly ["iphone", "iphone-large", "ipad", "android", "android-large"];
     orientations: readonly ["portrait", "landscape"];
     customViewport: boolean;
+    interactivePreview: boolean;
   };
   workspace: {
     defaultLifetimeMinutes: number;
@@ -60,11 +61,12 @@ export function getCapabilities(): AgentWorkspaceCapabilities {
       viewportPresets: ["desktop", "tablet", "mobile"],
       devicePresets: ["iphone", "iphone-large", "ipad", "android", "android-large"],
       orientations: ["portrait", "landscape"],
-      customViewport: true
+      customViewport: true,
+      interactivePreview: true
     },
     workspace: {
-      defaultLifetimeMinutes: 30,
-      maxLifetimeMinutes: 60
+      defaultLifetimeMinutes: 20,
+      maxLifetimeMinutes: 20
     }
   };
 }
