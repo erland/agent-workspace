@@ -9,6 +9,7 @@ import type {
   WorkspaceHandle
 } from "../src/core/sandbox-provider.js";
 import {
+  DEVICE_VIEWPORT_PRESETS,
   ScreenshotService,
   VIEWPORT_PRESETS,
   resolveViewport
@@ -53,10 +54,39 @@ describe("ScreenshotService", () => {
     assert.deepEqual(provider.readPaths, ["/tmp/agent-workspace-screenshot-shot_1.png"]);
   });
 
-  it("supports tablet, mobile and explicit viewports", () => {
+  it("supports generic presets, device orientations and explicit viewports", () => {
     assert.deepEqual(resolveViewport("tablet"), VIEWPORT_PRESETS.tablet);
     assert.deepEqual(resolveViewport("mobile"), VIEWPORT_PRESETS.mobile);
+    assert.deepEqual(resolveViewport({ device: "iphone" }), DEVICE_VIEWPORT_PRESETS.iphone);
+    assert.deepEqual(
+      resolveViewport({ device: "iphone", orientation: "landscape" }),
+      { width: DEVICE_VIEWPORT_PRESETS.iphone.height, height: DEVICE_VIEWPORT_PRESETS.iphone.width }
+    );
+    assert.deepEqual(resolveViewport({ device: "ipad", orientation: "portrait" }), DEVICE_VIEWPORT_PRESETS.ipad);
+    assert.deepEqual(
+      resolveViewport({ device: "android-large", orientation: "landscape" }),
+      {
+        width: DEVICE_VIEWPORT_PRESETS["android-large"].height,
+        height: DEVICE_VIEWPORT_PRESETS["android-large"].width
+      }
+    );
     assert.deepEqual(resolveViewport({width:1280,height:720}), {width:1280,height:720});
+  });
+
+  it("uses device and orientation in screenshot filenames", async () => {
+    const provider = new ScreenshotProvider({ exitCode:0, stdout:"", stderr:"" });
+    const result = await new ScreenshotService(provider, {
+      nowMs:()=>100,
+      artifactIdFactory:()=>"shot_device"
+    }).capture(handle, {
+      url:"http://127.0.0.1:4173",
+      viewport:{ device:"ipad", orientation:"landscape" }
+    });
+    assert.equal(result.status, "PASSED");
+    if (result.status !== "PASSED") return;
+    assert.equal(result.width, DEVICE_VIEWPORT_PRESETS.ipad.height);
+    assert.equal(result.height, DEVICE_VIEWPORT_PRESETS.ipad.width);
+    assert.equal(result.fileName, "prototype-ipad-landscape-shot_device.png");
   });
 
   it("rejects invalid explicit viewport dimensions", () => {
