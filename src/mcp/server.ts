@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/server";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
 import type { AgentWorkspaceTools, ToolResult } from "./tool-service.js";
@@ -12,9 +12,33 @@ import {
   WorkspaceUploadZipFromUrlInputSchema,
   WorkspaceUploadZipInputSchema
 } from "./schemas.js";
+import { SCREENSHOT_RESOURCE_TEMPLATE, screenshotResourceUri, singleTemplateValue } from "./screenshot-resource.js";
 
 export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpServer {
   const server = new McpServer({ name: "agent-workspace", version: "0.1.0" });
+
+  server.registerResource(
+    "prototype-screenshot",
+    new ResourceTemplate(SCREENSHOT_RESOURCE_TEMPLATE, { list: undefined }),
+    {
+      title: "Prototype screenshot",
+      description: "PNG screenshot captured from a running prototype.",
+      mimeType: "image/png"
+    },
+    async (uri, variables) => {
+      const workspaceId = singleTemplateValue(variables.workspaceId);
+      const artifactId = singleTemplateValue(variables.artifactId);
+      if (!workspaceId || !artifactId) throw new Error("Invalid screenshot resource URI");
+      const bytes = await tools.readScreenshotArtifact({ workspaceId, artifactId });
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: "image/png",
+          blob: Buffer.from(bytes).toString("base64")
+        }]
+      };
+    }
+  );
 
   registerJsonTool(server, "get_capabilities", "List supported runtimes, build systems and browser capabilities.", EmptyInputSchema, async () => tools.getCapabilities());
   registerJsonTool(server, "get_profile", "Show the current Agent Workspace identity and execution-provider connection.", EmptyInputSchema, async () => tools.getProfile());
@@ -63,11 +87,31 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
       if (!response.ok) return errorResult(response);
       const result = response.result as any;
       if (result.status === "PASSED") {
-        const structured = { result: { status: result.status, mimeType: result.mimeType, width: result.width, height: result.height, durationMs: result.durationMs } };
+        const resourceUri = screenshotResourceUri(input.workspaceId, result.artifactId);
+        const structured = {
+          result: {
+            status: result.status,
+            mimeType: result.mimeType,
+            width: result.width,
+            height: result.height,
+            durationMs: result.durationMs,
+            resourceUri,
+            fileName: result.fileName,
+            byteSize: result.bytes.byteLength
+          }
+        };
         return {
           structuredContent: structured,
           content: [
             { type: "text" as const, text: JSON.stringify(structured) },
+            {
+              type: "resource_link" as const,
+              uri: resourceUri,
+              name: result.fileName,
+              title: `Prototype screenshot ${result.width}x${result.height}`,
+              mimeType: result.mimeType,
+              size: result.bytes.byteLength
+            },
             { type: "image" as const, data: Buffer.from(result.bytes).toString("base64"), mimeType: result.mimeType }
           ]
         };
