@@ -34,6 +34,28 @@ describe("ArtifactService", () => {
     assert.deepEqual([...read.bytes], [1,2,3,4]);
   });
 
+  it("rejects artifacts above the configured byte limit before storage", async () => {
+    const repo = new InMemoryArtifactRepository();
+    const store = new InMemoryObjectStore();
+    const service = new ArtifactService("u1", repo, store, {
+      idFactory: () => "art_large",
+      maxArtifactBytes: 3
+    });
+
+    await assert.rejects(
+      () => service.publish({
+        workspaceId: "ws_1",
+        name: "large",
+        kind: "generic",
+        filename: "large.bin",
+        mediaType: "application/octet-stream",
+        bytes: new Uint8Array([1,2,3,4])
+      }),
+      /exceeds maximum size/
+    );
+    assert.equal(await store.exists("artifacts/u1/art_large/large.bin"), false);
+  });
+
   it("removes expired artifact bytes and metadata", async () => {
     const repo = new InMemoryArtifactRepository();
     const store = new InMemoryObjectStore();
