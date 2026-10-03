@@ -8,8 +8,10 @@ import {
 } from "../archive/archive-validator.js";
 import type { SandboxProvider, WorkspaceHandle } from "../core/sandbox-provider.js";
 import { RUNTIME_PROFILES } from "../core/runtime-profile.js";
-import type { WorkspaceRepository } from "../persistence/repositories.js";
-import type { PersistedWorkspace } from "../persistence/models.js";
+import type { ArtifactRepository, WorkspaceRepository } from "../persistence/repositories.js";
+import type { ArtifactRecord, PersistedWorkspace } from "../persistence/models.js";
+import { ArtifactService } from "../artifact/artifact-service.js";
+import { ProjectBuildService, type RequestedBuildOutput } from "../artifact/project-build-service.js";
 import { NpmVerifier } from "../verification/npm-verifier.js";
 import { MavenVerifier } from "../verification/maven-verifier.js";
 import type { ProjectVerificationResult } from "../verification/verification-result.js";
@@ -82,6 +84,8 @@ export interface WorkspaceServiceOptions {
   repository?: WorkspaceRepository;
   securityPolicy?: SecurityPolicy;
   objectStore?: ObjectStore;
+  artifactRepository?: ArtifactRepository;
+  artifactTtlMinutes?: number;
 }
 
 interface WorkspaceRecord {
@@ -108,6 +112,7 @@ export class WorkspaceService {
   private readonly repository: WorkspaceRepository | undefined;
   private readonly securityPolicy: SecurityPolicy;
   private readonly objectStore: ObjectStore;
+  private readonly artifactService: ArtifactService | undefined;
 
   public constructor(
     private readonly provider: SandboxProvider,
@@ -125,6 +130,12 @@ export class WorkspaceService {
     this.repository = options.repository;
     this.securityPolicy = options.securityPolicy ?? DEFAULT_SECURITY_POLICY;
     this.objectStore = options.objectStore ?? new InMemoryObjectStore();
+    this.artifactService = options.artifactRepository
+      ? new ArtifactService(this.userId, options.artifactRepository, this.objectStore, {
+          ttlMinutes: options.artifactTtlMinutes ?? 60,
+          now: this.now
+        })
+      : undefined;
     this.schedule =
       options.schedule ??
       ((callback, delayMs) => {
@@ -271,6 +282,49 @@ export class WorkspaceService {
         projectRoot: resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots)
       }).verify(handle)
     );
+  }
+
+  public async buildProject(
+    workspaceId: string,
+    outputs: readonly RequestedBuildOutput[] = []
+  ): Promise<{ status: "PASSED"; projectType: "NPM" | "MAVEN"; artifacts: ArtifactRecord[] }> {
+    const workspace = await this.requireReadyProject(workspaceId, "build");
+    const projectType = workspace.project!.analysis.projectType;
+    if (projectType !== "NPM" && projectType !== "MAVEN") {
+      throw new Error(`Unsupported build project type: ${projectType}`);
+    }
+    const artifactService = this.requireArtifactService();
+    return this.withEphemeralProject(workspace, async (handle) => {
+      const result = await new ProjectBuildService(
+        this.provider,
+        resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots)
+      ).build(handle, projectType, outputs);
+      const artifacts: ArtifactRecord[] = [];
+      for (const output of result.outputs) {
+        artifacts.push(await artifactService.publish({
+          workspaceId,
+          name: output.name,
+          kind: output.kind,
+          filename: output.filename,
+          mediaType: output.mediaType,
+          bytes: output.bytes
+        }));
+      }
+      return { status: "PASSED", projectType, artifacts };
+    });
+  }
+
+  public async getArtifact(artifactId: string): Promise<ArtifactRecord> {
+    return this.requireArtifactService().get(artifactId);
+  }
+
+  public async readArtifact(artifactId: string): Promise<{ artifact: ArtifactRecord; bytes: Uint8Array }> {
+    return this.requireArtifactService().read(artifactId);
+  }
+
+  public async listArtifacts(workspaceId: string): Promise<ArtifactRecord[]> {
+    await this.get(workspaceId);
+    return this.requireArtifactService().list(workspaceId);
   }
 
   public async startPrototype(workspaceId: string): Promise<PrototypeStartResult> {
@@ -486,6 +540,11 @@ export class WorkspaceService {
       count += 1;
     }
     return count;
+  }
+
+  private requireArtifactService(): ArtifactService {
+    if (!this.artifactService) throw new Error("Artifact storage is not configured");
+    return this.artifactService;
   }
 
   private async requireReadyProject(workspaceId: string, action: string): Promise<Workspace> {
