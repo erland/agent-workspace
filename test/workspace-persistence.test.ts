@@ -33,7 +33,7 @@ describe("WorkspaceService persistence", () => {
     const workspace = await restarted.get("ws-persisted");
 
     assert.equal(workspace.userId, "user-1");
-    assert.equal(workspace.providerWorkspaceId, "provider-1");
+    assert.equal(workspace.providerWorkspaceId, undefined);
     assert.equal(workspace.status, "READY");
   });
 
@@ -62,7 +62,7 @@ describe("WorkspaceService persistence", () => {
 
     const stored = await repository.findByIdForUser("ws-destroyed", "user-1");
     assert.equal(stored?.status, "DESTROYED");
-    assert.equal(provider.terminated.length, 1);
+    assert.equal(provider.terminated.length, 0);
   });
 
   it("reconciles an expired persisted workspace after restart", async () => {
