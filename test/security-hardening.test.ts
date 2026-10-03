@@ -10,6 +10,7 @@ import { InMemoryFixedWindowRateLimiter } from "../src/security/rate-limiter.js"
 import { normalizeToolError } from "../src/mcp/errors.js";
 import { ExpiredWorkspaceCleanupJob } from "../src/workspace/expired-workspace-cleanup-job.js";
 import type { ExecutionProviderFactory } from "../src/execution/execution-provider-factory.js";
+import { makeStoredZip } from "./zip-fixture.js";
 
 class FakeProvider implements SandboxProvider {
   creates: CreateWorkspaceOptions[] = [];
@@ -20,7 +21,12 @@ class FakeProvider implements SandboxProvider {
     return { providerId: "fake", providerWorkspaceId: `sb-${this.creates.length}` };
   }
   async uploadArchive(): Promise<void> {}
-  async exec(_handle: WorkspaceHandle, _command: Command): Promise<ExecutionResult> { return { exitCode: 0, stdout: "", stderr: "" }; }
+  async exec(_handle: WorkspaceHandle, command: Command): Promise<ExecutionResult> {
+    if (command.argv[0] === "node" && command.argv[1] === "-e") {
+      return { exitCode: 0, stdout: JSON.stringify({ hasPackageLock: false, scripts: {} }), stderr: "" };
+    }
+    return { exitCode: 0, stdout: "", stderr: "" };
+  }
   async readFile(): Promise<Uint8Array> { return new Uint8Array(); }
   async terminate(handle: WorkspaceHandle): Promise<void> {
     this.terminated.push(handle);
@@ -34,10 +40,17 @@ class FakeFactory implements ExecutionProviderFactory {
 }
 
 describe("DEV-014 security hardening", () => {
-  it("applies CPU, memory and outbound domain policy to new workspaces", async () => {
+  it("applies CPU, memory and outbound policy only when an execution sandbox is needed", async () => {
     const provider = new FakeProvider();
-    const service = new WorkspaceService(provider, { schedule: () => ({}) });
+    const service = new WorkspaceService(provider, { idFactory: () => "ws-policy", schedule: () => ({}) });
     await service.create();
+    assert.equal(provider.creates.length, 0);
+
+    await service.uploadZip("ws-policy", makeStoredZip([
+      { path: "package.json", content: "{}" }
+    ]));
+    await service.verifyProject("ws-policy");
+
     const create = provider.creates[0];
     assert.equal(create?.cpu, DEFAULT_SECURITY_POLICY.workspaceCpu);
     assert.equal(create?.cpuLimit, DEFAULT_SECURITY_POLICY.workspaceCpuLimit);
@@ -46,8 +59,9 @@ describe("DEV-014 security hardening", () => {
     assert.ok(create?.networkPolicy?.outboundDomainAllowlist?.includes("archive.ubuntu.com"));
     assert.ok(create?.networkPolicy?.outboundDomainAllowlist?.includes("security.ubuntu.com"));
     assert.deepEqual(create?.networkPolicy?.outboundCidrAllowlist, []);
-    assert.deepEqual(create?.encryptedPorts, [4173]);
-    assert.equal(DEFAULT_SECURITY_POLICY.maxWorkspaceLifetimeMinutes, 20);
+    assert.equal(create?.encryptedPorts, undefined);
+    assert.equal(provider.terminated.length, 1);
+    assert.equal(DEFAULT_SECURITY_POLICY.maxWorkspaceLifetimeMinutes, 60);
   });
 
   it("enforces a maximum number of active workspaces per user", async () => {
@@ -58,7 +72,7 @@ describe("DEV-014 security hardening", () => {
     });
     await service.create();
     await assert.rejects(() => service.create(), /active workspace limit exceeded/);
-    assert.equal(provider.creates.length, 1);
+    assert.equal(provider.creates.length, 0);
   });
 
   it("redacts bearer and provider credential material from errors/log text", () => {
@@ -78,15 +92,34 @@ describe("DEV-014 security hardening", () => {
     assert.throws(() => limiter.check("u1", "project_verify"), /Rate limit exceeded/);
   });
 
-  it("marks destroy state even when provider termination reports an error", async () => {
+  it("marks destroy state even when active interactive provider termination reports an error", async () => {
     const provider = new FakeProvider();
     const repo = new InMemoryWorkspaceRepository();
+    await repo.upsert({
+      id: "ws-active",
+      userId: "u1",
+      providerId: "fake",
+      providerWorkspaceId: "sb-active",
+      runtimeProfile: "java21-node22",
+      status: "READY",
+      createdAt: "2026-01-01T00:00:00Z",
+      expiresAt: "2026-01-01T01:00:00Z",
+      prototype: {
+        status: "RUNNING",
+        strategy: "dev",
+        port: 4173,
+        url: "http://127.0.0.1:4173",
+        processId: 1,
+        startedAt: "2026-01-01T00:00:00Z",
+        expiresAt: "2026-01-01T00:20:00Z"
+      }
+    });
     const service = new WorkspaceService(provider, { userId: "u1", repository: repo, schedule: () => ({}) });
-    const created = await service.create();
     provider.failTerminate = true;
-    await assert.rejects(() => service.destroy(created.id), /provider unavailable/);
-    const persisted = await repo.findByIdForUser(created.id, "u1");
+    await assert.rejects(() => service.destroy("ws-active"), /provider unavailable/);
+    const persisted = await repo.findByIdForUser("ws-active", "u1");
     assert.equal(persisted?.status, "DESTROYED");
+    assert.equal(persisted?.providerId, undefined);
   });
 
   it("cleanup marks expired workspaces even after interrupted provider cleanup", async () => {
