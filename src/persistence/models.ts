@@ -30,3 +30,19 @@ export interface PersistedWorkspace extends Omit<Workspace, "providerId" | "prov
   providerId?: string;
   providerWorkspaceId?: string;
 }
+
+
+export interface ArtifactRecord {
+  id: string;
+  userId: string;
+  workspaceId: string;
+  name: string;
+  kind: string;
+  filename: string;
+  mediaType: string;
+  sizeBytes: number;
+  sha256: string;
+  storageKey: string;
+  createdAt: string;
+  expiresAt: string;
+}
