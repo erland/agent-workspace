@@ -29,11 +29,14 @@ export class ExpiredWorkspaceCleanupJob {
       } catch {
         failed += 1;
       } finally {
+        const {
+          providerId: _providerId,
+          providerWorkspaceId: _providerWorkspaceId,
+          prototype: _prototype,
+          ...logicalWorkspace
+        } = workspace;
         await this.workspaces.upsert({
-          ...workspace,
-          providerId: undefined,
-          providerWorkspaceId: undefined,
-          prototype: undefined,
+          ...logicalWorkspace,
           status: "EXPIRED",
           destroyedAt: this.now().toISOString()
         });
