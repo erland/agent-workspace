@@ -25,7 +25,8 @@ export interface ProjectBuildResult {
 export class ProjectBuildService {
   constructor(
     private readonly provider: SandboxProvider,
-    private readonly projectRoot: string
+    private readonly projectRoot: string,
+    private readonly maxOutputBytes = 100 * 1024 * 1024
   ) {}
 
   async build(
@@ -53,6 +54,7 @@ export class ProjectBuildService {
       ? [...requested]
       : await this.detectNpmOutputs(handle);
     if (outputs.length === 0) throw new Error("NPM build completed but no build output was detected");
+    if (outputs.length > 12) throw new Error("Build produced more than 12 publishable outputs");
     return {
       status: "PASSED",
       projectType: "NPM",
@@ -69,6 +71,7 @@ export class ProjectBuildService {
       ? [...requested]
       : await this.detectMavenOutputs(handle);
     if (outputs.length === 0) throw new Error("Maven build completed but no JAR/WAR output was detected");
+    if (outputs.length > 12) throw new Error("Build produced more than 12 publishable outputs");
     return {
       status: "PASSED",
       projectType: "MAVEN",
@@ -107,7 +110,9 @@ export class ProjectBuildService {
       validateRelativePath(requested.path);
       const type = (await this.exec(handle, ["bash","-lc",`if [ -f ${shellQuote(requested.path)} ]; then printf file; elif [ -d ${shellQuote(requested.path)} ]; then printf dir; else exit 2; fi`])).stdout.trim();
       if (type === "file") {
-        const bytes = await this.provider.readFile(handle, `${this.projectRoot}/${requested.path}`);
+        const absolutePath = `${this.projectRoot}/${requested.path}`;
+        await this.assertOutputSize(handle, absolutePath);
+        const bytes = await this.provider.readFile(handle, absolutePath);
         const filename = requested.path.split("/").at(-1) ?? `artifact-${index + 1}`;
         result.push({
           name: requested.name ?? filename,
@@ -122,6 +127,7 @@ export class ProjectBuildService {
       if (type === "dir") {
         const archivePath = `/tmp/agent-workspace-build-${index}.tar.gz`;
         await this.mustExec(handle, ["bash","-lc",`tar -czf ${shellQuote(archivePath)} -C ${shellQuote(requested.path)} .`]);
+        await this.assertOutputSize(handle, archivePath);
         const bytes = await this.provider.readFile(handle, archivePath);
         const base = (requested.name ?? requested.path.split("/").at(-1) ?? `artifact-${index + 1}`).replace(/[^A-Za-z0-9._-]+/g,"-");
         result.push({
@@ -137,6 +143,20 @@ export class ProjectBuildService {
       throw new Error(`Unsupported build output type: ${requested.path}`);
     }
     return result;
+  }
+
+  private async assertOutputSize(handle: WorkspaceHandle, path: string): Promise<void> {
+    const result = await this.provider.exec(handle, {
+      argv: ["stat", "-c", "%s", path],
+      workdir: this.projectRoot,
+      timeoutMs: 30_000
+    });
+    if (result.exitCode !== 0) throw new Error(`Could not inspect build output size: ${path}`);
+    const size = Number.parseInt(result.stdout.trim(), 10);
+    if (!Number.isSafeInteger(size) || size < 0) throw new Error(`Invalid build output size: ${path}`);
+    if (size > this.maxOutputBytes) {
+      throw new Error(`Build output exceeds maximum size of ${this.maxOutputBytes} bytes: ${path}`);
+    }
   }
 
   private exec(handle: WorkspaceHandle, argv: readonly string[]) {
