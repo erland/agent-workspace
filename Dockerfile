@@ -28,7 +28,9 @@ COPY db ./db
 USER root
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn* \
     && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
-             /usr/local/bin/yarn /usr/local/bin/yarnpkg
+             /usr/local/bin/yarn /usr/local/bin/yarnpkg \
+    && mkdir -p /data \
+    && chown node:node /data
 USER node
 EXPOSE 3000
 
