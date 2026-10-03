@@ -35,6 +35,9 @@ class BuildProvider implements SandboxProvider {
     if (text.includes("if [ -f") && text.includes("elif [ -d")) {
       return { exitCode: 0, stdout: text.includes("dist/app.zip") ? "file" : "dir", stderr: "" };
     }
+    if (command.argv[0] === "stat") {
+      return { exitCode: 0, stdout: "4", stderr: "" };
+    }
     return { exitCode: 0, stdout: "", stderr: "" };
   }
 
