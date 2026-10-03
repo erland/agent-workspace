@@ -190,6 +190,14 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
       };
     }
   );
+  registerJsonTool(
+    server,
+    "artifact_download_link",
+    "Create a short-lived signed HTTPS download link for a published artifact. Use this when an external deployment service or user needs to fetch the artifact without MCP resource access.",
+    ArtifactIdInputSchema,
+    async (input: z.infer<typeof ArtifactIdInputSchema>) => tools.artifactDownloadLink(input)
+  );
+
   registerJsonTool(server, "prototype_start", "Install dependencies and start an uploaded npm web prototype.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.startPrototype(input));
 
   server.registerTool(
