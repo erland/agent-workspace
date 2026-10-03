@@ -48,17 +48,23 @@ export class ArtifactDownloadSigner {
       throw new Error("Invalid artifact download token");
     }
     const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as Partial<DownloadPayload>;
+    const expiresAtEpochSeconds = payload.expiresAtEpochSeconds;
     if (
       typeof payload.artifactId !== "string" ||
       typeof payload.userId !== "string" ||
-      !Number.isSafeInteger(payload.expiresAtEpochSeconds)
+      typeof expiresAtEpochSeconds !== "number" ||
+      !Number.isSafeInteger(expiresAtEpochSeconds)
     ) {
       throw new Error("Invalid artifact download token");
     }
-    if (payload.expiresAtEpochSeconds * 1000 <= this.nowMs()) {
+    if (expiresAtEpochSeconds * 1000 <= this.nowMs()) {
       throw new Error("Artifact download link has expired");
     }
-    return payload as DownloadPayload;
+    return {
+      artifactId: payload.artifactId,
+      userId: payload.userId,
+      expiresAtEpochSeconds
+    };
   }
 
   private sign(encoded: string): string {
