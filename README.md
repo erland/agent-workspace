@@ -120,7 +120,7 @@ npm ci
 npm run verify:dev003
 ```
 
-The live smoke creates a Java 21 / Node 22 Modal workspace, uploads and extracts a validated ZIP under `/workspace/project`, verifies the extracted file, and destroys the workspace.
+The live smoke stores a validated ZIP in Agent Workspace temporary storage, then verifies that a short-lived Java 21 / Node 22 execution can receive and extract it under `/workspace/project`.
 
 
 ## DEV-004 – project and runtime detection
@@ -149,7 +149,7 @@ npm run verify:dev005
 
 ## DEV-006 Maven verification
 
-Maven projects now use the same normalized verification model as npm. `./mvnw` is preferred when present; otherwise system `mvn` is used. Verification runs `test` followed by `package -DskipTests`, with bounded logs and a focused failure excerpt.
+Maven projects use the same normalized verification model as npm. `./mvnw` is preferred when present; otherwise system `mvn` is used. Verification runs `test`, which compiles and tests the project. Packaging is handled by `project_build` so verification does not perform duplicate work.
 
 Authenticated verification:
 
