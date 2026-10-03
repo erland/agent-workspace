@@ -3,8 +3,8 @@ import type { ProjectType } from "../project/project-detector.js";
 
 export interface RequestedBuildOutput {
   path: string;
-  name?: string;
-  kind?: string;
+  name?: string | undefined;
+  kind?: string | undefined;
 }
 
 export interface BuildArtifactOutput {
