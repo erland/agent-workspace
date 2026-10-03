@@ -32,6 +32,7 @@ export interface AgentWorkspaceTools {
   readArtifact(input: { artifactId: string }): Promise<{ artifact: any; bytes: Uint8Array }>;
   startPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
   previewPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
+  stopPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
   screenshotPrototype(input: { workspaceId: string; viewport?: ScreenshotViewport }): Promise<ToolResult<unknown>>;
   readScreenshotArtifact(input: { workspaceId: string; artifactId: string }): Promise<Uint8Array>;
   destroyWorkspace(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
@@ -104,6 +105,11 @@ export class AgentWorkspaceToolService implements AgentWorkspaceTools {
 
   public async previewPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
     try { return { ok: true, result: await this.workspaces.prototypePreviewLink(input.workspaceId) }; }
+    catch (error) { return this.failure(error); }
+  }
+
+  public async stopPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
+    try { return { ok: true, result: await this.workspaces.stopPrototype(input.workspaceId) }; }
     catch (error) { return this.failure(error); }
   }
 
