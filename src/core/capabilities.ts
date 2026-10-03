@@ -35,6 +35,13 @@ export interface AgentWorkspaceCapabilities {
   workspace: {
     defaultLifetimeMinutes: number;
     maxLifetimeMinutes: number;
+    executionModel: "lazy-ephemeral";
+    interactiveSandboxMaxLifetimeMinutes: number;
+  };
+  artifacts: {
+    temporaryStorage: boolean;
+    defaultLifetimeMinutes: number;
+    signedDownloadLinks: boolean;
   };
 }
 
@@ -65,8 +72,15 @@ export function getCapabilities(): AgentWorkspaceCapabilities {
       interactivePreview: true
     },
     workspace: {
-      defaultLifetimeMinutes: 20,
-      maxLifetimeMinutes: 20
+      defaultLifetimeMinutes: 60,
+      maxLifetimeMinutes: 60,
+      executionModel: "lazy-ephemeral",
+      interactiveSandboxMaxLifetimeMinutes: 20
+    },
+    artifacts: {
+      temporaryStorage: true,
+      defaultLifetimeMinutes: 60,
+      signedDownloadLinks: true
     }
   };
 }
