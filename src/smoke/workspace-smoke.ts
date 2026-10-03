@@ -1,4 +1,5 @@
 import { loadModalConfig } from "../config/modal-config.js";
+import { RUNTIME_PROFILES } from "../core/runtime-profile.js";
 import { ModalSandboxProvider } from "../providers/modal/modal-sandbox-provider.js";
 import { WorkspaceService } from "../workspace/workspace-service.js";
 
@@ -10,12 +11,15 @@ async function main(): Promise<void> {
   console.log(`Workspace ${workspace.id}`);
   console.log(`runtime => ${workspace.runtimeProfile}`);
   console.log(`status => ${workspace.status}`);
-  console.log(`provider sandbox => ${workspace.providerWorkspaceId}`);
+  if (workspace.providerWorkspaceId !== undefined) {
+    throw new Error("Logical workspace unexpectedly allocated a provider sandbox");
+  }
 
-  const handle = {
-    providerId: workspace.providerId,
-    providerWorkspaceId: workspace.providerWorkspaceId
-  };
+  const profile = RUNTIME_PROFILES[workspace.runtimeProfile];
+  const handle = await provider.createWorkspace({
+    imageRef: profile.imageRef,
+    timeoutMs: 5 * 60_000
+  });
 
   try {
     const java = await provider.exec(handle, {
@@ -27,7 +31,7 @@ async function main(): Promise<void> {
       timeoutMs: 30_000
     });
 
-    if (java.exitCode !== 0 || !java.stdout.includes('21')) {
+    if (java.exitCode !== 0 || !java.stdout.includes("21")) {
       throw new Error(`Expected Java 21, got: ${java.stdout || java.stderr}`);
     }
     if (node.exitCode !== 0 || !/^v22\./.test(node.stdout.trim())) {
@@ -37,6 +41,7 @@ async function main(): Promise<void> {
     console.log(`java => ${java.stdout.trim()}`);
     console.log(`node => ${node.stdout.trim()}`);
   } finally {
+    await provider.terminate(handle);
     const destroyed = await service.destroy(workspace.id);
     console.log(`workspace status => ${destroyed.status}`);
   }
