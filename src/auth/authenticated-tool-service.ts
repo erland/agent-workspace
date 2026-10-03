@@ -83,7 +83,7 @@ export class AuthenticatedAgentWorkspaceToolService {
     return this.withWorkspaceService("project_verify", input.workspaceId, (service) => service.verifyProject(input.workspaceId));
   }
 
-  async buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string; kind?: string }> }): Promise<ToolResult<unknown>> {
+  async buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined }): Promise<ToolResult<unknown>> {
     return this.withWorkspaceService(
       "project_build",
       input.workspaceId,
