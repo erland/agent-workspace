@@ -31,7 +31,7 @@ export const DEFAULT_SECURITY_POLICY: SecurityPolicy = {
   workspaceCpu: 1,
   workspaceCpuLimit: 2,
   workspaceMemoryMiB: 2048,
-  maxWorkspaceLifetimeMinutes: 20,
+  maxWorkspaceLifetimeMinutes: 60,
   requestRateLimitPerMinute: 60,
   oauthRegistrationRateLimitPerMinute: 20,
   maxScreenshotBytes: 10 * 1024 * 1024,
