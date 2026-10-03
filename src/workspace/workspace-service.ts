@@ -388,7 +388,7 @@ export class WorkspaceService {
     if (record.handle) {
       await this.provider.terminate(record.handle).catch(() => undefined);
     }
-    record.handle = undefined;
+    delete record.handle;
     delete record.workspace.providerId;
     delete record.workspace.providerWorkspaceId;
     delete record.workspace.prototype;
@@ -493,7 +493,7 @@ export class WorkspaceService {
         terminationError = error;
       }
     }
-    record.handle = undefined;
+    delete record.handle;
     delete record.workspace.providerId;
     delete record.workspace.providerWorkspaceId;
     delete record.workspace.prototype;
@@ -518,7 +518,7 @@ export class WorkspaceService {
     if (record.handle) {
       await this.provider.terminate(record.handle).catch(() => undefined);
     }
-    record.handle = undefined;
+    delete record.handle;
     delete record.workspace.providerId;
     delete record.workspace.providerWorkspaceId;
     delete record.workspace.prototype;
