@@ -17,7 +17,8 @@
 ## Resource and abuse controls
 
 - maximum 3 active workspaces per user,
-- maximum workspace lifetime 20 minutes,
+- maximum logical workspace/source/artifact working lifetime 60 minutes,
+- maximum interactive Modal prototype Sandbox lifetime 20 minutes; verify/build Sandboxes are terminated immediately after each operation,
 - CPU reservation 1 physical core; CPU hard limit 2 cores,
 - memory 2048 MiB,
 - per-user/per-operation fixed-window rate limit of 60/minute in v1,
@@ -26,6 +27,10 @@
 - screenshot dimensions capped at 4096×4096 and screenshot output capped at 10 MiB before control-plane readback,
 - OAuth Dynamic Client Registration capped at 16 KiB request metadata, 10 redirect URIs, 2048 characters per redirect URI and 20 registrations/minute per service instance,
 - command timeouts and bounded logs.
+
+## Temporary storage and artifact handoff
+
+Uploaded source archives, screenshots and build artifacts are copied out of execution Sandboxes into Agent Workspace temporary object storage. The v1 implementation uses a persistent Coolify volume through the provider-neutral ObjectStore interface. Build artifacts have independent expiry metadata and can be read through authenticated MCP resources or short-lived HMAC-signed HTTPS download links. Signed URLs are bounded by artifact expiry and do not contain Modal or Agent Workspace credentials.
 
 ## Interactive preview exposure
 
