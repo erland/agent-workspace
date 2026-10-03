@@ -177,7 +177,7 @@ describe("WorkspaceService", () => {
     await assert.rejects(() => service.create(), /database unavailable/);
     assert.equal(provider.terminated.length, 0);
     const persisted = await repository.findByIdForUser("ws_persist_failure", "user-persist-failure");
-    assert.equal(persisted?.status, "DESTROYED");
+    assert.equal(persisted, undefined);
   });
 });
 
