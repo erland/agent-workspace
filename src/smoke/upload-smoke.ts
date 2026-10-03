@@ -10,30 +10,11 @@ async function main(): Promise<void> {
 
   console.log(`Workspace ${workspace.id}`);
   console.log(`runtime => ${workspace.runtimeProfile}`);
-  console.log(`provider sandbox => ${workspace.providerWorkspaceId}`);
-
-  const handle = {
-    providerId: workspace.providerId,
-    providerWorkspaceId: workspace.providerWorkspaceId
-  };
+  if (workspace.providerWorkspaceId !== undefined) {
+    throw new Error("Logical workspace unexpectedly allocated a provider sandbox");
+  }
 
   try {
-    const java = await provider.exec(handle, {
-      argv: ["bash", "-lc", "java -version 2>&1 | head -n 1"],
-      timeoutMs: 30_000
-    });
-    const node = await provider.exec(handle, {
-      argv: ["node", "--version"],
-      timeoutMs: 30_000
-    });
-
-    if (java.exitCode !== 0 || !java.stdout.includes("21")) {
-      throw new Error(`Expected Java 21, got: ${java.stdout || java.stderr}`);
-    }
-    if (node.exitCode !== 0 || !/^v22\./.test(node.stdout.trim())) {
-      throw new Error(`Expected Node 22, got: ${node.stdout || node.stderr}`);
-    }
-
     const upload = await service.uploadZip(
       workspace.id,
       makeStoredZip([
@@ -56,20 +37,15 @@ async function main(): Promise<void> {
       throw new Error("Expected Node runtime mismatch warning for locked Node 22 workspace");
     }
 
-    const extracted = await provider.exec(handle, {
-      argv: ["bash", "-lc", "test -f /workspace/project/package.json"],
-      timeoutMs: 30_000
-    });
-    if (extracted.exitCode !== 0) {
-      throw new Error(`Uploaded ZIP was not extracted: ${extracted.stderr}`);
+    const verified = await service.verifyProject(workspace.id);
+    if (verified.status !== "PASSED" || verified.projectType !== "NPM") {
+      throw new Error("Expected stored ZIP to verify in an ephemeral execution sandbox");
     }
 
-    console.log(`java => ${java.stdout.trim()}`);
-    console.log(`node => ${node.stdout.trim()}`);
     console.log("ZIP validation => PASSED");
-    console.log("ZIP extraction => PASSED");
     console.log("project detection => NPM");
     console.log("node detection => 20 with mismatch warning");
+    console.log("ephemeral extraction/verification => PASSED");
   } finally {
     const destroyed = await service.destroy(workspace.id);
     console.log(`workspace status => ${destroyed.status}`);
