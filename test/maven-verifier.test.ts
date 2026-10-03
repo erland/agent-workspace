@@ -42,36 +42,34 @@ function tickingClock(): () => number {
   return () => (value += 10);
 }
 
-test("Maven verifier prefers mvnw and runs test then package", async () => {
+test("Maven verifier prefers mvnw and stops after compile/test verification", async () => {
   const provider = new ScriptedProvider([
     ok("./mvnw"),
-    ok("tests passed"),
-    ok("package built")
+    ok("tests passed")
   ]);
   const result = await new MavenVerifier(provider, { nowMs: tickingClock() }).verify(handle);
 
   assert.equal(result.status, "PASSED");
   assert.equal(result.projectType, "MAVEN");
-  assert.deepEqual(result.steps.map((step) => step.name), ["test", "package"]);
+  assert.deepEqual(result.steps.map((step) => step.name), ["test"]);
   assert.deepEqual(provider.commands[1]?.argv, ["./mvnw", "test"]);
-  assert.deepEqual(provider.commands[2]?.argv, ["./mvnw", "package", "-DskipTests"]);
+  assert.equal(provider.commands.length, 2);
   assert.ok(result.durationMs > 0);
 });
 
 test("Maven verifier falls back to system mvn", async () => {
   const provider = new ScriptedProvider([
     ok("mvn"),
-    ok("tests passed"),
-    ok("package built")
+    ok("tests passed")
   ]);
   const result = await new MavenVerifier(provider, { nowMs: tickingClock() }).verify(handle);
 
   assert.equal(result.status, "PASSED");
   assert.deepEqual(provider.commands[1]?.argv, ["mvn", "test"]);
-  assert.deepEqual(provider.commands[2]?.argv, ["mvn", "package", "-DskipTests"]);
+  assert.equal(provider.commands.length, 2);
 });
 
-test("Maven verifier normalizes test failure and stops before package", async () => {
+test("Maven verifier normalizes test failure", async () => {
   const provider = new ScriptedProvider([
     ok("mvn"),
     fail(1, "", "[ERROR] Tests run: 1, Failures: 1\nAssertionError: expected 2 but was 3")
@@ -85,21 +83,6 @@ test("Maven verifier normalizes test failure and stops before package", async ()
   assert.match(result.logExcerpt ?? "", /AssertionError/);
   assert.equal(result.steps.length, 1);
   assert.equal(provider.commands.length, 2);
-});
-
-test("Maven verifier normalizes package failure", async () => {
-  const provider = new ScriptedProvider([
-    ok("mvn"),
-    ok("tests passed"),
-    fail(2, "", "[ERROR] Failed to execute goal maven-jar-plugin")
-  ]);
-  const result = await new MavenVerifier(provider, { nowMs: tickingClock() }).verify(handle);
-
-  assert.equal(result.status, "FAILED");
-  assert.equal(result.failedStep, "package");
-  assert.equal(result.exitCode, 2);
-  assert.equal(result.steps.length, 2);
-  assert.match(result.logExcerpt ?? "", /maven-jar-plugin/);
 });
 
 test("Maven verifier bounds step logs and failure excerpt", async () => {
