@@ -53,9 +53,8 @@ describe("WorkspaceService", () => {
     assert.equal(workspace.id, "ws_test");
     assert.equal(workspace.status, "READY");
     assert.equal(workspace.runtimeProfile, "java21-node22");
-    assert.equal(workspace.expiresAt, "2026-09-29T12:20:00.000Z");
-    assert.equal(provider.creates[0]?.imageRef, "ghcr.io/erland/agent-workspace-runtime:java21-node22-v2");
-    assert.deepEqual(provider.creates[0]?.encryptedPorts, [4173]);
+    assert.equal(workspace.expiresAt, "2026-09-29T13:00:00.000Z");
+    assert.equal(provider.creates.length, 0);
     assert.equal(provider.commands.length, 0);
   });
 
@@ -74,7 +73,7 @@ describe("WorkspaceService", () => {
 
     assert.equal(workspace.runtimeProfile, "java25-node20");
     assert.equal(workspace.expiresAt, "2026-09-29T12:10:00.000Z");
-    assert.equal(provider.creates[0]?.imageRef, "ghcr.io/erland/agent-workspace-runtime:java25-node20-v2");
+    assert.equal(provider.creates.length, 0);
   });
 
   it("destroys a workspace and terminates the provider sandbox", async () => {
@@ -88,7 +87,7 @@ describe("WorkspaceService", () => {
     const destroyed = await service.destroy("ws_destroy");
 
     assert.equal(destroyed.status, "DESTROYED");
-    assert.equal(provider.terminated.length, 1);
+    assert.equal(provider.terminated.length, 0);
   });
 
   it("expires a workspace when its TTL has elapsed", async () => {
@@ -106,14 +105,14 @@ describe("WorkspaceService", () => {
     const expired = await service.get("ws_expire");
 
     assert.equal(expired.status, "EXPIRED");
-    assert.equal(provider.terminated.length, 1);
+    assert.equal(provider.terminated.length, 0);
   });
 
   it("rejects lifetimes above the configured maximum", async () => {
     const provider = new FakeProvider();
     const service = new WorkspaceService(provider, { schedule: () => ({}) });
 
-    await assert.rejects(() => service.create({ lifetimeMinutes: 21 }), /may not exceed 20/);
+    await assert.rejects(() => service.create({ lifetimeMinutes: 61 }), /may not exceed 60/);
   });
 
 
@@ -139,43 +138,23 @@ describe("WorkspaceService", () => {
     assert.equal(fulfilled.length, 1);
     assert.equal(rejected.length, 1);
     assert.match(String((rejected[0] as PromiseRejectedResult).reason), /active workspace limit exceeded/);
-    assert.equal(provider.creates.length, 1);
+    assert.equal(provider.creates.length, 0);
     assert.equal(provider.terminated.length, 0);
   });
 
-  it("releases a pre-allocation reservation when provider creation fails", async () => {
-    class FailOnceProvider extends FakeProvider {
-      override async createWorkspace(options: CreateWorkspaceOptions): Promise<WorkspaceHandle> {
-        this.creates.push(options);
-        if (this.creates.length === 1) throw new Error("provider create failed");
-        return { providerId: "fake", providerWorkspaceId: "provider-retry" };
-      }
-    }
-
-    const provider = new FailOnceProvider();
-    const repository = new InMemoryWorkspaceRepository();
-    let nextId = 0;
+  it("does not allocate an execution provider during logical workspace creation", async () => {
+    const provider = new FakeProvider();
     const service = new WorkspaceService(provider, {
-      userId: "user-provider-failure",
-      repository,
-      idFactory: () => `ws_provider_failure_${++nextId}`,
-      schedule: () => ({}),
-      securityPolicy: {
-        ...DEFAULT_SECURITY_POLICY,
-        maxActiveWorkspacesPerUser: 1
-      }
+      idFactory: () => "ws_lazy",
+      schedule: () => ({})
     });
 
-    await assert.rejects(() => service.create(), /provider create failed/);
-    assert.equal(
-      await repository.findByIdForUser("ws_provider_failure_1", "user-provider-failure"),
-      undefined
-    );
+    const workspace = await service.create();
 
-    const retried = await service.create();
-    assert.equal(retried.status, "READY");
-    assert.equal(retried.id, "ws_provider_failure_2");
-    assert.equal(provider.creates.length, 2);
+    assert.equal(workspace.status, "READY");
+    assert.equal(workspace.providerId, undefined);
+    assert.equal(workspace.providerWorkspaceId, undefined);
+    assert.equal(provider.creates.length, 0);
   });
 
   it("terminates and marks a reserved workspace destroyed when READY persistence fails", async () => {
@@ -196,7 +175,7 @@ describe("WorkspaceService", () => {
     });
 
     await assert.rejects(() => service.create(), /database unavailable/);
-    assert.equal(provider.terminated.length, 1);
+    assert.equal(provider.terminated.length, 0);
     const persisted = await repository.findByIdForUser("ws_persist_failure", "user-persist-failure");
     assert.equal(persisted?.status, "DESTROYED");
   });
@@ -224,7 +203,7 @@ describe("WorkspaceService ZIP upload", () => {
 
     const result = await service.uploadZip("ws_upload", archive);
 
-    assert.equal(provider.uploads.length, 1);
+    assert.equal(provider.uploads.length, 0);
     assert.equal(result.validation.entryCount, 1);
     assert.equal(result.workspace.project?.archive.entryCount, 1);
     assert.equal(result.workspace.project?.analysis.projectType, "NPM");
@@ -260,6 +239,8 @@ describe("WorkspaceService ZIP upload", () => {
     const result = await service.verifyProject("ws_nested_npm");
 
     assert.equal(result.status, "PASSED");
+    assert.equal(provider.creates.length, 1);
+    assert.equal(provider.terminated.length, 1);
     const verificationCommands = provider.commands.filter((command) => command.workdir !== undefined);
     assert.ok(verificationCommands.length >= 2);
     for (const command of verificationCommands) {
