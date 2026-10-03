@@ -71,6 +71,8 @@ AGENT_WORKSPACE_GOOGLE_CLIENT_SECRET=<google-web-client-secret>
 AGENT_WORKSPACE_AUTH_SIGNING_KEY=<base64-pkcs8-ed25519-private-key>
 AGENT_WORKSPACE_WEB_SESSION_SECRET=<random-session-secret>
 AGENT_WORKSPACE_CREDENTIAL_ENCRYPTION_KEY=<base64-32-byte-key>
+AGENT_WORKSPACE_ARTIFACT_SIGNING_KEY=<random-secret-at-least-32-bytes>
+AGENT_WORKSPACE_STORAGE_DIR=/data
 ```
 
 Google OAuth-klienten ska vara av typen **Web application** och ha exakt denna Authorized redirect URI:
@@ -198,14 +200,17 @@ When `runtime-images/Dockerfile` changes, increment `runtime-images/version.txt`
 
 Använd en separat persistent PostgreSQL-databas och TLS där providern stödjer det. Agent Workspace-containern innehåller ingen PostgreSQL-server och ingen separat PostgreSQL-resurs behöver skapas i Coolify om en extern databas redan finns. Vid containerstart körs SQL-migrationer från `db/migrations` under PostgreSQL advisory lock. Redan applicerade migrationer spåras i `schema_migration`.
 
-Applikationscontainern lagrar inga projektfiler permanent. Workspace-data ligger i sandbox-providern och metadata i PostgreSQL.
+Agent Workspace använder en persistent Coolify-volume för temporära source-ZIP:ar, screenshots och build-artifacts. Montera volymen på `/data` och sätt `AGENT_WORKSPACE_STORAGE_DIR=/data`. Metadata ligger i PostgreSQL. Modal används endast under aktiv exekvering: verify/build skapar kortlivade Sandboxes som termineras direkt efter operationen, medan interaktiv prototype-preview får leva högst 20 minuter.
+
+Den lokala lagringen ligger bakom `ObjectStore`, så den kan senare bytas mot R2/S3/MinIO utan ändrat MCP-kontrakt.
 
 ## Coolify-konfiguration
 
 1. Säkerställ att den separata PostgreSQL-databasen är nåbar från Coolify-hostens Docker-nätverk eller via dess nätverksadress.
 2. Skapa en Docker Image-baserad Application i Coolify och ange `ghcr.io/erland/agent-workspace:<release-tag>`.
-3. Lägg in environment variables/secrets ovan, inklusive `DATABASE_URL`, `AGENT_WORKSPACE_PUBLIC_BASE_URL`, Google Client ID/Secret, signing key, web session secret och credential encryption key. `AGENT_WORKSPACE_VERSION` behöver normalt inte sättas manuellt eftersom release-taggen redan är inbyggd i imagen.
-4. Ange applikationens interna port som `3000` och koppla önskad `https://`-domän till applikationen.
+3. Lägg in environment variables/secrets ovan, inklusive `DATABASE_URL`, `AGENT_WORKSPACE_PUBLIC_BASE_URL`, Google Client ID/Secret, signing key, web session secret, credential encryption key och artifact signing key. `AGENT_WORKSPACE_VERSION` behöver normalt inte sättas manuellt eftersom release-taggen redan är inbyggd i imagen.
+4. Skapa en persistent Coolify-volume och montera den som `/data`. Den ska överleva container-redeploys.
+5. Ange applikationens interna port som `3000` och koppla önskad `https://`-domän till applikationen.
 5. Lägg inte till någon host-port mapping för `3000`.
 6. Låt Coolifys Traefik-proxy hantera TLS och publik ingress på 80/443.
 7. Ange health path `/health`.
