@@ -27,7 +27,7 @@ export interface AgentWorkspaceTools {
   uploadZip(input: WorkspaceUploadZipToolInput): Promise<ToolResult<unknown>>;
   uploadZipFromUrl(input: { workspaceId: string; url: string; filename?: string }): Promise<ToolResult<unknown>>;
   verifyProject(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
-  buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string; kind?: string }> }): Promise<ToolResult<unknown>>;
+  buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined }): Promise<ToolResult<unknown>>;
   getArtifact(input: { artifactId: string }): Promise<ToolResult<unknown>>;
   artifactDownloadLink(input: { artifactId: string }): Promise<ToolResult<unknown>>;
   readArtifact(input: { artifactId: string }): Promise<{ artifact: any; bytes: Uint8Array }>;
@@ -85,7 +85,7 @@ export class AgentWorkspaceToolService implements AgentWorkspaceTools {
     catch (error) { return this.failure(error); }
   }
 
-  public async buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string; kind?: string }> }): Promise<ToolResult<unknown>> {
+  public async buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined }): Promise<ToolResult<unknown>> {
     try { return { ok: true, result: await this.workspaces.buildProject(input.workspaceId, input.outputs ?? []) }; }
     catch (error) { return this.failure(error); }
   }
