@@ -133,6 +133,7 @@ export class WorkspaceService {
     this.artifactService = options.artifactRepository
       ? new ArtifactService(this.userId, options.artifactRepository, this.objectStore, {
           ttlMinutes: options.artifactTtlMinutes ?? 60,
+          maxArtifactBytes: this.securityPolicy.maxArtifactBytes,
           now: this.now
         })
       : undefined;
