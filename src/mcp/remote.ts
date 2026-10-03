@@ -88,7 +88,7 @@ const remote = createRemoteMcpHandler(config, tokenVerifier, {
   workspaces,
   artifacts,
   objectStore,
-  artifactDownloadSigner,
+  ...(artifactDownloadSigner ? { artifactDownloadSigner } : {}),
   providerFactory,
   rateLimiter: new InMemoryFixedWindowRateLimiter({ limitPerMinute: DEFAULT_SECURITY_POLICY.requestRateLimitPerMinute }),
   audit: new JsonLineAuditEventSink()
