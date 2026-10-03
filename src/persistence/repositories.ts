@@ -1,6 +1,7 @@
 import type {
   ExternalIdentityRecord,
   PersistedExecutionAccount,
+  ArtifactRecord,
   PersistedWorkspace,
   UserRecord
 } from "./models.js";
@@ -45,4 +46,13 @@ export interface EncryptedCredentialRepository {
   upsert(record: EncryptedCredentialRecord): Promise<void>;
   findByRef(ref: string): Promise<EncryptedCredentialRecord | undefined>;
   deleteByRef(ref: string): Promise<void>;
+}
+
+
+export interface ArtifactRepository {
+  upsert(artifact: ArtifactRecord): Promise<void>;
+  findByIdForUser(artifactId: string, userId: string): Promise<ArtifactRecord | undefined>;
+  listByWorkspaceForUser(workspaceId: string, userId: string): Promise<ArtifactRecord[]>;
+  listExpired(nowIso: string, limit?: number): Promise<ArtifactRecord[]>;
+  deleteById(artifactId: string): Promise<void>;
 }

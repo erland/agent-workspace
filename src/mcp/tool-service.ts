@@ -27,8 +27,13 @@ export interface AgentWorkspaceTools {
   uploadZip(input: WorkspaceUploadZipToolInput): Promise<ToolResult<unknown>>;
   uploadZipFromUrl(input: { workspaceId: string; url: string; filename?: string }): Promise<ToolResult<unknown>>;
   verifyProject(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
+  buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined }): Promise<ToolResult<unknown>>;
+  getArtifact(input: { artifactId: string }): Promise<ToolResult<unknown>>;
+  artifactDownloadLink(input: { artifactId: string }): Promise<ToolResult<unknown>>;
+  readArtifact(input: { artifactId: string }): Promise<{ artifact: any; bytes: Uint8Array }>;
   startPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
   previewPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
+  stopPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
   screenshotPrototype(input: { workspaceId: string; viewport?: ScreenshotViewport }): Promise<ToolResult<unknown>>;
   readScreenshotArtifact(input: { workspaceId: string; artifactId: string }): Promise<Uint8Array>;
   destroyWorkspace(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
@@ -80,6 +85,24 @@ export class AgentWorkspaceToolService implements AgentWorkspaceTools {
     catch (error) { return this.failure(error); }
   }
 
+  public async buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined }): Promise<ToolResult<unknown>> {
+    try { return { ok: true, result: await this.workspaces.buildProject(input.workspaceId, input.outputs ?? []) }; }
+    catch (error) { return this.failure(error); }
+  }
+
+  public async getArtifact(input: { artifactId: string }): Promise<ToolResult<unknown>> {
+    try { return { ok: true, result: await this.workspaces.getArtifact(input.artifactId) }; }
+    catch (error) { return this.failure(error); }
+  }
+
+  public async artifactDownloadLink(_input: { artifactId: string }): Promise<ToolResult<unknown>> {
+    return this.failure(new Error("Artifact download links are only available from the remote Agent Workspace service"));
+  }
+
+  public async readArtifact(input: { artifactId: string }): Promise<{ artifact: any; bytes: Uint8Array }> {
+    return this.workspaces.readArtifact(input.artifactId);
+  }
+
   public async startPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
     try { return { ok: true, result: await this.workspaces.startPrototype(input.workspaceId) }; }
     catch (error) { return this.failure(error); }
@@ -87,6 +110,11 @@ export class AgentWorkspaceToolService implements AgentWorkspaceTools {
 
   public async previewPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
     try { return { ok: true, result: await this.workspaces.prototypePreviewLink(input.workspaceId) }; }
+    catch (error) { return this.failure(error); }
+  }
+
+  public async stopPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
+    try { return { ok: true, result: await this.workspaces.stopPrototype(input.workspaceId) }; }
     catch (error) { return this.failure(error); }
   }
 

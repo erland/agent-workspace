@@ -1,6 +1,6 @@
 import { getCapabilities } from "../core/capabilities.js";
 import type { ExecutionProviderFactory } from "../execution/execution-provider-factory.js";
-import type { ExecutionAccountRepository, UserRepository, WorkspaceRepository } from "../persistence/repositories.js";
+import type { ArtifactRepository, ExecutionAccountRepository, UserRepository, WorkspaceRepository } from "../persistence/repositories.js";
 import { IdentityService } from "../persistence/identity-service.js";
 import { RepositoryProfileProvider } from "../persistence/profile-provider.js";
 import type { ScreenshotViewport } from "../prototype/screenshot-service.js";
@@ -16,12 +16,17 @@ import type { UserRateLimiter } from "../security/rate-limiter.js";
 import type { AuditEventSink } from "../audit/audit-events.js";
 import { isModalAuthenticationError } from "../providers/modal/modal-auth-error.js";
 import type { PersistedExecutionAccount } from "../persistence/models.js";
+import type { ObjectStore } from "../storage/object-store.js";
+import type { ArtifactDownloadSigner } from "../artifact/artifact-download.js";
 
 export interface AuthenticatedToolServiceDependencies {
   identityService: IdentityService;
   users: UserRepository;
   executionAccounts: ExecutionAccountRepository;
   workspaces: WorkspaceRepository;
+  artifacts: ArtifactRepository;
+  objectStore: ObjectStore;
+  artifactDownloadSigner?: ArtifactDownloadSigner;
   providerFactory: ExecutionProviderFactory;
   rateLimiter?: UserRateLimiter;
   audit?: AuditEventSink;
@@ -78,6 +83,51 @@ export class AuthenticatedAgentWorkspaceToolService {
     return this.withWorkspaceService("project_verify", input.workspaceId, (service) => service.verifyProject(input.workspaceId));
   }
 
+  async buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined }): Promise<ToolResult<unknown>> {
+    return this.withWorkspaceService(
+      "project_build",
+      input.workspaceId,
+      (service) => service.buildProject(input.workspaceId, input.outputs ?? [])
+    );
+  }
+
+  async getArtifact(input: { artifactId: string }): Promise<ToolResult<unknown>> {
+    return this.withWorkspaceService(
+      "artifact_get",
+      undefined,
+      (service) => service.getArtifact(input.artifactId)
+    );
+  }
+
+  async readArtifact(input: { artifactId: string }): Promise<{ artifact: any; bytes: Uint8Array }> {
+    const result = await this.withWorkspaceService(
+      "artifact_resource",
+      undefined,
+      (service) => service.readArtifact(input.artifactId)
+    );
+    if (!result.ok) throw new Error(result.error.message);
+    return result.result;
+  }
+
+  async artifactDownloadLink(input: { artifactId: string }): Promise<ToolResult<unknown>> {
+    return this.withWorkspaceService(
+      "artifact_download_link",
+      undefined,
+      async (service) => {
+        const signer = this.deps.artifactDownloadSigner;
+        if (!signer) throw new Error("Artifact download links are not configured");
+        const artifact = await service.getArtifact(input.artifactId);
+        return {
+          artifactId: artifact.id,
+          filename: artifact.filename,
+          mediaType: artifact.mediaType,
+          sizeBytes: artifact.sizeBytes,
+          ...signer.create(artifact)
+        };
+      }
+    );
+  }
+
   async startPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
     return this.withWorkspaceService("prototype_start", input.workspaceId, (service) => service.startPrototype(input.workspaceId));
   }
@@ -87,6 +137,14 @@ export class AuthenticatedAgentWorkspaceToolService {
       "prototype_preview_link",
       input.workspaceId,
       (service) => service.prototypePreviewLink(input.workspaceId)
+    );
+  }
+
+  async stopPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
+    return this.withWorkspaceService(
+      "prototype_stop",
+      input.workspaceId,
+      (service) => service.stopPrototype(input.workspaceId)
     );
   }
 
@@ -123,7 +181,12 @@ export class AuthenticatedAgentWorkspaceToolService {
       executionAccount = account;
       if (!account || account.status !== "CONNECTED") throw new Error("Execution account is not connected");
       const provider = await this.deps.providerFactory.createForAccount(account);
-      const service = new WorkspaceService(provider, { userId: user.id, repository: this.deps.workspaces });
+      const service = new WorkspaceService(provider, {
+        userId: user.id,
+        repository: this.deps.workspaces,
+        artifactRepository: this.deps.artifacts,
+        objectStore: this.deps.objectStore
+      });
       const result = await operation(service);
       await this.audit(userId, action, "SUCCEEDED", undefined, workspaceId);
       return { ok: true, result };

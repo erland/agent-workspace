@@ -39,7 +39,7 @@ describe("DEV-010 MCP tool service contract", () => {
     assert.equal(created.ok, true);
     const destroyed = await tools.destroyWorkspace({ workspaceId: "ws_1" });
     assert.equal(destroyed.ok, true);
-    assert.equal(provider.terminated, true);
+    assert.equal(provider.terminated, false);
   });
 
   it("uploads base64 ZIP and project_verify selects npm", async () => {
@@ -53,6 +53,7 @@ describe("DEV-010 MCP tool service contract", () => {
     const verified = await tools.verifyProject({ workspaceId: "ws_1" });
     assert.equal(verified.ok, true);
     if (verified.ok) assert.equal((verified.result as any).projectType, "NPM");
+    assert.equal(provider.terminated, true);
   });
 
   it("returns standardized error for unknown workspace", async () => {

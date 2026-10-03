@@ -1,12 +1,14 @@
 import type { ExecutionProviderFactory } from "../execution/execution-provider-factory.js";
 import type { ExecutionAccountRepository, WorkspaceRepository } from "../persistence/repositories.js";
+import type { ObjectStore } from "../storage/object-store.js";
 
 export class ExpiredWorkspaceCleanupJob {
   constructor(
     private readonly workspaces: WorkspaceRepository,
     private readonly accounts: ExecutionAccountRepository,
     private readonly providerFactory: ExecutionProviderFactory,
-    private readonly now: () => Date = () => new Date()
+    private readonly now: () => Date = () => new Date(),
+    private readonly objectStore?: ObjectStore
   ) {}
 
   async run(limit = 100): Promise<{ processed: number; failed: number }> {
@@ -27,11 +29,18 @@ export class ExpiredWorkspaceCleanupJob {
       } catch {
         failed += 1;
       } finally {
+        const {
+          providerId: _providerId,
+          providerWorkspaceId: _providerWorkspaceId,
+          prototype: _prototype,
+          ...logicalWorkspace
+        } = workspace;
         await this.workspaces.upsert({
-          ...workspace,
+          ...logicalWorkspace,
           status: "EXPIRED",
           destroyedAt: this.now().toISOString()
         });
+        await this.objectStore?.deletePrefix(`workspaces/${workspace.userId}/${workspace.id}/`).catch(() => undefined);
         processed += 1;
       }
     }

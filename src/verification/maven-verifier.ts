@@ -53,16 +53,6 @@ export class MavenVerifier {
       return this.failedResult(startedAt, steps, test);
     }
 
-    const packageStep = await this.runStep(handle, "package", {
-      argv: [executable, "package", "-DskipTests"],
-      workdir: this.projectRoot,
-      timeoutMs: this.commandTimeoutMs
-    });
-    steps.push(packageStep);
-    if (packageStep.status === "FAILED") {
-      return this.failedResult(startedAt, steps, packageStep);
-    }
-
     return {
       status: "PASSED",
       projectType: "MAVEN",

@@ -7,6 +7,7 @@ import type { AuthInfo, OAuthTokenVerifier } from "@modelcontextprotocol/server"
 import { createRemoteMcpHandler } from "../mcp/remote-handler.js";
 import { IdentityService } from "../persistence/identity-service.js";
 import {
+  InMemoryArtifactRepository,
   InMemoryExecutionAccountRepository,
   InMemoryExternalIdentityRepository,
   InMemoryUserRepository,
@@ -14,6 +15,7 @@ import {
 } from "../persistence/in-memory.js";
 import type { ExecutionProviderFactory } from "../execution/execution-provider-factory.js";
 import type { SandboxProvider } from "../core/sandbox-provider.js";
+import { InMemoryObjectStore } from "../storage/in-memory-object-store.js";
 
 class StaticVerifier implements OAuthTokenVerifier {
   async verifyAccessToken(token: string): Promise<AuthInfo> {
@@ -39,6 +41,8 @@ const users = new InMemoryUserRepository();
 const identities = new InMemoryExternalIdentityRepository();
 const executionAccounts = new InMemoryExecutionAccountRepository();
 const workspaces = new InMemoryWorkspaceRepository();
+const artifacts = new InMemoryArtifactRepository();
+const objectStore = new InMemoryObjectStore();
 let userNo = 0;
 const identityService = new IdentityService(users, identities, executionAccounts, {
   idFactory: (kind) => kind === "user" ? `usr-smoke-${++userNo}` : `idn-smoke-${userNo}`
@@ -55,7 +59,7 @@ const config = {
   host: "127.0.0.1"
 };
 const handler = createRemoteMcpHandler(config, new StaticVerifier(), {
-  identityService, users, executionAccounts, workspaces, providerFactory: new NeverUsedProviderFactory()
+  identityService, users, executionAccounts, workspaces, artifacts, objectStore, providerFactory: new NeverUsedProviderFactory()
 });
 const server = createServer((req, res) => { void serve(req, res); });
 await new Promise<void>((resolve) => server.listen(config.port, config.host, resolve));

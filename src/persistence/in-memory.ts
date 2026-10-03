@@ -1,10 +1,12 @@
 import type {
+  ArtifactRepository,
   ExecutionAccountRepository,
   ExternalIdentityRepository,
   UserRepository,
   WorkspaceRepository
 } from "./repositories.js";
 import type {
+  ArtifactRecord,
   ExternalIdentityRecord,
   PersistedExecutionAccount,
   PersistedWorkspace,
@@ -110,4 +112,37 @@ export class InMemoryWorkspaceRepository implements WorkspaceRepository {
 
 function identityKey(issuer: string, subject: string): string {
   return `${issuer}\u0000${subject}`;
+}
+
+
+export class InMemoryArtifactRepository implements ArtifactRepository {
+  private readonly values = new Map<string, ArtifactRecord>();
+
+  async upsert(artifact: ArtifactRecord): Promise<void> {
+    this.values.set(artifact.id, structuredClone(artifact));
+  }
+
+  async findByIdForUser(artifactId: string, userId: string): Promise<ArtifactRecord | undefined> {
+    const value = this.values.get(artifactId);
+    return value && value.userId === userId ? structuredClone(value) : undefined;
+  }
+
+  async listByWorkspaceForUser(workspaceId: string, userId: string): Promise<ArtifactRecord[]> {
+    return [...this.values.values()]
+      .filter((value) => value.workspaceId === workspaceId && value.userId === userId)
+      .map((value) => structuredClone(value));
+  }
+
+  async listExpired(nowIso: string, limit = 100): Promise<ArtifactRecord[]> {
+    const now = Date.parse(nowIso);
+    return [...this.values.values()]
+      .filter((value) => Date.parse(value.expiresAt) <= now)
+      .sort((a, b) => Date.parse(a.expiresAt) - Date.parse(b.expiresAt))
+      .slice(0, limit)
+      .map((value) => structuredClone(value));
+  }
+
+  async deleteById(artifactId: string): Promise<void> {
+    this.values.delete(artifactId);
+  }
 }

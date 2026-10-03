@@ -107,7 +107,7 @@ npm ci
 npm run verify:dev002
 ```
 
-The live smoke creates a real Modal workspace, verifies Java 21 and Node 22, and destroys it.
+The live smoke creates a logical workspace, verifies that workspace creation does not allocate an execution sandbox, then creates a short-lived execution sandbox to verify Java 21 and Node 22.
 
 ## DEV-003 – ZIP upload and validation
 
@@ -120,7 +120,7 @@ npm ci
 npm run verify:dev003
 ```
 
-The live smoke creates a Java 21 / Node 22 Modal workspace, uploads and extracts a validated ZIP under `/workspace/project`, verifies the extracted file, and destroys the workspace.
+The live smoke stores a validated ZIP in Agent Workspace temporary storage, then verifies that a short-lived Java 21 / Node 22 execution can receive and extract it under `/workspace/project`.
 
 
 ## DEV-004 – project and runtime detection
@@ -149,7 +149,7 @@ npm run verify:dev005
 
 ## DEV-006 Maven verification
 
-Maven projects now use the same normalized verification model as npm. `./mvnw` is preferred when present; otherwise system `mvn` is used. Verification runs `test` followed by `package -DskipTests`, with bounded logs and a focused failure excerpt.
+Maven projects use the same normalized verification model as npm. `./mvnw` is preferred when present; otherwise system `mvn` is used. Verification runs `test`, which compiles and tests the project. Packaging is handled by `project_build` so verification does not perform duplicate work.
 
 Authenticated verification:
 
@@ -173,6 +173,16 @@ npm run verify:dev007
 ```
 
 Browser and screenshot capabilities intentionally remain disabled until the prototype steps are implemented.
+
+## Lazy execution and temporary artifact storage
+
+A logical Agent Workspace no longer implies a live Modal Sandbox. `workspace_create` creates metadata only and `workspace_upload_zip` persists the validated source ZIP through the provider-neutral `ObjectStore` abstraction. The production v1 store is a Coolify persistent volume mounted at `/data`.
+
+`project_verify` creates a short-lived Sandbox, uploads the stored source, compiles/tests the project, and always terminates the Sandbox in a `finally` block. Maven verification runs `test` only; packaging is performed by `project_build`. `project_build` similarly uses a short-lived Sandbox, publishes detected or explicitly requested outputs to temporary artifact storage, then terminates the Sandbox.
+
+Published build artifacts have independent 60-minute TTL metadata. They can be consumed through `agent-workspace://artifacts/{artifactId}` or through a short-lived signed HTTPS link returned by `artifact_download_link`.
+
+Interactive prototypes are the exception: `prototype_start` creates a Sandbox that may stay alive for at most 20 minutes. `prototype_stop` releases it immediately while leaving the logical workspace and stored artifacts intact. Screenshots are copied into Agent Workspace storage immediately, so gallery/resource reads no longer depend on the prototype Sandbox remaining alive.
 
 ## DEV-008 prototype start
 
@@ -203,7 +213,7 @@ After `npm ci`, start the local stdio MCP server with:
 npm run mcp:stdio
 ```
 
-DEV-010 exposes: `get_capabilities`, `get_profile`, `workspace_create`, `workspace_upload_zip`, `workspace_upload_zip_from_url`, `project_verify`, `prototype_start`, `prototype_preview_link`, `prototype_screenshot`, `prototype_screenshot_gallery`, and `workspace_destroy`.
+DEV-010 exposes: `get_capabilities`, `get_profile`, `workspace_create`, `workspace_upload_zip`, `workspace_upload_zip_from_url`, `project_verify`, `project_build`, `artifact_get`, `artifact_download_link`, `prototype_start`, `prototype_stop`, `prototype_preview_link`, `prototype_screenshot`, `prototype_screenshot_gallery`, and `workspace_destroy`.
 
 ### ZIP transport across MCP hosts
 
@@ -215,7 +225,7 @@ The provider-neutral workspace layer remains unchanged: every transport is norma
 
 ### Screenshot return transport
 
-`prototype_screenshot` returns the PNG as a normal inline MCP image block for compatible clients. It deliberately does **not** advertise the screenshot as a `resource_link` in the tool result, because hosts such as ChatGPT may treat returned file resources as materializable attachments and ask the user for an extra approval. The screenshot still has a protected `resourceUri` in structured metadata and remains available through `resources/read` for clients that explicitly need it while the workspace is alive. Screenshot resources remain protected by the same MCP OAuth/user isolation as the workspace and disappear when the sandbox is destroyed.
+`prototype_screenshot` copies the PNG into Agent Workspace temporary storage and returns it as a normal inline MCP image block for compatible clients. It deliberately does **not** advertise the screenshot as a `resource_link` in the tool result, because hosts such as ChatGPT may treat returned file resources as materializable attachments and ask the user for an extra approval. The screenshot still has a protected `resourceUri` in structured metadata and remains available through `resources/read` for clients that explicitly need it while the logical workspace is alive. Screenshot resources remain protected by the same MCP OAuth/user isolation and no longer depend on the Modal Sandbox remaining alive.
 
 For ChatGPT and other MCP Apps-compatible hosts, `prototype_screenshot` is capture-only: it returns screenshot metadata plus the resource/image content needed by the model and non-UI clients, but it deliberately has no UI template. This prevents each individual capture from creating its own visible widget.
 
@@ -225,7 +235,7 @@ All visible screenshot presentation goes through `prototype_screenshot_gallery`.
 
 Workspaces now expose the prototype port (4173) through a Modal encrypted HTTPS tunnel. `prototype_start` still starts and verifies the prototype inside the sandbox; `prototype_preview_link` is a separate opt-in tool that returns the clickable tunnel URL only when the user asks to try or interact with the prototype.
 
-The workspace default and maximum lifetime are both 20 minutes. The preview URL is valid only while that sandbox is alive and returns the workspace `expiresAt` timestamp. The tunnel is temporary but public to anyone who has the URL, so the tool result explicitly labels access as `temporary-public`. No Modal credentials, Agent Workspace OAuth tokens or application secrets are embedded in the link.
+The logical workspace default and maximum lifetime are 60 minutes. The interactive preview Sandbox is independently capped at 20 minutes. The preview URL is valid only while that Sandbox is alive and returns the prototype execution `expiresAt` timestamp. The tunnel is temporary but public to anyone who has the URL, so the tool result explicitly labels access as `temporary-public`. No Modal credentials, Agent Workspace OAuth tokens or application secrets are embedded in the link.
 
 Vite prototypes bind to `0.0.0.0` when a tunnel is available and receive the exact Modal tunnel hostname through `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS`; localhost readiness checks remain unchanged.
 

@@ -4,8 +4,10 @@ import { describe, it } from "node:test";
 import { AuthenticatedAgentWorkspaceToolService } from "../src/auth/authenticated-tool-service.js";
 import type { SandboxProvider, CreateWorkspaceOptions, Command, ExecutionResult, WorkspaceHandle } from "../src/core/sandbox-provider.js";
 import type { ExecutionProviderFactory } from "../src/execution/execution-provider-factory.js";
+import { InMemoryObjectStore } from "../src/storage/in-memory-object-store.js";
 import { IdentityService } from "../src/persistence/identity-service.js";
 import {
+  InMemoryArtifactRepository,
   InMemoryExecutionAccountRepository,
   InMemoryExternalIdentityRepository,
   InMemoryUserRepository,
@@ -36,12 +38,14 @@ function setup() {
   const identities = new InMemoryExternalIdentityRepository();
   const accounts = new InMemoryExecutionAccountRepository();
   const workspaces = new InMemoryWorkspaceRepository();
+  const artifacts = new InMemoryArtifactRepository();
+  const objectStore = new InMemoryObjectStore();
   let userNo = 0;
   const identityService = new IdentityService(users, identities, accounts, {
     idFactory: (kind) => kind === "user" ? `usr-${++userNo}` : `idn-${userNo}`
   });
   const provider = new FakeProvider();
-  const deps = { identityService, users, executionAccounts: accounts, workspaces, providerFactory: new FakeFactory(provider) };
+  const deps = { identityService, users, executionAccounts: accounts, workspaces, artifacts, objectStore, providerFactory: new FakeFactory(provider) };
   return { deps, accounts, workspaces };
 }
 
