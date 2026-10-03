@@ -192,7 +192,7 @@ async function handleArtifactDownload(request: Request): Promise<Response | unde
       headers: {
         "content-type": artifact.mediaType,
         "content-length": String(bytes.byteLength),
-        "content-disposition": `attachment; filename="${artifact.filename.replaceAll('"', '')}"`,
+        "content-disposition": `attachment; filename="${artifact.filename.replace(/[\r\n"]/g, "")}"`,
         "cache-control": "private, no-store"
       }
     });
