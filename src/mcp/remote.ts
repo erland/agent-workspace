@@ -109,11 +109,16 @@ const settingsHandler = authServer && mutableCredentialStore
     })
   : undefined;
 
-const cleanupJob = new ExpiredWorkspaceCleanupJob(workspaces, executionAccounts, providerFactory);
+const cleanupJob = new ExpiredWorkspaceCleanupJob(workspaces, executionAccounts, providerFactory, () => new Date(), objectStore);
 const cleanupTimer = setInterval(() => {
-  void cleanupJob.run().then(({ processed, failed }) => {
-    if (processed > 0) console.error(JSON.stringify({ type: "cleanup", processed, failed }));
-  }).catch((error) => console.error("Workspace cleanup failed", error));
+  void Promise.all([
+    cleanupJob.run(),
+    cleanupExpiredArtifacts()
+  ]).then(([{ processed, failed }, artifactProcessed]) => {
+    if (processed > 0 || artifactProcessed > 0) {
+      console.error(JSON.stringify({ type: "cleanup", processed, failed, artifactProcessed }));
+    }
+  }).catch((error) => console.error("Workspace/artifact cleanup failed", error));
 }, 60_000);
 cleanupTimer.unref();
 
@@ -154,6 +159,17 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
     }
     res.end(error instanceof RequestBodyTooLargeError ? "Payload Too Large" : "Internal Server Error");
   }
+}
+
+async function cleanupExpiredArtifacts(limit = 100): Promise<number> {
+  const expired = await artifacts.listExpired(new Date().toISOString(), limit);
+  let processed = 0;
+  for (const artifact of expired) {
+    await objectStore.delete(artifact.storageKey).catch(() => undefined);
+    await artifacts.deleteById(artifact.id);
+    processed += 1;
+  }
+  return processed;
 }
 
 async function handleArtifactDownload(request: Request): Promise<Response | undefined> {
