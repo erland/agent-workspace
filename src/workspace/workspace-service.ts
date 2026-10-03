@@ -298,7 +298,8 @@ export class WorkspaceService {
     return this.withEphemeralProject(workspace, async (handle) => {
       const result = await new ProjectBuildService(
         this.provider,
-        resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots)
+        resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots),
+        this.securityPolicy.maxArtifactBytes
       ).build(handle, projectType, outputs);
       const artifacts: ArtifactRecord[] = [];
       for (const output of result.outputs) {
