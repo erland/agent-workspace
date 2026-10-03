@@ -27,6 +27,9 @@ export interface AgentWorkspaceTools {
   uploadZip(input: WorkspaceUploadZipToolInput): Promise<ToolResult<unknown>>;
   uploadZipFromUrl(input: { workspaceId: string; url: string; filename?: string }): Promise<ToolResult<unknown>>;
   verifyProject(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
+  buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string; kind?: string }> }): Promise<ToolResult<unknown>>;
+  getArtifact(input: { artifactId: string }): Promise<ToolResult<unknown>>;
+  readArtifact(input: { artifactId: string }): Promise<{ artifact: any; bytes: Uint8Array }>;
   startPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
   previewPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
   screenshotPrototype(input: { workspaceId: string; viewport?: ScreenshotViewport }): Promise<ToolResult<unknown>>;
@@ -78,6 +81,20 @@ export class AgentWorkspaceToolService implements AgentWorkspaceTools {
   public async verifyProject(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
     try { return { ok: true, result: await this.workspaces.verifyProject(input.workspaceId) }; }
     catch (error) { return this.failure(error); }
+  }
+
+  public async buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string; kind?: string }> }): Promise<ToolResult<unknown>> {
+    try { return { ok: true, result: await this.workspaces.buildProject(input.workspaceId, input.outputs ?? []) }; }
+    catch (error) { return this.failure(error); }
+  }
+
+  public async getArtifact(input: { artifactId: string }): Promise<ToolResult<unknown>> {
+    try { return { ok: true, result: await this.workspaces.getArtifact(input.artifactId) }; }
+    catch (error) { return this.failure(error); }
+  }
+
+  public async readArtifact(input: { artifactId: string }): Promise<{ artifact: any; bytes: Uint8Array }> {
+    return this.workspaces.readArtifact(input.artifactId);
   }
 
   public async startPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
