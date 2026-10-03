@@ -17,6 +17,7 @@ import type { AuditEventSink } from "../audit/audit-events.js";
 import { isModalAuthenticationError } from "../providers/modal/modal-auth-error.js";
 import type { PersistedExecutionAccount } from "../persistence/models.js";
 import type { ObjectStore } from "../storage/object-store.js";
+import type { ArtifactDownloadSigner } from "../artifact/artifact-download.js";
 
 export interface AuthenticatedToolServiceDependencies {
   identityService: IdentityService;
@@ -25,6 +26,7 @@ export interface AuthenticatedToolServiceDependencies {
   workspaces: WorkspaceRepository;
   artifacts: ArtifactRepository;
   objectStore: ObjectStore;
+  artifactDownloadSigner?: ArtifactDownloadSigner;
   providerFactory: ExecutionProviderFactory;
   rateLimiter?: UserRateLimiter;
   audit?: AuditEventSink;
@@ -105,6 +107,25 @@ export class AuthenticatedAgentWorkspaceToolService {
     );
     if (!result.ok) throw new Error(result.error.message);
     return result.result;
+  }
+
+  async artifactDownloadLink(input: { artifactId: string }): Promise<ToolResult<unknown>> {
+    return this.withWorkspaceService(
+      "artifact_download_link",
+      undefined,
+      async (service) => {
+        const signer = this.deps.artifactDownloadSigner;
+        if (!signer) throw new Error("Artifact download links are not configured");
+        const artifact = await service.getArtifact(input.artifactId);
+        return {
+          artifactId: artifact.id,
+          filename: artifact.filename,
+          mediaType: artifact.mediaType,
+          sizeBytes: artifact.sizeBytes,
+          ...signer.create(artifact)
+        };
+      }
+    );
   }
 
   async startPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
