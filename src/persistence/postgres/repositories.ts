@@ -1,4 +1,5 @@
 import type {
+  ArtifactRepository,
   EncryptedCredentialRecord,
   EncryptedCredentialRepository,
   ExecutionAccountRepository,
@@ -7,6 +8,7 @@ import type {
   WorkspaceRepository
 } from "../repositories.js";
 import type {
+  ArtifactRecord,
   ExternalIdentityRecord,
   PersistedExecutionAccount,
   PersistedWorkspace,
@@ -331,5 +333,85 @@ function mapWorkspace(row: WorkspaceRow): PersistedWorkspace {
     ...(row.destroyed_at ? { destroyedAt: toIso(row.destroyed_at) } : {}),
     ...(project ? { project } : {}),
     ...(prototype ? { prototype } : {})
+  };
+}
+
+
+export class PostgresArtifactRepository implements ArtifactRepository {
+  constructor(private readonly db: SqlClient) {}
+
+  async upsert(artifact: ArtifactRecord): Promise<void> {
+    await this.db.query(
+      `insert into artifact
+         (id, user_id, workspace_id, name, kind, filename, media_type, size_bytes, sha256, storage_key, created_at, expires_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       on conflict (id) do update set
+         name = excluded.name,
+         kind = excluded.kind,
+         filename = excluded.filename,
+         media_type = excluded.media_type,
+         size_bytes = excluded.size_bytes,
+         sha256 = excluded.sha256,
+         storage_key = excluded.storage_key,
+         expires_at = excluded.expires_at`,
+      [artifact.id, artifact.userId, artifact.workspaceId, artifact.name, artifact.kind,
+       artifact.filename, artifact.mediaType, artifact.sizeBytes, artifact.sha256,
+       artifact.storageKey, artifact.createdAt, artifact.expiresAt]
+    );
+  }
+
+  async findByIdForUser(artifactId: string, userId: string): Promise<ArtifactRecord | undefined> {
+    const result = await this.db.query<ArtifactRow>(
+      `select id,user_id,workspace_id,name,kind,filename,media_type,size_bytes,sha256,storage_key,created_at,expires_at
+       from artifact where id = $1 and user_id = $2`,
+      [artifactId, userId]
+    );
+    const row = result.rows[0];
+    return row ? mapArtifact(row) : undefined;
+  }
+
+  async listByWorkspaceForUser(workspaceId: string, userId: string): Promise<ArtifactRecord[]> {
+    const result = await this.db.query<ArtifactRow>(
+      `select id,user_id,workspace_id,name,kind,filename,media_type,size_bytes,sha256,storage_key,created_at,expires_at
+       from artifact where workspace_id = $1 and user_id = $2 order by created_at asc`,
+      [workspaceId, userId]
+    );
+    return result.rows.map(mapArtifact);
+  }
+
+  async listExpired(nowIso: string, limit = 100): Promise<ArtifactRecord[]> {
+    const result = await this.db.query<ArtifactRow>(
+      `select id,user_id,workspace_id,name,kind,filename,media_type,size_bytes,sha256,storage_key,created_at,expires_at
+       from artifact where expires_at <= $1 order by expires_at asc limit $2`,
+      [nowIso, limit]
+    );
+    return result.rows.map(mapArtifact);
+  }
+
+  async deleteById(artifactId: string): Promise<void> {
+    await this.db.query(`delete from artifact where id = $1`, [artifactId]);
+  }
+}
+
+type ArtifactRow = {
+  id: string; user_id: string; workspace_id: string; name: string; kind: string;
+  filename: string; media_type: string; size_bytes: number | string; sha256: string;
+  storage_key: string; created_at: string | Date; expires_at: string | Date;
+};
+
+function mapArtifact(row: ArtifactRow): ArtifactRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    workspaceId: row.workspace_id,
+    name: row.name,
+    kind: row.kind,
+    filename: row.filename,
+    mediaType: row.media_type,
+    sizeBytes: Number(row.size_bytes),
+    sha256: row.sha256,
+    storageKey: row.storage_key,
+    createdAt: toIso(row.created_at),
+    expiresAt: toIso(row.expires_at)
   };
 }
