@@ -29,6 +29,7 @@ export interface AgentWorkspaceTools {
   verifyProject(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
   buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string; kind?: string }> }): Promise<ToolResult<unknown>>;
   getArtifact(input: { artifactId: string }): Promise<ToolResult<unknown>>;
+  artifactDownloadLink(input: { artifactId: string }): Promise<ToolResult<unknown>>;
   readArtifact(input: { artifactId: string }): Promise<{ artifact: any; bytes: Uint8Array }>;
   startPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
   previewPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
@@ -92,6 +93,10 @@ export class AgentWorkspaceToolService implements AgentWorkspaceTools {
   public async getArtifact(input: { artifactId: string }): Promise<ToolResult<unknown>> {
     try { return { ok: true, result: await this.workspaces.getArtifact(input.artifactId) }; }
     catch (error) { return this.failure(error); }
+  }
+
+  public async artifactDownloadLink(_input: { artifactId: string }): Promise<ToolResult<unknown>> {
+    return this.failure(new Error("Artifact download links are only available from the remote Agent Workspace service"));
   }
 
   public async readArtifact(input: { artifactId: string }): Promise<{ artifact: any; bytes: Uint8Array }> {
