@@ -16,12 +16,14 @@ export interface ArtifactServiceOptions {
   ttlMinutes?: number;
   now?: () => Date;
   idFactory?: () => string;
+  maxArtifactBytes?: number;
 }
 
 export class ArtifactService {
   private readonly ttlMinutes: number;
   private readonly now: () => Date;
   private readonly idFactory: () => string;
+  private readonly maxArtifactBytes: number;
 
   constructor(
     private readonly userId: string,
@@ -32,10 +34,14 @@ export class ArtifactService {
     this.ttlMinutes = options.ttlMinutes ?? 60;
     this.now = options.now ?? (() => new Date());
     this.idFactory = options.idFactory ?? (() => `art_${randomUUID()}`);
+    this.maxArtifactBytes = options.maxArtifactBytes ?? 100 * 1024 * 1024;
   }
 
   async publish(input: PublishArtifactInput): Promise<ArtifactRecord> {
     if (input.bytes.byteLength === 0) throw new Error("Artifact is empty");
+    if (input.bytes.byteLength > this.maxArtifactBytes) {
+      throw new Error(`Artifact exceeds maximum size of ${this.maxArtifactBytes} bytes`);
+    }
     const id = this.idFactory();
     const createdAt = this.now();
     const storageKey = `artifacts/${this.userId}/${id}/${safeFilename(input.filename)}`;
