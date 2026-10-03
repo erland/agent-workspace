@@ -8,7 +8,7 @@ export const WorkspaceIdInputSchema = z.object({ workspaceId: z.string().min(1) 
 export const WorkspaceCreateInputSchema = z.object({
   java: z.enum(["17", "21", "25"]).optional(),
   node: z.enum(["20", "22"]).optional(),
-  lifetimeMinutes: z.number().positive().max(20).optional()
+  lifetimeMinutes: z.number().positive().max(60).optional()
 }).strict();
 
 export const OpenAIFileParameterSchema = z.object({
@@ -105,4 +105,34 @@ export const PrototypePreviewOutputSchema = z.object({
     access: z.literal("temporary-public"),
     port: z.number().int().positive()
   }).strict()
+}).strict();
+
+
+export const ProjectBuildInputSchema = z.object({
+  workspaceId: z.string().min(1),
+  outputs: z.array(z.object({
+    path: z.string().min(1).max(512),
+    name: z.string().min(1).max(120).optional(),
+    kind: z.string().min(1).max(80).optional()
+  }).strict()).max(12).optional()
+}).strict();
+
+export const ArtifactIdInputSchema = z.object({
+  artifactId: z.string().min(1).max(128)
+}).strict();
+
+export const ArtifactOutputSchema = z.object({
+  result: z.object({
+    id: z.string(),
+    workspaceId: z.string(),
+    name: z.string(),
+    kind: z.string(),
+    filename: z.string(),
+    mediaType: z.string(),
+    sizeBytes: z.number().int().nonnegative(),
+    sha256: z.string(),
+    createdAt: z.string(),
+    expiresAt: z.string(),
+    resourceUri: z.string().optional()
+  }).passthrough()
 }).strict();
