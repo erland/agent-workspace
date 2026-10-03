@@ -107,7 +107,7 @@ npm ci
 npm run verify:dev002
 ```
 
-The live smoke creates a real Modal workspace, verifies Java 21 and Node 22, and destroys it.
+The live smoke creates a logical workspace, verifies that workspace creation does not allocate an execution sandbox, then creates a short-lived execution sandbox to verify Java 21 and Node 22.
 
 ## DEV-003 – ZIP upload and validation
 
