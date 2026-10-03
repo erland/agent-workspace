@@ -34,6 +34,7 @@ import { handleHealthRequest } from "../http/health.js";
 import { createSettingsHandler } from "../http/settings.js";
 import { SandboxModalCredentialVerifier } from "../providers/modal/modal-credential-verifier.js";
 import { LocalVolumeObjectStore } from "../storage/local-volume-object-store.js";
+import { ArtifactDownloadSigner } from "../artifact/artifact-download.js";
 
 const config = loadRemoteOAuthConfig();
 const SERVICE_VERSION = process.env.npm_package_version ?? process.env.AGENT_WORKSPACE_VERSION ?? "unknown";
@@ -46,6 +47,9 @@ const executionAccounts = new PostgresExecutionAccountRepository(db);
 const workspaces = new PostgresWorkspaceRepository(db);
 const artifacts = new PostgresArtifactRepository(db);
 const objectStore = new LocalVolumeObjectStore();
+const artifactDownloadSigner = process.env.AGENT_WORKSPACE_ARTIFACT_SIGNING_KEY
+  ? new ArtifactDownloadSigner(process.env.AGENT_WORKSPACE_ARTIFACT_SIGNING_KEY, config.publicBaseUrl)
+  : undefined;
 const encryptedCredentialRecords = new PostgresEncryptedCredentialRepository(db);
 const identityService = new IdentityService(users, identities, executionAccounts);
 const oauthStore = new PostgresOAuthStore(db);
@@ -84,6 +88,7 @@ const remote = createRemoteMcpHandler(config, tokenVerifier, {
   workspaces,
   artifacts,
   objectStore,
+  artifactDownloadSigner,
   providerFactory,
   rateLimiter: new InMemoryFixedWindowRateLimiter({ limitPerMinute: DEFAULT_SECURITY_POLICY.requestRateLimitPerMinute }),
   audit: new JsonLineAuditEventSink()
@@ -128,11 +133,12 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
         : (new URL(request.url).pathname.startsWith("/settings")
             ? new Response("Settings login is not configured", { status: 503 })
             : undefined);
-    const health = authResponse || settings ? undefined : await handleHealthRequest(request, {
+    const artifactDownload = authResponse || settings ? undefined : await handleArtifactDownload(request);
+    const health = authResponse || settings || artifactDownload ? undefined : await handleHealthRequest(request, {
       version: SERVICE_VERSION,
       checkDatabase: async () => { await pool.query("select 1"); }
     });
-    const response = authResponse ?? settings ?? health ?? await remote.fetch(request);
+    const response = authResponse ?? settings ?? artifactDownload ?? health ?? await remote.fetch(request);
     res.statusCode = response.status;
     const setCookies = (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.() ?? [];
     response.headers.forEach((value, key) => {
@@ -147,6 +153,35 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
       res.statusCode = error instanceof RequestBodyTooLargeError ? 413 : 500;
     }
     res.end(error instanceof RequestBodyTooLargeError ? "Payload Too Large" : "Internal Server Error");
+  }
+}
+
+async function handleArtifactDownload(request: Request): Promise<Response | undefined> {
+  const url = new URL(request.url);
+  const prefix = "/artifacts/download/";
+  if (!url.pathname.startsWith(prefix)) return undefined;
+  if (request.method !== "GET") return new Response("Method Not Allowed", { status: 405 });
+  if (!artifactDownloadSigner) return new Response("Artifact downloads are not configured", { status: 503 });
+
+  try {
+    const token = decodeURIComponent(url.pathname.slice(prefix.length));
+    const payload = artifactDownloadSigner.verify(token);
+    const artifact = await artifacts.findByIdForUser(payload.artifactId, payload.userId);
+    if (!artifact || Date.parse(artifact.expiresAt) <= Date.now()) {
+      return new Response("Artifact not found", { status: 404 });
+    }
+    const bytes = await objectStore.get(artifact.storageKey);
+    return new Response(bytes, {
+      status: 200,
+      headers: {
+        "content-type": artifact.mediaType,
+        "content-length": String(bytes.byteLength),
+        "content-disposition": `attachment; filename="${artifact.filename.replaceAll('"', '')}"`,
+        "cache-control": "private, no-store"
+      }
+    });
+  } catch {
+    return new Response("Invalid or expired artifact download link", { status: 403 });
   }
 }
 
