@@ -17,8 +17,13 @@ function tools(): AgentWorkspaceTools {
     async uploadZip() { return { ok: true, result: {} }; },
     async uploadZipFromUrl() { return { ok: true, result: {} }; },
     async verifyProject() { return { ok: true, result: {} }; },
+    async buildProject() { return { ok: true, result: { status: "PASSED", projectType: "NPM", artifacts: [] } }; },
+    async getArtifact() { return { ok: true, result: { id: "art_1", workspaceId: "ws_1", name: "app", kind: "zip", filename: "app.zip", mediaType: "application/zip", sizeBytes: 3, sha256: "abc", createdAt: "2026-01-01T00:00:00Z", expiresAt: "2026-01-01T01:00:00Z" } }; },
+    async artifactDownloadLink() { return { ok: true, result: { artifactId: "art_1", url: "https://example.test/a", expiresAt: "2026-01-01T00:10:00Z" } }; },
+    async readArtifact() { return { artifact: { id: "art_1", mediaType: "application/zip" }, bytes: new Uint8Array([1,2,3]) }; },
     async startPrototype() { return { ok: true, result: {} }; },
     async previewPrototype() { return { ok: true, result: { status: "AVAILABLE", url: "https://preview-example.modal.run", expiresAt: "2026-09-29T12:20:00.000Z", access: "temporary-public", port: 4173 } }; },
+    async stopPrototype() { return { ok: true, result: {} }; },
     async screenshotPrototype() {
       return {
         ok: true,
