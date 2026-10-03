@@ -18,6 +18,7 @@ import { DefaultExecutionProviderFactory } from "../execution/execution-provider
 import { IdentityService } from "../persistence/identity-service.js";
 import { createPostgresPool, PgSqlClient } from "../persistence/postgres/pool.js";
 import {
+  PostgresArtifactRepository,
   PostgresEncryptedCredentialRepository,
   PostgresExecutionAccountRepository,
   PostgresExternalIdentityRepository,
@@ -32,6 +33,7 @@ import { ExpiredWorkspaceCleanupJob } from "../workspace/expired-workspace-clean
 import { handleHealthRequest } from "../http/health.js";
 import { createSettingsHandler } from "../http/settings.js";
 import { SandboxModalCredentialVerifier } from "../providers/modal/modal-credential-verifier.js";
+import { LocalVolumeObjectStore } from "../storage/local-volume-object-store.js";
 
 const config = loadRemoteOAuthConfig();
 const SERVICE_VERSION = process.env.npm_package_version ?? process.env.AGENT_WORKSPACE_VERSION ?? "unknown";
@@ -42,6 +44,8 @@ const users = new PostgresUserRepository(db);
 const identities = new PostgresExternalIdentityRepository(db);
 const executionAccounts = new PostgresExecutionAccountRepository(db);
 const workspaces = new PostgresWorkspaceRepository(db);
+const artifacts = new PostgresArtifactRepository(db);
+const objectStore = new LocalVolumeObjectStore();
 const encryptedCredentialRecords = new PostgresEncryptedCredentialRepository(db);
 const identityService = new IdentityService(users, identities, executionAccounts);
 const oauthStore = new PostgresOAuthStore(db);
@@ -78,6 +82,8 @@ const remote = createRemoteMcpHandler(config, tokenVerifier, {
   users,
   executionAccounts,
   workspaces,
+  artifacts,
+  objectStore,
   providerFactory,
   rateLimiter: new InMemoryFixedWindowRateLimiter({ limitPerMinute: DEFAULT_SECURITY_POLICY.requestRateLimitPerMinute }),
   audit: new JsonLineAuditEventSink()
