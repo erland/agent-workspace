@@ -9,6 +9,7 @@ export interface SecurityPolicy {
   requestRateLimitPerMinute: number;
   oauthRegistrationRateLimitPerMinute: number;
   maxScreenshotBytes: number;
+  maxArtifactBytes: number;
   networkPolicy: NetworkPolicy;
 }
 
@@ -35,6 +36,7 @@ export const DEFAULT_SECURITY_POLICY: SecurityPolicy = {
   requestRateLimitPerMinute: 60,
   oauthRegistrationRateLimitPerMinute: 20,
   maxScreenshotBytes: 10 * 1024 * 1024,
+  maxArtifactBytes: 100 * 1024 * 1024,
   networkPolicy: {
     outboundDomainAllowlist: [...DEFAULT_DEPENDENCY_DOMAINS],
     outboundCidrAllowlist: []
