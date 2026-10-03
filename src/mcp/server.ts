@@ -3,8 +3,11 @@ import * as z from "zod/v4";
 
 import type { AgentWorkspaceTools, ToolResult } from "./tool-service.js";
 import {
+  ArtifactIdInputSchema,
+  ArtifactOutputSchema,
   EmptyInputSchema,
   JsonObjectOutputSchema,
+  ProjectBuildInputSchema,
   PrototypePreviewOutputSchema,
   PrototypeScreenshotGalleryInputSchema,
   PrototypeScreenshotInputSchema,
@@ -16,6 +19,7 @@ import {
   WorkspaceUploadZipInputSchema
 } from "./schemas.js";
 import { SCREENSHOT_RESOURCE_TEMPLATE, screenshotResourceUri, singleTemplateValue } from "./screenshot-resource.js";
+import { ARTIFACT_RESOURCE_TEMPLATE, artifactResourceUri, singleArtifactTemplateValue } from "./artifact-resource.js";
 import { SCREENSHOT_GALLERY_HTML, SCREENSHOT_GALLERY_MIME_TYPE, SCREENSHOT_GALLERY_URI } from "./screenshot-gallery.js";
 
 export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpServer {
@@ -43,6 +47,28 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
         }
       }]
     })
+  );
+
+  server.registerResource(
+    "build-artifact",
+    new ResourceTemplate(ARTIFACT_RESOURCE_TEMPLATE, { list: undefined }),
+    {
+      title: "Build artifact",
+      description: "Build artifact published by Agent Workspace.",
+      mimeType: "application/octet-stream"
+    },
+    async (uri, variables) => {
+      const artifactId = singleArtifactTemplateValue(variables.artifactId);
+      if (!artifactId) throw new Error("Invalid artifact resource URI");
+      const { artifact, bytes } = await tools.readArtifact({ artifactId });
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: artifact.mediaType,
+          blob: Buffer.from(bytes).toString("base64")
+        }]
+      };
+    }
   );
 
   server.registerResource(
@@ -97,7 +123,73 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
     async (input: z.infer<typeof WorkspaceUploadZipFromUrlInputSchema>) => tools.uploadZipFromUrl(input)
   );
 
-  registerJsonTool(server, "project_verify", "Build and test the uploaded npm or Maven project.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.verifyProject(input));
+  registerJsonTool(server, "project_verify", "Compile/test the uploaded npm or Maven project in a short-lived execution sandbox. No build artifact is retained.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.verifyProject(input));
+
+  server.registerTool(
+    "project_build",
+    {
+      description: "Build the uploaded project in a short-lived execution sandbox and publish one or more temporary build artifacts. If outputs are omitted, Agent Workspace detects conventional npm or Maven outputs.",
+      inputSchema: ProjectBuildInputSchema,
+      outputSchema: JsonObjectOutputSchema
+    },
+    async (input: z.infer<typeof ProjectBuildInputSchema>) => {
+      const response = await tools.buildProject(input);
+      if (!response.ok) return errorResult(response);
+      const result = response.result as any;
+      const structured = {
+        result: {
+          ...result,
+          artifacts: (result.artifacts ?? []).map((artifact: any) => ({
+            ...artifact,
+            resourceUri: artifactResourceUri(artifact.id)
+          }))
+        }
+      };
+      return {
+        structuredContent: structured,
+        content: [
+          { type: "text" as const, text: JSON.stringify(structured) },
+          ...(structured.result.artifacts ?? []).map((artifact: any) => ({
+            type: "resource_link" as const,
+            uri: artifact.resourceUri,
+            name: artifact.filename,
+            title: artifact.name,
+            mimeType: artifact.mediaType,
+            size: artifact.sizeBytes
+          }))
+        ]
+      };
+    }
+  );
+
+  server.registerTool(
+    "artifact_get",
+    {
+      description: "Return metadata and an MCP resource link for a previously published temporary build artifact.",
+      inputSchema: ArtifactIdInputSchema,
+      outputSchema: ArtifactOutputSchema
+    },
+    async (input: z.infer<typeof ArtifactIdInputSchema>) => {
+      const response = await tools.getArtifact(input);
+      if (!response.ok) return errorResult(response);
+      const artifact = response.result as any;
+      const structured = { result: { ...artifact, resourceUri: artifactResourceUri(artifact.id) } };
+      return {
+        structuredContent: structured,
+        content: [
+          { type: "text" as const, text: JSON.stringify(structured) },
+          {
+            type: "resource_link" as const,
+            uri: structured.result.resourceUri,
+            name: artifact.filename,
+            title: artifact.name,
+            mimeType: artifact.mediaType,
+            size: artifact.sizeBytes
+          }
+        ]
+      };
+    }
+  );
   registerJsonTool(server, "prototype_start", "Install dependencies and start an uploaded npm web prototype.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.startPrototype(input));
 
   server.registerTool(
@@ -218,6 +310,8 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
       };
     }
   );
+
+  registerJsonTool(server, "prototype_stop", "Stop the interactive prototype sandbox immediately while keeping the logical workspace and stored source/artifacts.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.stopPrototype(input));
 
   registerJsonTool(server, "workspace_destroy", "Terminate a workspace and release its sandbox resources.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.destroyWorkspace(input));
   return server;
