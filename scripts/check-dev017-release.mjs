@@ -18,7 +18,9 @@ const requiredFiles = [
   "runtime-images/version.txt",
   ".github/workflows/runtime-images.yml",
   ".github/workflows/security-scan.yml",
-  ".github/workflows/release-image.yml"
+  ".github/workflows/release-image.yml",
+  "security/trivy-runtime-ignore.yaml",
+  "scripts/check-runtime-trivy-exceptions.mjs"
 ];
 
 for (const path of requiredFiles) {
@@ -95,6 +97,12 @@ for (const required of [
 
 if (securityWorkflow.includes("ignore-unfixed: true")) {
   throw new Error("Security scan workflow must not globally ignore unfixed vulnerabilities");
+}
+if (!securityWorkflow.includes("trivyignores: security/trivy-runtime-ignore.yaml")) {
+  throw new Error("Runtime image scans must use the reviewed runtime Trivy exception file");
+}
+if (!securityWorkflow.includes("node scripts/check-runtime-trivy-exceptions.mjs")) {
+  throw new Error("Runtime Trivy exceptions must be validated before scanning");
 }
 
 

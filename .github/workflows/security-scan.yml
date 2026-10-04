@@ -79,6 +79,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate runtime vulnerability exceptions
+        run: node scripts/check-runtime-trivy-exceptions.mjs
+
       - name: Build default runtime image
         run: |
           docker build             --build-arg JAVA_VERSION=21             --build-arg NODE_MAJOR=22             -t agent-workspace-runtime-security-scan:java21-node22             runtime-images
@@ -90,6 +93,7 @@ jobs:
           scanners: vuln,secret
           severity: HIGH,CRITICAL
           exit-code: "1"
+          trivyignores: security/trivy-runtime-ignore.yaml
 
   runtime-matrix:
     name: Runtime image scan java${{ matrix.java }}-node${{ matrix.node }}
@@ -104,6 +108,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate runtime vulnerability exceptions
+        run: node scripts/check-runtime-trivy-exceptions.mjs
+
       - name: Build runtime image
         run: |
           docker build             --build-arg JAVA_VERSION=${{ matrix.java }}             --build-arg NODE_MAJOR=${{ matrix.node }}             -t agent-workspace-runtime-security-scan:java${{ matrix.java }}-node${{ matrix.node }}             runtime-images
@@ -115,3 +122,4 @@ jobs:
           scanners: vuln,secret
           severity: HIGH,CRITICAL
           exit-code: "1"
+          trivyignores: security/trivy-runtime-ignore.yaml
