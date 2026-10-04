@@ -1,0 +1,13 @@
+vulnerabilities:
+  - id: CVE-2026-93748
+    purls:
+      - "pkg:npm/http-cache-semantics@4.2.0"
+    expired_at: 2026-11-04
+    statement: >-
+      Temporary risk acceptance for Agent Workspace runtime images only.
+      The vulnerable package is inherited by runtime tooling and has no upstream
+      fixed version as of 2026-10-04. The reported issue requires shared HTTP
+      cache behavior across trust boundaries; Agent Workspace executes user work
+      in isolated, short-lived sandboxes and does not provide a shared HTTP cache.
+      Owner: repository maintainer. Remove this exception as soon as an upstream
+      fixed version is available, or review no later than the expiry date.
