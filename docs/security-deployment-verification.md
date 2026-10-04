@@ -82,7 +82,9 @@ The repository security workflow performs:
 - Trivy default runtime-image scan on normal CI events,
 - full six-profile runtime-image matrix scan weekly and on manual dispatch.
 
-High/critical findings fail the security workflow whether or not an upstream fix is currently available. The workflow must not use Trivy's global `ignore-unfixed` behavior. If a temporary exception is ever required, it must be narrowly scoped to explicit vulnerability IDs with rationale/owner and an expiry/review date. The current baseline has no Trivy vulnerability exception file.
+High/critical findings fail the security workflow whether or not an upstream fix is currently available. The workflow must not use Trivy's global `ignore-unfixed` behavior. Temporary exceptions must be narrowly scoped to explicit vulnerability IDs with rationale/owner and an expiry/review date.
+
+The current baseline contains exactly one such exception: `CVE-2026-93748` for `pkg:npm/http-cache-semantics@4.2.0`, used only by runtime-image scans. It expires on 2026-11-04. `scripts/check-runtime-trivy-exceptions.mjs` verifies that the exception file contains only that reviewed CVE/package scope, records an owner, and has not expired. The application image and repository scans do not use the runtime ignore file.
 
 ## Completion criteria
 
