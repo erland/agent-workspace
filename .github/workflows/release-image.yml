@@ -1,4 +1,4 @@
-name: Release Application Image
+name: Release Application Image and Plugin
 
 on:
   release:
@@ -59,3 +59,46 @@ jobs:
           echo '`${{ steps.image.outputs.name }}:${{ github.event.release.tag_name }}`' >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Use this exact tag in Coolify for a reproducible deployment." >> "$GITHUB_STEP_SUMMARY"
+
+  publish-plugin:
+    name: Build and publish OpenAI plugin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      AGENT_WORKSPACE_MCP_URL: ${{ vars.AGENT_WORKSPACE_MCP_URL || 'https://agent-workspace.apphome.one/mcp' }}
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build portable OpenAI plugin
+        id: plugin
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          npm run plugin:build -- --version "$VERSION"
+          cd build/plugin
+          zip -qr "../agent-workspace-plugin-${VERSION}.zip" agent-workspace
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "archive=build/agent-workspace-plugin-${VERSION}.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Inspect plugin archive
+        run: |
+          unzip -l "${{ steps.plugin.outputs.archive }}"
+          unzip -p "${{ steps.plugin.outputs.archive }}" agent-workspace/plugin.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>JSON.parse(s))"
+          unzip -p "${{ steps.plugin.outputs.archive }}" agent-workspace/mcp.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>JSON.parse(s))"
+
+      - name: Attach plugin ZIP to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" "${{ steps.plugin.outputs.archive }}" --clobber

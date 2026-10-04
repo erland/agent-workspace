@@ -1,0 +1,25 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "agent-workspace",
+  "version": "__PLUGIN_VERSION__",
+  "description": "Create isolated development workspaces, verify and build projects, run web prototypes, and inspect results through a remote MCP service.",
+  "author": {
+    "name": "Erland Lindmark"
+  },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Agent Workspace",
+        "shortDescription": "Build and test projects",
+        "longDescription": "Create isolated workspaces for uploaded projects, verify and build npm or Maven applications, run temporary web prototypes, capture screenshots, and hand off build artifacts to other services.",
+        "developerName": "Erland Lindmark",
+        "category": "Developer Tools",
+        "defaultPrompt": [
+          "Verify and build this project in an isolated workspace.",
+          "Run this web prototype and show me a screenshot.",
+          "Build this project and give me a downloadable artifact."
+        ]
+      }
+    }
+  }
+}

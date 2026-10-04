@@ -55,3 +55,24 @@ jobs:
 
       - name: Release-readiness checks
         run: npm run check:release
+
+
+  plugin-package:
+    runs-on: ubuntu-latest
+    env:
+      AGENT_WORKSPACE_MCP_URL: https://agent-workspace.example.test/mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build portable OpenAI plugin
+        run: npm run plugin:build -- --version 0.0.0-ci
+      - name: Validate generated package
+        run: |
+          test -f build/plugin/agent-workspace/plugin.json
+          test -f build/plugin/agent-workspace/mcp.json
+          test -f build/plugin/agent-workspace/skills/agent-workspace/SKILL.md
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('build/plugin/agent-workspace/plugin.json')); if(p.name!=='agent-workspace'||p.version!=='0.0.0-ci') process.exit(1)"
+          node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('build/plugin/agent-workspace/mcp.json')); if(m.mcpServers['agent-workspace'].url!=='https://agent-workspace.example.test/mcp') process.exit(1)"

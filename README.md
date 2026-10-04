@@ -215,6 +215,14 @@ npm run mcp:stdio
 
 DEV-010 exposes: `get_capabilities`, `get_profile`, `workspace_create`, `workspace_upload_zip`, `workspace_upload_zip_from_url`, `project_verify`, `project_build`, `artifact_get`, `artifact_download_link`, `prototype_start`, `prototype_stop`, `prototype_preview_link`, `prototype_screenshot`, `prototype_screenshot_gallery`, and `workspace_destroy`.
 
+
+### OpenAI plugin package
+
+GitHub Releases also publish a portable OpenAI/Agent Plugins package named `agent-workspace-plugin-<version>.zip`. It declares the production Streamable HTTP MCP endpoint and includes workflow guidance for upload, verification, builds, prototypes, screenshots, cleanup, and optional handoff of static build artifacts to PWA Preview.
+
+The package is generated from templates in `plugin/`. The public MCP URL is configurable with the GitHub Actions variable `AGENT_WORKSPACE_MCP_URL` and defaults to `https://agent-workspace.apphome.one/mcp`. See [`docs/openai-plugin-distribution.md`](docs/openai-plugin-distribution.md) for the package format, build command, release behavior, and configuration.
+
+
 ### ZIP transport across MCP hosts
 
 `workspace_upload_zip` keeps the existing Base64 input as a portable fallback and also declares the optional top-level `archive` input through `_meta["openai/fileParams"]`. ChatGPT can therefore pass an attached file as a temporary download reference without embedding the ZIP bytes in the MCP JSON request.
@@ -374,3 +382,8 @@ AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION=2
 ```
 
 When the runtime recipe changes, increment `runtime-images/version.txt` and update the application runtime image version in the same change. The runtime-image workflow refuses to publish a tag that already exists in GHCR, so an existing `vN` cannot be repurposed accidentally; publish a new version instead.
+
+
+## Plugin distribution
+
+See [`docs/openai-plugin-distribution.md`](docs/openai-plugin-distribution.md) for the portable ChatGPT/Codex plugin package and release build.
