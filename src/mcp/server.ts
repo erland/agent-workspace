@@ -107,6 +107,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
   server.registerTool(
     "workspace_upload_zip",
     {
+      annotations: toolAnnotations("workspace_upload_zip"),
       description: "Upload a ZIP project into a workspace. ChatGPT may provide archive as a native file parameter; archiveBase64 remains available as a portable fallback.",
       inputSchema: WorkspaceUploadZipInputSchema,
       outputSchema: JsonObjectOutputSchema,
@@ -128,6 +129,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
   server.registerTool(
     "project_build",
     {
+      annotations: toolAnnotations("project_build"),
       description: "Build the uploaded project in a short-lived execution sandbox and publish one or more temporary build artifacts. If outputs are omitted, Agent Workspace detects conventional npm or Maven outputs.",
       inputSchema: ProjectBuildInputSchema,
       outputSchema: JsonObjectOutputSchema
@@ -165,6 +167,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
   server.registerTool(
     "artifact_get",
     {
+      annotations: toolAnnotations("artifact_get"),
       description: "Return metadata and an MCP resource link for a previously published temporary build artifact.",
       inputSchema: ArtifactIdInputSchema,
       outputSchema: ArtifactOutputSchema
@@ -203,6 +206,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
   server.registerTool(
     "prototype_preview_link",
     {
+      annotations: toolAnnotations("prototype_preview_link"),
       description: "Return the temporary public HTTPS link for a running prototype. Use only when the user asks to open, try, click through, or interact with the prototype themselves. The link expires when the 20-minute workspace sandbox expires.",
       inputSchema: WorkspaceIdInputSchema,
       outputSchema: PrototypePreviewOutputSchema
@@ -225,6 +229,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
   server.registerTool(
     "prototype_screenshot",
     {
+      annotations: toolAnnotations("prototype_screenshot"),
       description: "Capture exactly one PNG screenshot of a running prototype. Use desktop/tablet/mobile for generic views, device + orientation for named mobile/tablet profiles, or explicit width/height. Do not create additional orientations or device variants unless the user explicitly requested them.",
       inputSchema: PrototypeScreenshotInputSchema,
       outputSchema: ScreenshotOutputSchema
@@ -268,6 +273,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
   server.registerTool(
     "prototype_screenshot_gallery",
     {
+      annotations: toolAnnotations("prototype_screenshot_gallery"),
       description: "Render one or more already captured prototype screenshots in the single visible screenshot UI. Always use this after prototype_screenshot when the user wants to see captured screenshots; use labels to distinguish desktop, tablet, mobile, or iterations.",
       inputSchema: PrototypeScreenshotGalleryInputSchema,
       outputSchema: ScreenshotGalleryOutputSchema,
@@ -325,6 +331,33 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
   return server;
 }
 
+
+function toolAnnotations(name: string) {
+  const readOnly = new Set([
+    "get_capabilities",
+    "get_profile",
+    "artifact_get",
+    "prototype_preview_link",
+    "prototype_screenshot_gallery"
+  ]);
+  const destructive = new Set(["prototype_stop", "workspace_destroy"]);
+  const openWorld = new Set([
+    "workspace_create",
+    "workspace_upload_zip_from_url",
+    "project_verify",
+    "project_build",
+    "prototype_start",
+    "prototype_screenshot",
+    "prototype_stop",
+    "workspace_destroy"
+  ]);
+  return {
+    readOnlyHint: readOnly.has(name),
+    openWorldHint: openWorld.has(name),
+    destructiveHint: destructive.has(name)
+  };
+}
+
 function registerJsonTool<TInput>(
   server: McpServer,
   name: string,
@@ -332,7 +365,7 @@ function registerJsonTool<TInput>(
   inputSchema: any,
   handler: (input: TInput) => Promise<ToolResult<unknown>>
 ): void {
-  server.registerTool(name, { description, inputSchema, outputSchema: JsonObjectOutputSchema }, async (input: TInput) => jsonToolResult(await handler(input)));
+  server.registerTool(name, { annotations: toolAnnotations(name), description, inputSchema, outputSchema: JsonObjectOutputSchema }, async (input: TInput) => jsonToolResult(await handler(input)));
 }
 
 function jsonToolResult(response: ToolResult<unknown>) {
