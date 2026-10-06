@@ -2,7 +2,7 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "agent-workspace",
   "version": "__PLUGIN_VERSION__",
-  "description": "Create isolated development workspaces, verify and build projects, run web prototypes, and inspect results through a remote MCP service.",
+  "description": "Create isolated development workspaces to inspect, verify, build, run, and visually test uploaded source projects through a remote MCP service.",
   "author": {
     "name": "Erland Lindmark"
   },
@@ -11,14 +11,89 @@
       "interface": {
         "displayName": "Agent Workspace",
         "shortDescription": "Build and test projects",
-        "longDescription": "Create isolated workspaces for uploaded projects, verify and build npm or Maven applications, run temporary web prototypes, capture screenshots, and hand off build artifacts to other services.",
+        "longDescription": "Create isolated workspaces for uploaded source projects, verify and build npm or Maven applications, run temporary web prototypes, capture screenshots, and return temporary build artifacts. Workspaces and execution resources are isolated per authenticated user.",
         "developerName": "Erland Lindmark",
         "category": "Developer Tools",
         "defaultPrompt": [
           "Verify and build this project in an isolated workspace.",
           "Run this web prototype and show me a screenshot.",
           "Build this project and give me a downloadable artifact."
-        ]
+        ],
+        "capabilities": [
+          "Interactive"
+        ],
+        "websiteURL": "https://agent-workspace.apphome.one/about",
+        "supportURL": "https://agent-workspace.apphome.one/support",
+        "privacyPolicyURL": "https://agent-workspace.apphome.one/privacy",
+        "termsOfServiceURL": "https://agent-workspace.apphome.one/terms",
+        "logo": "assets/logo.png",
+        "composerIcon": "assets/composer-icon.png"
+      },
+      "review": {
+        "commerce": false,
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Inspect Agent Workspace runtime support before creating a workspace.",
+              "prompt": "What Java and Node runtimes can Agent Workspace use?",
+              "tools_triggered": "get_capabilities",
+              "expected_behavior": "Calls get_capabilities and reports only the runtimes and capabilities returned by the service."
+            },
+            {
+              "description": "Create a short-lived workspace, upload a harmless npm ZIP, verify it, and clean up.",
+              "prompt": "Verify the attached project in a short-lived Agent Workspace and clean everything up when done.",
+              "tools_triggered": "workspace_create, workspace_upload_zip, project_verify, workspace_destroy",
+              "expected_behavior": "Creates a workspace, uploads the attached ZIP, runs project_verify, reports the actual verification result, and destroys the workspace even after a failure.",
+              "file_attachment_urls": [
+                "https://raw.githubusercontent.com/erland/agent-workspace/main/plugin/review-fixtures/sample-project.zip"
+              ]
+            },
+            {
+              "description": "Build an attached project and return the produced temporary artifact.",
+              "prompt": "Build the attached project in Agent Workspace and give me the resulting artifact.",
+              "tools_triggered": "workspace_create, workspace_upload_zip, project_build, artifact_get, workspace_destroy",
+              "expected_behavior": "Creates and uploads into an isolated workspace, runs project_build, exposes only returned artifact metadata/resources, and destroys the workspace after the artifact handoff.",
+              "file_attachment_urls": [
+                "https://raw.githubusercontent.com/erland/agent-workspace/main/plugin/review-fixtures/sample-project.zip"
+              ]
+            },
+            {
+              "description": "Run an uploaded web project as a prototype and capture one desktop screenshot.",
+              "prompt": "Run this web project as a prototype, show me one desktop screenshot, then stop and clean up.",
+              "tools_triggered": "workspace_create, workspace_upload_zip, prototype_start, prototype_screenshot, prototype_screenshot_gallery, prototype_stop, workspace_destroy",
+              "expected_behavior": "Uses one workspace, starts the prototype only after upload, captures exactly one requested desktop screenshot, presents it through the gallery, then stops the prototype and destroys the workspace.",
+              "file_attachment_urls": [
+                "https://raw.githubusercontent.com/erland/agent-workspace/main/plugin/review-fixtures/sample-project.zip"
+              ]
+            },
+            {
+              "description": "Show the authenticated user's Agent Workspace profile and execution-provider connection state.",
+              "prompt": "Show my Agent Workspace profile and whether my execution provider is connected.",
+              "tools_triggered": "get_profile",
+              "expected_behavior": "Calls get_profile and reports the returned identity/provider state without exposing stored credentials."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Do not use Agent Workspace when the user only wants a GitHub repository edited directly.",
+              "prompt": "Edit README.md directly in my GitHub repository and commit it."
+            },
+            {
+              "description": "Do not start a prototype or screenshots when the user only asks a conceptual programming question.",
+              "prompt": "Explain the difference between npm and Maven builds."
+            },
+            {
+              "description": "Do not claim access to local desktop files that were not uploaded or provided through a supported source.",
+              "prompt": "Open the project from my Desktop folder and run its tests."
+            }
+          ]
+        }
+      },
+      "publication": {
+        "countries": [
+          "SE"
+        ],
+        "release_notes": "Initial Marketplace package with complete MCP configuration, workflow skill, public support/privacy/terms pages, review cases, and plugin icons."
       }
     }
   }
