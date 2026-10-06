@@ -20,7 +20,14 @@ const requiredFiles = [
   ".github/workflows/security-scan.yml",
   ".github/workflows/release-image.yml",
   "security/trivy-runtime-ignore.yaml",
-  "scripts/check-runtime-trivy-exceptions.mjs"
+  "scripts/check-runtime-trivy-exceptions.mjs",
+  "plugin/app.template.json",
+  "plugin/chatgpt-update.template.json",
+  "plugin/plugin.template.json",
+  "plugin/mcp.template.json",
+  "plugin/skills/agent-workspace/SKILL.md",
+  "scripts/build-plugin.mjs",
+  "docs/openai-plugin-distribution.md"
 ];
 
 for (const path of requiredFiles) {
@@ -124,7 +131,12 @@ for (const required of [
   "packages: write",
   "github.event.release.tag_name",
   "ghcr.io/",
-  "AGENT_WORKSPACE_VERSION"
+  "AGENT_WORKSPACE_VERSION",
+  "AGENT_WORKSPACE_CHATGPT_APP_ID",
+  "AGENT_WORKSPACE_CHATGPT_PLUGIN_NAME",
+  "--target chatgpt",
+  "--target desktop",
+  "agent-workspace-plugin-desktop-"
 ]) {
   if (!releaseWorkflow.includes(required)) {
     throw new Error(`Release image workflow is missing required release behavior: ${required}`);
@@ -132,6 +144,33 @@ for (const required of [
 }
 if (releaseWorkflow.includes("MODAL_TOKEN_ID") || releaseWorkflow.includes("MODAL_TOKEN_SECRET")) {
   throw new Error("Application release image workflow must not require Modal credentials");
+}
+
+const pluginBuilder = await readFile("scripts/build-plugin.mjs", "utf8");
+for (const required of [
+  "AGENT_WORKSPACE_CHATGPT_APP_ID",
+  "AGENT_WORKSPACE_CHATGPT_PLUGIN_NAME",
+  "build/plugin-",
+  ".codex-plugin",
+  "dev-",
+  "agent-workspace"
+]) {
+  if (!pluginBuilder.includes(required)) {
+    throw new Error(`Plugin builder is missing required ChatGPT update behavior: ${required}`);
+  }
+}
+
+const pluginDocs = await readFile("docs/openai-plugin-distribution.md", "utf8");
+for (const required of [
+  "ChatGPT update package",
+  "agent-workspace-plugin-<version>.zip",
+  "agent-workspace-plugin-desktop-<version>.zip",
+  "asdk_app_6ac26be163c88191b081136c7222b2a6",
+  "dev-6ac26be163c88191b081136c7222b2a6"
+]) {
+  if (!pluginDocs.includes(required)) {
+    throw new Error(`Plugin distribution docs are missing required behavior: ${required}`);
+  }
 }
 
 const status = await readFile(".system-builder/work-status.yaml", "utf8");

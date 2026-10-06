@@ -1,0 +1,18 @@
+{
+  "apps": "./.app.json",
+  "author": {
+    "name": "App developer"
+  },
+  "description": "Provides isolated development workspaces where ChatGPT can upload or create project files, run commands, build and test applications, verify projects, start web prototypes, take screenshots, and inspect results. Use it when a task requires executing code, working with a project or ZIP archive, running tests/builds, or validating a web prototype. Workspaces are temporary and should be destroyed when the task is complete.",
+  "interface": {
+    "capabilities": [],
+    "category": "Other",
+    "defaultPrompt": null,
+    "developerName": "App developer",
+    "displayName": "Agent Workspace",
+    "longDescription": "Provides isolated development workspaces where ChatGPT can upload or create project files, run commands, build and test applications, verify projects, start web prototypes, take screenshots, and inspect results. Use it when a task requires executing code, working with a project or ZIP archive, running tests/builds, or validating a web prototype. Workspaces are temporary and should be destroyed when the task is complete.",
+    "shortDescription": "Provides isolated development workspaces where ChatGPT can upload or create project files, run commands, build and test applications, verify projects, start web prototypes, take screenshots, and inspect results. Use it when a task requires executing code, working with a project or ZIP archive, running tests/builds, or validating a web prototype. Workspaces are temporary and should be destroyed when the task is complete."
+  },
+  "name": "__CHATGPT_PLUGIN_NAME__",
+  "version": "__PLUGIN_VERSION__"
+}
