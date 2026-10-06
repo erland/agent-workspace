@@ -58,33 +58,26 @@ jobs:
 
 
   plugin-package:
+    name: Validate Marketplace plugin package
     runs-on: ubuntu-latest
     env:
       AGENT_WORKSPACE_MCP_URL: https://agent-workspace.example.test/mcp
-      AGENT_WORKSPACE_CHATGPT_APP_ID: asdk_app_agentworkspace_ci
-      AGENT_WORKSPACE_CHATGPT_PLUGIN_NAME: dev-agentworkspace-ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - name: Build ChatGPT update package
-        run: npm run plugin:build -- --version 0.0.0-ci --target chatgpt
-      - name: Validate ChatGPT update package
+      - name: Build Marketplace package
+        run: npm run plugin:build -- --version 0.0.0-ci --target marketplace
+      - name: Validate Marketplace package
         run: |
-          test -f build/plugin-chatgpt/.app.json
-          test -f build/plugin-chatgpt/.codex-plugin/plugin.json
-          test ! -e build/plugin-chatgpt/agent-workspace
-          test ! -e build/plugin-chatgpt/mcp.json
-          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('build/plugin-chatgpt/.codex-plugin/plugin.json')); if(p.name!=='dev-agentworkspace-ci'||p.version!=='0.0.0-ci'||p.apps!=='./.app.json') process.exit(1)"
-          node -e "const fs=require('fs'); const a=JSON.parse(fs.readFileSync('build/plugin-chatgpt/.app.json')); if(a.apps['dev-agentworkspace-ci'].id!=='asdk_app_agentworkspace_ci') process.exit(1)"
-      - name: Build desktop MCP package
-        run: npm run plugin:build -- --version 0.0.0-ci --target desktop
-      - name: Validate desktop MCP package
-        run: |
-          test -f build/plugin-desktop/agent-workspace/plugin.json
-          test -f build/plugin-desktop/agent-workspace/mcp.json
-          test -f build/plugin-desktop/agent-workspace/skills/agent-workspace/SKILL.md
-          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('build/plugin-desktop/agent-workspace/plugin.json')); if(p.name!=='agent-workspace'||p.version!=='0.0.0-ci') process.exit(1)"
-          node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('build/plugin-desktop/agent-workspace/mcp.json')); if(m.mcpServers['agent-workspace'].url!=='https://agent-workspace.example.test/mcp') process.exit(1)"
+          test -f build/plugin-marketplace/agent-workspace/plugin.json
+          test -f build/plugin-marketplace/agent-workspace/mcp.json
+          test -f build/plugin-marketplace/agent-workspace/skills/agent-workspace/SKILL.md
+          test -f build/plugin-marketplace/agent-workspace/assets/logo.png
+          test -f build/plugin-marketplace/agent-workspace/assets/composer-icon.png
+          test ! -e build/plugin-marketplace/agent-workspace/.app.json
+          test ! -e build/plugin-marketplace/agent-workspace/.codex-plugin
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('build/plugin-marketplace/agent-workspace/plugin.json'));const o=p.extensions?.['com.openai'];if(p.name!=='agent-workspace'||p.version!=='0.0.0-ci'||p.apps!=null||o?.apps!=null||o?.publication?.countries?.[0]!=='SE'||o?.review?.commerce!==false)process.exit(1)"
+          node -e "const fs=require('fs');const m=JSON.parse(fs.readFileSync('build/plugin-marketplace/agent-workspace/mcp.json'));if(m.mcpServers['agent-workspace'].type!=='streamable-http'||m.mcpServers['agent-workspace'].url!=='https://agent-workspace.example.test/mcp')process.exit(1)"
