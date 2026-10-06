@@ -1,0 +1,18 @@
+{
+  "apps": "./.app.json",
+  "author": {
+    "name": "App developer"
+  },
+  "description": "Provides isolated development workspaces where ChatGPT can upload or create project files, run commands, build and test applications, verify projects, start web prototypes, take screenshots, and inspect results.",
+  "interface": {
+    "capabilities": [],
+    "category": "Developer Tools",
+    "defaultPrompt": null,
+    "developerName": "App developer",
+    "displayName": "Agent Workspace",
+    "longDescription": "Provides isolated development workspaces where ChatGPT can upload or create project files, run commands, build and test applications, verify projects, start web prototypes, take screenshots, and inspect results.",
+    "shortDescription": "Build and test projects"
+  },
+  "name": "__CHATGPT_PLUGIN_NAME__",
+  "version": "__PLUGIN_VERSION__"
+}
