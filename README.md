@@ -216,11 +216,14 @@ npm run mcp:stdio
 DEV-010 exposes: `get_capabilities`, `get_profile`, `workspace_create`, `workspace_upload_zip`, `workspace_upload_zip_from_url`, `project_verify`, `project_build`, `artifact_get`, `artifact_download_link`, `prototype_start`, `prototype_stop`, `prototype_preview_link`, `prototype_screenshot`, `prototype_screenshot_gallery`, and `workspace_destroy`.
 
 
-### OpenAI plugin package
+### OpenAI plugin packages
 
-GitHub Releases also publish a portable OpenAI/Agent Plugins package named `agent-workspace-plugin-<version>.zip`. It declares the production Streamable HTTP MCP endpoint and includes workflow guidance for upload, verification, builds, prototypes, screenshots, cleanup, and optional handoff of static build artifacts to PWA Preview.
+GitHub Releases publish two plugin artifacts:
 
-The package is generated from templates in `plugin/`. The public MCP URL is configurable with the GitHub Actions variable `AGENT_WORKSPACE_MCP_URL` and defaults to `https://agent-workspace.apphome.one/mcp`. See [`docs/openai-plugin-distribution.md`](docs/openai-plugin-distribution.md) for the package format, build command, release behavior, and configuration.
+- `agent-workspace-plugin-<version>.zip` — a ChatGPT update package for the already registered Agent Workspace app. It contains `.app.json` and `.codex-plugin/plugin.json` directly at the ZIP root and is intended to be uploaded as a new version of the existing ChatGPT app.
+- `agent-workspace-plugin-desktop-<version>.zip` — the portable Agent Plugins/direct-MCP package with `plugin.json`, `mcp.json`, and the Agent Workspace skill under an `agent-workspace/` top-level directory.
+
+The release build uses the GitHub Actions variables `AGENT_WORKSPACE_CHATGPT_APP_ID` (required), optional `AGENT_WORKSPACE_CHATGPT_PLUGIN_NAME`, and `AGENT_WORKSPACE_MCP_URL`. See [`docs/openai-plugin-distribution.md`](docs/openai-plugin-distribution.md) for the package formats, build commands, release behavior, and configuration.
 
 
 ### ZIP transport across MCP hosts
