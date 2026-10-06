@@ -22,8 +22,24 @@ import { SCREENSHOT_RESOURCE_TEMPLATE, screenshotResourceUri, singleTemplateValu
 import { ARTIFACT_RESOURCE_TEMPLATE, artifactResourceUri, singleArtifactTemplateValue } from "./artifact-resource.js";
 import { SCREENSHOT_GALLERY_HTML, SCREENSHOT_GALLERY_MIME_TYPE, SCREENSHOT_GALLERY_URI } from "./screenshot-gallery.js";
 
+const AGENT_WORKSPACE_DESCRIPTION =
+  "Creates temporary sandbox workspaces for verifying, building, running and visually inspecting uploaded npm and Maven projects.";
+const AGENT_WORKSPACE_WEBSITE = "https://agent-workspace.apphome.one/about";
+const AGENT_WORKSPACE_ICON_DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAB7UlEQVR4nO2aMU7DUAyGHQQTjCywwsrA0IWBhQmBxAHYkFiBAzBygLYrUjcOgITExMLA0oELwDGYGMKUKI1Iajv2+wPxJ1VK1Dz39//8/JK22dbeSU4DZgUtAE0YgBaAJgxAC0ATBqAFoAkD0ALQrGoGvT4/WOsw4/D4XHS9uAL6nDyRXJ/IgL4nXyDRmXEfhqpBs6uL8jifzmj97bQ8v1zbKY/HowlbiAec5SBeAtXkiagxeSKim/m1NHxyBr8LhAHSAfl0tnD+dfBUHt9/fy68h+4BHFT3AW0mjDvJSU8sAbQANOwlsL254akDxuArIAxAC0ATBqAFoAkD0ALQuBqwOzpjXXd0+16+tDG0uBlQCO+SgEWMZbgYUBfclkB11l/u9lUxupCkB3zMH5OM0WBuQH2muiRSH+tRBaYGSJNvKv+2GNYmmBng3a29PsvMgPpMWa5hz9huFbBsljjlr40twa0CPOllBRD5NCzLXeU3zLdBjgnc8vdOnijRjZCmElLtKi4GWHRtz85fxa0CCsF14ZLu3xTDEtclYCHce3dR/TTWhWWznpr4RggtAE0YgBaAJgzgXpjyed8Crl5RBfwVEyQ6xUug7yZI9al6QF9N0Ohi/1P0vxK7AFoAmjAALQBNGIAWgCYMQAtA8wO6c5LmRtskgAAAAABJRU5ErkJggg==";
+
 export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpServer {
-  const server = new McpServer({ name: "agent-workspace", version: "0.1.0" });
+  const server = new McpServer({
+    name: "agent-workspace",
+    title: "Agent Workspace",
+    version: process.env.AGENT_WORKSPACE_VERSION ?? process.env.npm_package_version ?? "0.1.0-dev.16.6",
+    description: AGENT_WORKSPACE_DESCRIPTION,
+    websiteUrl: AGENT_WORKSPACE_WEBSITE,
+    icons: [{
+      src: AGENT_WORKSPACE_ICON_DATA_URI,
+      mimeType: "image/png",
+      sizes: ["64x64"]
+    }]
+  });
 
   server.registerResource(
     "prototype-screenshot-gallery",
