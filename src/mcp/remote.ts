@@ -31,6 +31,7 @@ import { DEFAULT_SECURITY_POLICY } from "../security/security-policy.js";
 import { JsonLineAuditEventSink } from "../audit/audit-events.js";
 import { ExpiredWorkspaceCleanupJob } from "../workspace/expired-workspace-cleanup-job.js";
 import { handleHealthRequest } from "../http/health.js";
+import { handlePublicInfoRequest } from "../http/public-info.js";
 import { createSettingsHandler } from "../http/settings.js";
 import { SandboxModalCredentialVerifier } from "../providers/modal/modal-credential-verifier.js";
 import { LocalVolumeObjectStore } from "../storage/local-volume-object-store.js";
@@ -130,20 +131,21 @@ server.listen(config.port, config.host, () => {
 async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
     const request = await toWebRequest(req, config.publicBaseUrl);
-    const authResponse = authServer ? await authServer.handle(request) : undefined;
-    const settings = authResponse
+    const publicInfo = handlePublicInfoRequest(request);
+    const authResponse = publicInfo ? undefined : (authServer ? await authServer.handle(request) : undefined);
+    const settings = publicInfo || authResponse
       ? undefined
       : settingsHandler
         ? await settingsHandler(request)
         : (new URL(request.url).pathname.startsWith("/settings")
             ? new Response("Settings login is not configured", { status: 503 })
             : undefined);
-    const artifactDownload = authResponse || settings ? undefined : await handleArtifactDownload(request);
-    const health = authResponse || settings || artifactDownload ? undefined : await handleHealthRequest(request, {
+    const artifactDownload = publicInfo || authResponse || settings ? undefined : await handleArtifactDownload(request);
+    const health = publicInfo || authResponse || settings || artifactDownload ? undefined : await handleHealthRequest(request, {
       version: SERVICE_VERSION,
       checkDatabase: async () => { await pool.query("select 1"); }
     });
-    const response = authResponse ?? settings ?? artifactDownload ?? health ?? await remote.fetch(request);
+    const response = publicInfo ?? authResponse ?? settings ?? artifactDownload ?? health ?? await remote.fetch(request);
     res.statusCode = response.status;
     const setCookies = (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.() ?? [];
     response.headers.forEach((value, key) => {

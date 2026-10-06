@@ -67,8 +67,6 @@ jobs:
       contents: write
     env:
       AGENT_WORKSPACE_MCP_URL: ${{ vars.AGENT_WORKSPACE_MCP_URL || 'https://agent-workspace.apphome.one/mcp' }}
-      AGENT_WORKSPACE_CHATGPT_APP_ID: ${{ vars.AGENT_WORKSPACE_CHATGPT_APP_ID }}
-      AGENT_WORKSPACE_CHATGPT_PLUGIN_NAME: ${{ vars.AGENT_WORKSPACE_CHATGPT_PLUGIN_NAME }}
 
     steps:
       - name: Checkout release tag
@@ -82,38 +80,32 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Build ChatGPT update and desktop plugin packages
+      - name: Build Marketplace plugin package
         id: plugin
         shell: bash
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          if [[ -z "${AGENT_WORKSPACE_CHATGPT_APP_ID}" ]]; then
-            echo "Repository variable AGENT_WORKSPACE_CHATGPT_APP_ID must contain the registered ChatGPT app id before release." >&2
-            exit 1
-          fi
-          npm run plugin:build -- --version "$VERSION" --target chatgpt
-          npm run plugin:build -- --version "$VERSION" --target desktop
+          npm run plugin:build -- --version "$VERSION" --target marketplace
           mkdir -p build
-          (cd build/plugin-chatgpt && zip -qr "../agent-workspace-plugin-${VERSION}.zip" .app.json .codex-plugin)
-          (cd build/plugin-desktop && zip -qr "../agent-workspace-plugin-desktop-${VERSION}.zip" agent-workspace)
+          (cd build/plugin-marketplace && zip -qr "../agent-workspace-plugin-${VERSION}.zip" agent-workspace)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "archive=build/agent-workspace-plugin-${VERSION}.zip" >> "$GITHUB_OUTPUT"
-          echo "desktop_archive=build/agent-workspace-plugin-desktop-${VERSION}.zip" >> "$GITHUB_OUTPUT"
 
-      - name: Inspect plugin archives
+      - name: Inspect Marketplace plugin archive
         run: |
           unzip -l "${{ steps.plugin.outputs.archive }}"
-          unzip -p "${{ steps.plugin.outputs.archive }}" .codex-plugin/plugin.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const p=JSON.parse(s);if(p.version!=='${{ steps.plugin.outputs.version }}'||!p.name.startsWith('dev-')||p.apps!=='./.app.json')process.exit(1)})"
-          unzip -p "${{ steps.plugin.outputs.archive }}" .app.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const a=JSON.parse(s);const names=Object.keys(a.apps||{});if(names.length!==1||a.apps[names[0]].id!=='${AGENT_WORKSPACE_CHATGPT_APP_ID}')process.exit(1)})"
-          if unzip -l "${{ steps.plugin.outputs.archive }}" | grep -Eq '(^|[[:space:]])agent-workspace/|mcp.json'; then
-            echo "ChatGPT update package must have no extra top directory and no mcp.json" >&2
+          unzip -p "${{ steps.plugin.outputs.archive }}" agent-workspace/plugin.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const p=JSON.parse(s);if(p.name!=='agent-workspace'||p.version!=='${{ steps.plugin.outputs.version }}'||p.apps!=null||p.extensions?.['com.openai']?.apps!=null)process.exit(1)})"
+          unzip -p "${{ steps.plugin.outputs.archive }}" agent-workspace/mcp.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const m=JSON.parse(s);if(m.mcpServers?.['agent-workspace']?.url!=='${AGENT_WORKSPACE_MCP_URL}')process.exit(1)})"
+          unzip -p "${{ steps.plugin.outputs.archive }}" agent-workspace/skills/agent-workspace/SKILL.md >/dev/null
+          unzip -p "${{ steps.plugin.outputs.archive }}" agent-workspace/assets/logo.png >/dev/null
+          unzip -p "${{ steps.plugin.outputs.archive }}" agent-workspace/assets/composer-icon.png >/dev/null
+          if unzip -l "${{ steps.plugin.outputs.archive }}" | grep -Eq '\.app\.json|\.codex-plugin/'; then
+            echo "Marketplace upload must not contain app bindings or compatibility update manifests." >&2
             exit 1
           fi
-          unzip -p "${{ steps.plugin.outputs.desktop_archive }}" agent-workspace/plugin.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>JSON.parse(s))"
-          unzip -p "${{ steps.plugin.outputs.desktop_archive }}" agent-workspace/mcp.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>JSON.parse(s))"
 
-      - name: Attach plugin ZIPs to GitHub Release
+      - name: Attach plugin ZIP to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.event.release.tag_name }}" "${{ steps.plugin.outputs.archive }}" "${{ steps.plugin.outputs.desktop_archive }}" --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" "${{ steps.plugin.outputs.archive }}" --clobber

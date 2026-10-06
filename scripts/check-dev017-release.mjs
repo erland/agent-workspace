@@ -21,11 +21,12 @@ const requiredFiles = [
   ".github/workflows/release-image.yml",
   "security/trivy-runtime-ignore.yaml",
   "scripts/check-runtime-trivy-exceptions.mjs",
-  "plugin/app.template.json",
-  "plugin/chatgpt-update.template.json",
   "plugin/plugin.template.json",
   "plugin/mcp.template.json",
   "plugin/skills/agent-workspace/SKILL.md",
+  "plugin/assets/logo.png",
+  "plugin/assets/composer-icon.png",
+  "plugin/review-fixtures/sample-project.zip",
   "scripts/build-plugin.mjs",
   "docs/openai-plugin-distribution.md"
 ];
@@ -132,11 +133,9 @@ for (const required of [
   "github.event.release.tag_name",
   "ghcr.io/",
   "AGENT_WORKSPACE_VERSION",
-  "AGENT_WORKSPACE_CHATGPT_APP_ID",
-  "AGENT_WORKSPACE_CHATGPT_PLUGIN_NAME",
-  "--target chatgpt",
-  "--target desktop",
-  "agent-workspace-plugin-desktop-"
+  "AGENT_WORKSPACE_MCP_URL",
+  "--target marketplace",
+  "agent-workspace-plugin-"
 ]) {
   if (!releaseWorkflow.includes(required)) {
     throw new Error(`Release image workflow is missing required release behavior: ${required}`);
@@ -148,28 +147,43 @@ if (releaseWorkflow.includes("MODAL_TOKEN_ID") || releaseWorkflow.includes("MODA
 
 const pluginBuilder = await readFile("scripts/build-plugin.mjs", "utf8");
 for (const required of [
-  "AGENT_WORKSPACE_CHATGPT_APP_ID",
-  "AGENT_WORKSPACE_CHATGPT_PLUGIN_NAME",
-  "build/plugin-",
-  ".codex-plugin",
-  "dev-",
+  "AGENT_WORKSPACE_MCP_URL",
+  "marketplace",
+  "plugin/assets",
   "agent-workspace"
 ]) {
   if (!pluginBuilder.includes(required)) {
-    throw new Error(`Plugin builder is missing required ChatGPT update behavior: ${required}`);
+    throw new Error(`Plugin builder is missing Marketplace behavior: ${required}`);
   }
 }
 
 const pluginDocs = await readFile("docs/openai-plugin-distribution.md", "utf8");
 for (const required of [
-  "ChatGPT update package",
+  "Marketplace",
   "agent-workspace-plugin-<version>.zip",
-  "agent-workspace-plugin-desktop-<version>.zip",
-  "asdk_app_6ac26be163c88191b081136c7222b2a6",
-  "dev-6ac26be163c88191b081136c7222b2a6"
+  "https://agent-workspace.apphome.one/mcp",
+  "commerce: false",
+  "Sweden"
 ]) {
   if (!pluginDocs.includes(required)) {
     throw new Error(`Plugin distribution docs are missing required behavior: ${required}`);
+  }
+}
+
+const pluginManifest = await readFile("plugin/plugin.template.json", "utf8");
+for (const required of [
+  "websiteURL",
+  "supportURL",
+  "privacyPolicyURL",
+  "termsOfServiceURL",
+  "assets/logo.png",
+  "assets/composer-icon.png",
+  "\"countries\": [",
+  "\"SE\"",
+  "\"commerce\": false"
+]) {
+  if (!pluginManifest.includes(required)) {
+    throw new Error(`Plugin manifest is missing Marketplace metadata: ${required}`);
   }
 }
 
