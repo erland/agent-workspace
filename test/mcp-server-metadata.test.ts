@@ -21,13 +21,13 @@ describe("Agent Workspace MCP server metadata", () => {
       assert.ok(info);
       assert.equal(info.name, "agent-workspace");
       assert.equal(info.title, "Agent Workspace");
-      assert.match(info.version, /\\S+/);
+      assert.match(info.version, /\S+/);
       assert.match(info.description ?? "", /temporary sandbox workspaces/i);
       assert.equal(info.websiteUrl, "https://agent-workspace.apphome.one/about");
       assert.equal(info.icons?.length, 1);
       assert.equal(info.icons?.[0]?.mimeType, "image/png");
       assert.deepEqual(info.icons?.[0]?.sizes, ["64x64"]);
-      assert.match(info.icons?.[0]?.src ?? "", /^data:image\\/png;base64,/);
+      assert.match(info.icons?.[0]?.src ?? "", /^data:image\/png;base64,/);
     } finally {
       await client.close();
       await server.close();
