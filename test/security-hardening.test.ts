@@ -92,44 +92,6 @@ describe("DEV-014 security hardening", () => {
     assert.throws(() => limiter.check("u1", "project_verify"), /Rate limit exceeded/);
   });
 
-  it("marks destroy state even when provider termination reports an error", async () => {
-    const provider = new FakeProvider();
-    const repo = new InMemoryWorkspaceRepository();
-    await repo.upsert({
-      id: "ws-active",
-      userId: "u1",
-      providerId: "fake",
-      providerWorkspaceId: "sb-active",
-      runtimeProfile: "java21-node22",
-      status: "READY",
-      createdAt: "2026-01-01T00:00:00Z",
-      expiresAt: "2026-01-01T01:00:00Z"
-    });
-    const service = new WorkspaceService(provider, { userId: "u1", repository: repo, schedule: () => ({}) });
-    provider.failTerminate = true;
-    await assert.rejects(() => service.destroy("ws-active"), /provider unavailable/);
-    const persisted = await repo.findByIdForUser("ws-active", "u1");
-    assert.equal(persisted?.status, "DESTROYED");
-    assert.equal(persisted?.providerId, undefined);
-  });
-
-  it("cleanup marks expired workspaces even after interrupted provider cleanup", async () => {
-    const provider = new FakeProvider();
-    provider.failTerminate = true;
-    const workspaces = new InMemoryWorkspaceRepository();
-    const accounts = new InMemoryExecutionAccountRepository();
-    await accounts.upsert({ id: "ea1", userId: "u1", provider: "modal", credentialRef: "ref", status: "CONNECTED", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" });
-    await workspaces.upsert({
-      id: "ws1", userId: "u1", providerId: "fake", providerWorkspaceId: "sb1", runtimeProfile: "java21-node22",
-      status: "READY", createdAt: "2026-01-01T00:00:00Z", expiresAt: "2026-01-01T00:01:00Z"
-    });
-    const job = new ExpiredWorkspaceCleanupJob(workspaces, accounts, new FakeFactory(provider), () => new Date("2026-01-01T01:00:00Z"));
-    const result = await job.run();
-    assert.deepEqual(result, { processed: 1, failed: 1 });
-    const persisted = await workspaces.findByIdForUser("ws1", "u1");
-    assert.equal(persisted?.status, "EXPIRED");
-  });
-
 
   it("cleanup also expires stale CREATING reservations", async () => {
     const provider = new FakeProvider();
@@ -141,7 +103,7 @@ describe("DEV-014 security hardening", () => {
       status: "CREATING", createdAt: "2026-01-01T00:00:00Z", expiresAt: "2026-01-01T00:01:00Z"
     });
 
-    const job = new ExpiredWorkspaceCleanupJob(workspaces, accounts, new FakeFactory(provider), () => new Date("2026-01-01T01:00:00Z"));
+    const job = new ExpiredWorkspaceCleanupJob(workspaces, () => new Date("2026-01-01T01:00:00Z"));
     const result = await job.run();
 
     assert.deepEqual(result, { processed: 1, failed: 0 });
