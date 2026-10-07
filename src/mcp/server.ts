@@ -146,7 +146,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
     "project_build",
     {
       annotations: toolAnnotations("project_build"),
-      description: "Build the uploaded project in a short-lived execution sandbox and publish one or more temporary build artifacts. If outputs are omitted, Agent Workspace detects conventional npm or Maven outputs.",
+      description: "Build the uploaded project in a short-lived execution sandbox and publish one or more temporary build artifacts. outputs may select project-relative files or directories; files are published unchanged and directories are packaged as .tar.gz. If outputs are omitted, Agent Workspace detects conventional npm or Maven outputs.",
       inputSchema: ProjectBuildInputSchema,
       outputSchema: JsonObjectOutputSchema
     },
