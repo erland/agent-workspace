@@ -51,7 +51,7 @@ describe("multi-user identity persistence", () => {
   it("enforces user ownership when loading workspaces", async () => {
     const workspaces = new InMemoryWorkspaceRepository();
     await workspaces.upsert({
-      id: "ws-1", userId: "user-1", providerId: "modal", providerWorkspaceId: "sb-1",
+      id: "ws-1", userId: "user-1",
       runtimeProfile: "java21-node22", status: "READY",
       createdAt: "2026-09-29T18:00:00.000Z", expiresAt: "2026-09-29T18:30:00.000Z"
     });

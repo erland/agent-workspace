@@ -83,9 +83,7 @@ export class InMemoryWorkspaceRepository implements WorkspaceRepository {
     if (
       workspace &&
       workspace.userId === userId &&
-      workspace.status === "CREATING" &&
-      workspace.providerId === undefined &&
-      workspace.providerWorkspaceId === undefined
+      workspace.status === "CREATING"
     ) {
       this.values.delete(workspaceId);
     }

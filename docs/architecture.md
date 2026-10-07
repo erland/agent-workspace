@@ -138,8 +138,6 @@ Pre-persistence development state kan hållas processlokalt under tidiga steg. N
 Workspace
 ├── id
 ├── userId
-├── provider
-├── providerWorkspaceId
 ├── runtimeProfile
 ├── status
 ├── createdAt
@@ -203,7 +201,7 @@ app_user
 
 `execution_account` stores `credentialRef`, never Modal refresh tokens, token secrets or OAuth client secrets. Credential material remains behind the server-side `ExecutionAccountCredentialStore` boundary from DEV-011.
 
-Workspace rows are ownership-scoped by `user_id` and contain enough provider metadata (`provider_id`, `provider_workspace_id`, runtime, status and expiry) to rehydrate a provider handle after an application restart. Project metadata may be stored as JSONB; project source files remain in temporary object storage and are copied into execution sandboxes as needed.
+Workspace rows are ownership-scoped by `user_id` and persist logical workspace metadata only: runtime, status, expiry and optional project metadata. Execution provider handles are deliberately not persisted because verify/build sandboxes are short-lived and terminated in the operation `finally` path. Project source files remain in temporary object storage and are copied into execution sandboxes as needed.
 
 `WorkspaceService` accepts an optional `WorkspaceRepository`. With persistence enabled it writes state transitions, can rehydrate a workspace after process restart and can reconcile persisted expired READY workspaces through `cleanupExpired()`.
 

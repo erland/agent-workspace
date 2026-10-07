@@ -76,7 +76,7 @@ describe("WorkspaceService", () => {
     assert.equal(provider.creates.length, 0);
   });
 
-  it("destroys a workspace and terminates the provider sandbox", async () => {
+  it("destroys a logical workspace without allocating a provider sandbox", async () => {
     const provider = new FakeProvider();
     const service = new WorkspaceService(provider, {
       idFactory: () => "ws_destroy",
@@ -152,8 +152,6 @@ describe("WorkspaceService", () => {
     const workspace = await service.create();
 
     assert.equal(workspace.status, "READY");
-    assert.equal(workspace.providerId, undefined);
-    assert.equal(workspace.providerWorkspaceId, undefined);
     assert.equal(provider.creates.length, 0);
   });
 

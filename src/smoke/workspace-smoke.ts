@@ -11,10 +11,6 @@ async function main(): Promise<void> {
   console.log(`Workspace ${workspace.id}`);
   console.log(`runtime => ${workspace.runtimeProfile}`);
   console.log(`status => ${workspace.status}`);
-  if (workspace.providerWorkspaceId !== undefined) {
-    throw new Error("Logical workspace unexpectedly allocated a provider sandbox");
-  }
-
   const profile = RUNTIME_PROFILES[workspace.runtimeProfile];
   const handle = await provider.createWorkspace({
     imageRef: profile.imageRef,
