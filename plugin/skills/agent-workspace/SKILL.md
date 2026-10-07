@@ -16,8 +16,8 @@ When beginning a project workflow:
 1. Use `get_profile` when user/account readiness matters.
 2. Use `get_capabilities` when runtime support or available build capabilities matter.
 3. Create a logical workspace with `workspace_create`.
-4. Upload the source archive with `workspace_upload_zip` when ChatGPT can supply an attached ZIP through file parameters.
-5. Use `workspace_upload_zip_from_url` only when a public HTTPS source URL is the appropriate transport.
+4. Upload the source archive with `workspace_upload_zip` when ChatGPT can supply an attached or locally created ZIP through the native file parameter. This is the only normal step that requires file materialization in the ChatGPT workflow.
+5. Use `workspace_upload_zip_from_url` only when a public HTTPS source URL is the appropriate transport; do not materialize a file just to use this URL-based path.
 
 Do not treat source download URLs as Agent Workspace authorization. Authentication and user isolation remain enforced by the MCP connection.
 
@@ -27,17 +27,17 @@ Use `project_verify` when the user wants to know whether the project compiles, t
 
 Use `project_build` when the user needs built output or an artifact for later handoff. `outputs[].path` may select a project-relative file or directory. Files are published unchanged; directories are packaged as `.tar.gz`.
 
-Use `artifact_get` to inspect produced artifacts and `artifact_download_link` when another service or the user needs a short-lived HTTPS download URL.
+Use `artifact_get` to inspect produced artifacts. Use `artifact_download_link` when another service or the user needs a short-lived HTTPS download URL. For service-to-service handoff, pass this URL directly; do not materialize the artifact into ChatGPT unless the user explicitly needs the file itself.
 
 When PWA Preview is available and the built output is a static web application, use:
 
 1. `project_build`
 2. `artifact_download_link`
-3. PWA Preview `preview_create` for a new preview or `preview_update` for an existing preview
+3. Pass the returned signed HTTPS URL directly as PWA Preview `sourceUrl` to `preview_create` for a new preview or `preview_update` for an existing preview
 
 Agent Workspace and PWA Preview remain independent services. Do not assume PWA Preview is installed.
 
-For screenshots of a published preview, use Browser Screenshot with the preview URL when that service is available.
+For screenshots of a published preview, pass the preview URL directly to Browser Screenshot when that service is available. Do not materialize PWA files or screenshot input through Agent Workspace.
 
 ## Cleanup
 
