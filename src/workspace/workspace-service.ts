@@ -186,12 +186,6 @@ export class WorkspaceService {
     const record = await this.requireRecord(workspaceId);
     if (record.workspace.status === "READY" && this.isExpired(record.workspace)) {
       await this.expire(workspaceId);
-    } else if (
-      record.workspace.status === "READY" &&
-      record.workspace.prototype?.status === "RUNNING" &&
-      Date.parse(record.workspace.prototype.expiresAt) <= this.now().getTime()
-    ) {
-      await this.stopPrototype(workspaceId).catch(() => undefined);
     }
     return cloneWorkspace(record.workspace);
   }
@@ -427,17 +421,6 @@ export class WorkspaceService {
     await this.provider.uploadArchive(handle, archive);
   }
 
-  private requireActiveHandle(record: WorkspaceRecord): WorkspaceHandle {
-    if (record.handle) return record.handle;
-    const { providerId, providerWorkspaceId } = record.workspace;
-    if (!providerId || !providerWorkspaceId) {
-      throw new Error(`Workspace ${record.workspace.id} has no active execution`);
-    }
-    const handle = { providerId, providerWorkspaceId };
-    record.handle = handle;
-    return handle;
-  }
-
   private async requireRecord(workspaceId: string): Promise<WorkspaceRecord> {
     const cached = this.records.get(workspaceId);
     if (cached) return cached;
@@ -519,10 +502,6 @@ export class WorkspaceService {
     return `${this.workspaceStoragePrefix(workspaceId)}source.zip`;
   }
 
-  private screenshotStorageKey(workspaceId: string, artifactId: string): string {
-    if (!/^[A-Za-z0-9_-]{1,128}$/.test(artifactId)) throw new Error("Invalid screenshot artifact id");
-    return `${this.workspaceStoragePrefix(workspaceId)}screenshots/${artifactId}.png`;
-  }
 }
 
 function cloneWorkspace(workspace: Workspace): Workspace {
