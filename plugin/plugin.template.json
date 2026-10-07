@@ -2,7 +2,7 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "agent-workspace",
   "version": "__PLUGIN_VERSION__",
-  "description": "Create isolated development workspaces to inspect, verify, build, run, and visually test uploaded source projects through a remote MCP service.",
+  "description": "Create isolated development workspaces to inspect, verify, and build uploaded source projects and publish temporary build artifacts through a remote MCP service.",
   "author": {
     "name": "Erland Lindmark"
   },
@@ -11,12 +11,12 @@
       "interface": {
         "displayName": "Agent Workspace",
         "shortDescription": "Build and test projects",
-        "longDescription": "Create isolated workspaces for uploaded source projects, verify and build npm or Maven applications, run temporary web prototypes, capture screenshots, and return temporary build artifacts. Workspaces and execution resources are isolated per authenticated user.",
+        "longDescription": "Create isolated workspaces for uploaded source projects, verify and build npm or Maven applications, and publish temporary build artifacts for download or handoff to dedicated preview services. Workspaces and execution resources are isolated per authenticated user.",
         "developerName": "Erland Lindmark",
         "category": "Developer Tools",
         "defaultPrompt": [
           "Verify and build this project in an isolated workspace.",
-          "Run this web prototype and show me a screenshot.",
+          "Build this static web project and give me an artifact I can hand to PWA Preview.",
           "Build this project and give me a downloadable artifact."
         ],
         "capabilities": [
@@ -53,15 +53,6 @@
               "prompt": "Build the attached project in Agent Workspace and give me the resulting artifact.",
               "tools_triggered": "workspace_create, workspace_upload_zip, project_build, artifact_get, workspace_destroy",
               "expected_behavior": "Creates and uploads into an isolated workspace, runs project_build, exposes only returned artifact metadata/resources, and destroys the workspace after the artifact handoff.",
-              "file_attachment_urls": [
-                "https://raw.githubusercontent.com/erland/agent-workspace/main/plugin/review-fixtures/sample-project.zip"
-              ]
-            },
-            {
-              "description": "Run an uploaded web project as a prototype and capture one desktop screenshot.",
-              "prompt": "Run this web project as a prototype, show me one desktop screenshot, then stop and clean up.",
-              "tools_triggered": "workspace_create, workspace_upload_zip, prototype_start, prototype_screenshot, prototype_screenshot_gallery, prototype_stop, workspace_destroy",
-              "expected_behavior": "Uses one workspace, starts the prototype only after upload, captures exactly one requested desktop screenshot, presents it through the gallery, then stops the prototype and destroys the workspace.",
               "file_attachment_urls": [
                 "https://raw.githubusercontent.com/erland/agent-workspace/main/plugin/review-fixtures/sample-project.zip"
               ]
