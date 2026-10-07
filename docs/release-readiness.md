@@ -14,7 +14,6 @@ The v1 implementation covers:
 - ZIP upload and validation,
 - npm and Maven verification,
 - Java 17/21/25 and Node 20/22 runtime profiles,
-- prototype start and screenshots,
 - MCP stdio and remote MCP surfaces,
 - PostgreSQL persistence,
 - OAuth-protected remote resource-server behavior,
@@ -27,7 +26,7 @@ The v1 implementation covers:
 | Gate | Required | Result | Evidence |
 |---|---|---|---|
 | Unit/type/build/contract/security/deployment checks | yes | PASS | GitHub CI on merged main |
-| Local Modal runtime/build/prototype acceptance | yes | PASS | User verification through DEV-016 |
+| Local Modal runtime/build acceptance | yes | PASS | User verification through DEV-016 and subsequent build-only regression CI |
 | Reproducible npm dependencies | yes | PASS | committed `package-lock.json`, `npm ci` in CI/Docker |
 | Documentation/repository hygiene | yes | PASS | DEV-017 checks + post-merge reconciliation |
 | DEV-011 Modal third-party OAuth onboarding | no for personal-token pilot; yes only for third-party OAuth claim | DEFERRED | Personal API tokens now provide per-user Modal isolation; Modal-issued OAuth integration is still unavailable |
@@ -37,7 +36,7 @@ The v1 implementation covers:
 
 ## Acceptance
 
-Local acceptance is green for the implemented execution flows, including npm PASS/FAIL, Maven PASS/FAIL, runtime selection, prototype start, screenshots and cleanup through a real local MCP client and authenticated Modal profile.
+Local acceptance is green for the retained execution flows, including npm PASS/FAIL, Maven PASS/FAIL, runtime selection, build/artifact handling and cleanup through the MCP path. Historical prototype/screenshot acceptance is no longer part of the current Agent Workspace release surface.
 
 This does not constitute final acceptance of the deployed production path.
 
