@@ -121,6 +121,18 @@ export const ArtifactIdInputSchema = z.object({
   artifactId: z.string().min(1).max(128)
 }).strict();
 
+
+export const ArtifactDownloadLinkOutputSchema = z.object({
+  result: z.object({
+    artifactId: z.string(),
+    filename: z.string(),
+    mediaType: z.string(),
+    sizeBytes: z.number().int().nonnegative(),
+    url: z.string().url(),
+    expiresAt: z.string()
+  }).strict()
+}).strict();
+
 export const ArtifactOutputSchema = z.object({
   result: z.object({
     id: z.string(),
