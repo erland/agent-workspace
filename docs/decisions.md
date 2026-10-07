@@ -72,3 +72,28 @@ A Modal client must be constructed per execution account rather than held as one
 **Rationale:** Uploaded npm/Maven projects can execute arbitrary code through build scripts and plugins. The sandbox therefore has to be treated as hostile even when the top-level command is server-controlled.
 
 **Trade-off:** A restrictive dependency-domain policy may reject legitimate projects that depend on custom/private repositories. V1 prefers an explicit failure over silently granting unrestricted egress; configurable repository policies can be added later.
+
+
+## ADR-015 – Separate build, preview, and browser-rendering responsibilities
+
+**Status:** Accepted
+
+**Decision:** Agent Workspace owns temporary execution, project verification, project build, and artifact publication. PWA Preview owns static preview publication and preview lifecycle. Browser Screenshot owns browser rendering and screenshot presentation.
+
+The target Agent Workspace MCP surface therefore excludes the current `prototype_start`, `prototype_preview_link`, `prototype_screenshot`, `prototype_screenshot_gallery`, and `prototype_stop` tools once migration prerequisites are complete.
+
+The supported cross-service handoff is:
+
+```text
+Agent Workspace project_build
+  -> artifact_download_link
+  -> PWA Preview preview_create(sourceUrl)
+  -> preview URL
+  -> Browser Screenshot screenshot_create
+```
+
+**Rationale:** The three services currently overlap around prototype hosting and screenshot capture. Keeping those concerns in Agent Workspace duplicates browser/runtime code, makes MCP tool selection less clear, and keeps execution sandboxes alive for work that dedicated services can perform more efficiently.
+
+**Migration constraint:** This ADR defines the target state only. Prototype tools remain available until `project_build` output handling and the signed artifact handoff to PWA Preview are verified. Removal is intentionally staged to avoid breaking the existing end-to-end workflow.
+
+See `docs/service-boundaries.md` for the detailed responsibility split and migration order.

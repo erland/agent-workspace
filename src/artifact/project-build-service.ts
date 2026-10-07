@@ -108,7 +108,14 @@ export class ProjectBuildService {
     for (let index = 0; index < outputs.length; index += 1) {
       const requested = outputs[index]!;
       validateRelativePath(requested.path);
-      const type = (await this.exec(handle, ["bash","-lc",`if [ -f ${shellQuote(requested.path)} ]; then printf file; elif [ -d ${shellQuote(requested.path)} ]; then printf dir; else exit 2; fi`])).stdout.trim();
+      const inspection = await this.exec(handle, ["bash","-lc",`if [ -f ${shellQuote(requested.path)} ]; then printf file; elif [ -d ${shellQuote(requested.path)} ]; then printf dir; else exit 2; fi`]);
+      if (inspection.exitCode === 2) {
+        throw new Error(`Requested build output does not exist: ${requested.path}`);
+      }
+      if (inspection.exitCode !== 0) {
+        throw new Error(inspection.stderr || inspection.stdout || `Could not inspect build output: ${requested.path}`);
+      }
+      const type = inspection.stdout.trim();
       if (type === "file") {
         const absolutePath = `${this.projectRoot}/${requested.path}`;
         await this.assertOutputSize(handle, absolutePath);
