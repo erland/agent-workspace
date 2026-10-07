@@ -3,13 +3,12 @@ import { describe, it } from "node:test";
 
 import type { Command, CreateWorkspaceOptions, ExecutionResult, SandboxProvider, WorkspaceHandle } from "../src/core/sandbox-provider.js";
 import { WorkspaceService } from "../src/workspace/workspace-service.js";
-import { InMemoryWorkspaceRepository, InMemoryExecutionAccountRepository } from "../src/persistence/in-memory.js";
+import { InMemoryWorkspaceRepository } from "../src/persistence/in-memory.js";
 import { DEFAULT_SECURITY_POLICY } from "../src/security/security-policy.js";
 import { redactSensitiveText } from "../src/security/redaction.js";
 import { InMemoryFixedWindowRateLimiter } from "../src/security/rate-limiter.js";
 import { normalizeToolError } from "../src/mcp/errors.js";
 import { ExpiredWorkspaceCleanupJob } from "../src/workspace/expired-workspace-cleanup-job.js";
-import type { ExecutionProviderFactory } from "../src/execution/execution-provider-factory.js";
 import { makeStoredZip } from "./zip-fixture.js";
 
 class FakeProvider implements SandboxProvider {
@@ -32,11 +31,6 @@ class FakeProvider implements SandboxProvider {
     this.terminated.push(handle);
     if (this.failTerminate) throw new Error("provider unavailable");
   }
-}
-
-class FakeFactory implements ExecutionProviderFactory {
-  constructor(private readonly provider: SandboxProvider) {}
-  async createForAccount(): Promise<SandboxProvider> { return this.provider; }
 }
 
 describe("DEV-014 security hardening", () => {
@@ -96,8 +90,6 @@ describe("DEV-014 security hardening", () => {
   it("cleanup also expires stale CREATING reservations", async () => {
     const provider = new FakeProvider();
     const workspaces = new InMemoryWorkspaceRepository();
-    const accounts = new InMemoryExecutionAccountRepository();
-    await accounts.upsert({ id: "ea1", userId: "u1", provider: "modal", credentialRef: "ref", status: "CONNECTED", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" });
     await workspaces.upsert({
       id: "ws-creating", userId: "u1", runtimeProfile: "java21-node22",
       status: "CREATING", createdAt: "2026-01-01T00:00:00Z", expiresAt: "2026-01-01T00:01:00Z"
