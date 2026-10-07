@@ -114,6 +114,8 @@ Agent Workspace project_build
     -> PWA Preview preview_create(sourceUrl)
 ```
 
+The concrete contract and failure handling are documented in `docs/artifact-handoff.md`.
+
 Agent Workspace must not retain a second static preview/public-hosting implementation.
 
 ## Browser Screenshot owns
