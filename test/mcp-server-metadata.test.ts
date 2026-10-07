@@ -22,7 +22,7 @@ describe("Agent Workspace MCP server metadata", () => {
       assert.equal(info.name, "agent-workspace");
       assert.equal(info.title, "Agent Workspace");
       assert.match(info.version, /\S+/);
-      assert.match(info.description ?? "", /temporary sandbox workspaces/i);
+      assert.match(info.description ?? "", /temporary logical workspaces/i);
       assert.equal(info.websiteUrl, "https://agent-workspace.apphome.one/about");
       assert.equal(info.icons?.length, 1);
       assert.equal(info.icons?.[0]?.mimeType, "image/png");
