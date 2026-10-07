@@ -1,6 +1,6 @@
 # Security baseline – v1
 
-`agent-workspace` treats every uploaded ZIP and every build/prototype process as untrusted code.
+`agent-workspace` treats every uploaded ZIP and every build/verification process as untrusted code.
 
 ## Trust boundaries
 
@@ -18,23 +18,22 @@
 
 - maximum 3 active workspaces per user,
 - maximum logical workspace/source/artifact working lifetime 60 minutes,
-- maximum interactive Modal prototype Sandbox lifetime 20 minutes; verify/build Sandboxes are terminated immediately after each operation,
+- verify/build Sandboxes are terminated immediately after each operation,
 - CPU reservation 1 physical core; CPU hard limit 2 cores,
 - memory 2048 MiB,
 - per-user/per-operation fixed-window rate limit of 60/minute in v1,
 - maximum ZIP 100 MiB compressed / 500 MiB declared uncompressed / 20,000 entries,
 - remote HTTP payload cap 145 MiB,
-- screenshot dimensions capped at 4096×4096 and screenshot output capped at 10 MiB before control-plane readback,
 - OAuth Dynamic Client Registration capped at 16 KiB request metadata, 10 redirect URIs, 2048 characters per redirect URI and 20 registrations/minute per service instance,
 - command timeouts and bounded logs.
 
 ## Temporary storage and artifact handoff
 
-Uploaded source archives, screenshots and build artifacts are copied out of execution Sandboxes into Agent Workspace temporary object storage. The v1 implementation uses a persistent Coolify volume through the provider-neutral ObjectStore interface. Build artifacts have independent expiry metadata and can be read through authenticated MCP resources or short-lived HMAC-signed HTTPS download links. Signed URLs are bounded by artifact expiry and do not contain Modal or Agent Workspace credentials.
+Uploaded source archives and build artifacts are copied out of execution Sandboxes into Agent Workspace temporary object storage. The v1 implementation uses a persistent Coolify volume through the provider-neutral ObjectStore interface. Build artifacts have independent expiry metadata and can be read through authenticated MCP resources or short-lived HMAC-signed HTTPS download links. Signed URLs are bounded by artifact expiry and do not contain Modal or Agent Workspace credentials.
 
-## Interactive preview exposure
+## Browser boundary
 
-A running prototype may be exposed through a Modal encrypted HTTPS tunnel on port 4173. The tunnel lifetime is bounded by the same maximum 20-minute Sandbox lifetime. The URL is treated as a temporary public capability: anyone who obtains it can access the prototype until the Sandbox terminates. The preview contains no Agent Workspace or Modal credentials. Only the prototype port is tunneled.
+Agent Workspace does not expose interactive previews or screenshot capture. Browser navigation, Chromium/Playwright execution, viewport/device handling, and screenshot presentation belong to Browser Screenshot. Agent Workspace runtime image v3 therefore contains no browser runtime.
 
 ## Network policy
 
@@ -44,7 +43,7 @@ A live Modal smoke test is included to verify the effective behavior against all
 
 ## Logging and audit
 
-Build/prototype output is bounded and redacted for common bearer/provider credential patterns. Audit events contain identifiers, action, outcome and error code only; they do not contain access tokens, refresh tokens or Modal credential material.
+Build/verification output is bounded and redacted for common bearer/provider credential patterns. Audit events contain identifiers, action, outcome and error code only; they do not contain access tokens, refresh tokens or Modal credential material.
 
 ## Cleanup
 
@@ -60,14 +59,6 @@ A focused security review of the current implementation identified no verified c
 - stale `CREATING` reservations are included in expiry cleanup so a crashed creator cannot consume quota indefinitely,
 - the expiry timer is installed only after the workspace has successfully reached `READY`.
 
-The resource-bound findings have now also been addressed:
-
-- prototype screenshots use viewport capture instead of unbounded full-page capture,
-- screenshot artifacts are limited to 10 MiB and size-checked inside the sandbox before bytes are read into the control-plane process,
-- `POST /register` is limited to 16 KiB at HTTP intake and in the OAuth handler,
-- Dynamic Client Registration accepts at most 10 redirect URIs, each at most 2048 characters, and client names at most 200 characters,
-- Dynamic Client Registration has an independent per-instance limit of 20 requests/minute.
-
 The runtime-image hardening finding has now been addressed at the recommended minimum level:
 
 - the publish workflow queries GHCR before build/push and refuses to publish an exact runtime tag that already exists,
@@ -77,7 +68,7 @@ The runtime-image hardening finding has now been addressed at the recommended mi
 
 Digest pinning remains an optional future strengthening if stronger supply-chain immutability is required.
 
-The repository now also contains automated dependency/container scanning and a deployment-security checklist. During introduction of these scans, additional hardening issues were found and fixed: the runtime image now runs as a non-root user; the application runtime image no longer ships unused npm/corepack/yarn tooling that carried high-severity vulnerabilities; and runtime-image OS/Playwright/npm-toolchain dependencies were updated or patched until the default runtime image passed the high/critical Trivy gate. These runtime recipe changes are published as runtime image version 2.
+The repository now also contains automated dependency/container scanning and a deployment-security checklist. During introduction of these scans, additional hardening issues were found and fixed: the runtime image now runs as a non-root user; the application runtime image no longer ships unused npm/corepack/yarn tooling that carried high-severity vulnerabilities; runtime-image OS/npm-toolchain dependencies were updated or patched until the default runtime image passed the high/critical Trivy gate; and Playwright/Chromium were removed entirely once browser responsibilities moved to Browser Screenshot. The browser-free runtime recipe is published as runtime image version 3.
 
 The Trivy policy is fail-closed for High/Critical findings, including vulnerabilities that do not yet have an upstream fix. Global `ignore-unfixed` suppression is prohibited by the release-readiness check. Removing that suppression surfaced 19 inherited Debian Bookworm vulnerability IDs in the application image; instead of retaining exceptions, the application base image was upgraded to the official Node 22.23.3 Alpine 3.24 image.
 
@@ -113,7 +104,7 @@ Live Modal smoke tests remain environment-dependent and are run only when approp
 The runtime-image baseline at the time of this review is:
 
 ```text
-runtime-images/version.txt = 2
+runtime-images/version.txt = 3
 ```
 
 Any runtime-image recipe change must increment that version until stronger immutable-image enforcement is implemented.
@@ -123,7 +114,7 @@ Any runtime-image recipe change must increment that version until stronger immut
 The planned implementation order is:
 
 1. **Workspace lifecycle hardening** – implemented in the current remediation increment: atomic quota reservation, compensating failed creation and stale `CREATING` cleanup.
-2. **Resource bounds** – implemented and regression-verified: viewport/byte-bounded screenshots plus OAuth registration request, metadata and rate limits.
+2. **Resource bounds** – implemented and regression-verified for build artifacts and OAuth registration request, metadata and rate limits.
 3. **Runtime-image hardening** – implemented and statically regression-verified: existing versioned GHCR tags cannot be republished by the workflow.
 4. **Security verification** – repository controls implemented and CI-scanned; live Modal egress and deployed Coolify/PostgreSQL verification remain external/pending.
 
