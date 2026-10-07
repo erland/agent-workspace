@@ -82,6 +82,11 @@ if (!runtimeProfile.includes("bootstrapCommands: []")) {
   throw new Error("Runtime profiles must not reinstall the fixed toolchain during workspace startup");
 }
 
+const runtimeDockerfile = await readFile("runtime-images/Dockerfile", "utf8");
+if (/playwright|chromium|PLAYWRIGHT_BROWSERS_PATH/i.test(runtimeDockerfile)) {
+  throw new Error("Agent Workspace runtime images must not contain Playwright/Chromium browser tooling");
+}
+
 const runtimeWorkflow = await readFile(".github/workflows/runtime-images.yml", "utf8");
 if (!runtimeWorkflow.includes("packages: write")) {
   throw new Error("Runtime image workflow must have packages: write permission");
