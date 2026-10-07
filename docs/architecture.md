@@ -17,7 +17,7 @@ ChatGPT / Claude / MCP client
 | WorkspaceService            |
 | RuntimeResolver             |
 | VerificationService         |
-| PrototypeService            |
+| ArtifactService             |
 | SandboxProvider             |
 +-------------+---------------+
               |
@@ -128,7 +128,7 @@ Java metadata kan inkludera relevanta `pom.xml` properties. Node metadata kan in
 
 Ett workspace får en låst runtime-profil vid creation. Upload kan rapportera mismatch men får inte tyst byta profil.
 
-Each profile resolves to a versioned registry tag such as `ghcr.io/erland/agent-workspace-runtime:java21-node22-v1`. The runtime image already contains JDK, Node/npm, Maven, unzip, Playwright and Chromium. `bootstrapCommands` is intentionally empty in production runtime profiles.
+Each profile resolves to a versioned registry tag such as `ghcr.io/erland/agent-workspace-runtime:java21-node22-v1`. The runtime image contains the build toolchain required by the supported runtime profile. Browser tooling is not part of the Agent Workspace target architecture. `bootstrapCommands` is intentionally empty in production runtime profiles.
 
 ## 6. Workspace state
 
@@ -165,18 +165,9 @@ Projektfiler lagras i sandboxen, inte i PostgreSQL.
 
 Alla resultat normaliseras till provider-neutrala `ExecutionResult`/`VerificationResult`.
 
-## 8. Prototype
+## 8. Artifact handoff
 
-PrototypeService ska:
-
-1. installera dependencies,
-2. välja stödd startstrategi,
-3. starta server i sandbox,
-4. verifiera readiness,
-5. köra Playwright/Chromium mot localhost,
-6. returnera PNG bytes + viewport metadata.
-
-Publik URL krävs inte i v1.
+Build outputs are published as temporary artifacts. Static web outputs can be handed to PWA Preview through a short-lived signed URL from `artifact_download_link`. Browser rendering and screenshots belong to Browser Screenshot.
 
 ## 9. Säkerhetsgränser
 
@@ -197,7 +188,7 @@ agent-workspace container
 PostgreSQL (när persistence krävs)
 ```
 
-Modal hostar all build/browser-exekvering. Coolify-servern behöver därför inte Java, Maven, Node build tooling eller Chromium för användarprojekten.
+Modal hostar all build-exekvering. Coolify-servern behöver därför inte Java, Maven eller Node build tooling för användarprojekten.
 
 ## 11. Multi-user persistence (DEV-012)
 
@@ -212,7 +203,7 @@ app_user
 
 `execution_account` stores `credentialRef`, never Modal refresh tokens, token secrets or OAuth client secrets. Credential material remains behind the server-side `ExecutionAccountCredentialStore` boundary from DEV-011.
 
-Workspace rows are ownership-scoped by `user_id` and contain enough provider metadata (`provider_id`, `provider_workspace_id`, runtime, status and expiry) to rehydrate a provider handle after an application restart. Project/prototype metadata may be stored as JSONB; project source files remain in the sandbox, not PostgreSQL.
+Workspace rows are ownership-scoped by `user_id` and contain enough provider metadata (`provider_id`, `provider_workspace_id`, runtime, status and expiry) to rehydrate a provider handle after an application restart. Project metadata may be stored as JSONB; project source files remain in temporary object storage and are copied into execution sandboxes as needed.
 
 `WorkspaceService` accepts an optional `WorkspaceRepository`. With persistence enabled it writes state transitions, can rehydrate a workspace after process restart and can reconcile persisted expired READY workspaces through `cleanupExpired()`.
 
