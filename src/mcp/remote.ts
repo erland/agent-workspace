@@ -110,7 +110,7 @@ const settingsHandler = authServer && mutableCredentialStore
     })
   : undefined;
 
-const cleanupJob = new ExpiredWorkspaceCleanupJob(workspaces, executionAccounts, providerFactory, () => new Date(), objectStore);
+const cleanupJob = new ExpiredWorkspaceCleanupJob(workspaces, () => new Date(), objectStore);
 const cleanupTimer = setInterval(() => {
   void Promise.all([
     cleanupJob.run(),
