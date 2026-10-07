@@ -2,11 +2,9 @@ ARG JAVA_VERSION=21
 FROM eclipse-temurin:${JAVA_VERSION}-jdk-noble
 
 ARG NODE_MAJOR=22
-ARG PLAYWRIGHT_VERSION=1.55.1
 ARG NPM_VERSION=11.21.0
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    PLAYWRIGHT_BROWSERS_PATH=/opt/agent-workspace/ms-playwright
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN set -eux; \
     find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -i 's|http://|https://|g' {} +; \
@@ -31,14 +29,10 @@ RUN set -eux; \
     ! grep -R --include=package.json -l '"version": "6.28.0"' "${npm_root}"/node_modules/undici 2>/dev/null; \
     rm -rf /tmp/npm-security-patches; \
     cd /; \
-    mkdir -p /opt/agent-workspace/browser-tools; \
-    npm install --prefix /opt/agent-workspace/browser-tools "playwright@${PLAYWRIGHT_VERSION}"; \
-    /opt/agent-workspace/browser-tools/node_modules/.bin/playwright install --with-deps chromium; \
     java -version; \
     node --version; \
     npm --version; \
     mvn --version; \
-    /opt/agent-workspace/browser-tools/node_modules/.bin/playwright --version; \
     rm -rf /var/lib/apt/lists/* /root/.npm/_cacache; \
     groupadd --system agent-workspace; \
     useradd --system --gid agent-workspace --create-home --home-dir /home/agent-workspace agent-workspace; \
