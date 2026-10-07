@@ -32,7 +32,6 @@ export class ExpiredWorkspaceCleanupJob {
         const {
           providerId: _providerId,
           providerWorkspaceId: _providerWorkspaceId,
-          prototype: _prototype,
           ...logicalWorkspace
         } = workspace;
         await this.workspaces.upsert({
