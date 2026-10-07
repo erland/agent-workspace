@@ -47,7 +47,7 @@ describe("PostgreSQL repositories", () => {
   it("maps persisted workspace metadata including project JSON state", async () => {
     const db = new FakeSqlClient();
     db.nextRows = [{
-      id: "ws-1", user_id: "user-1", provider_id: "modal", provider_workspace_id: "sb-1",
+      id: "ws-1", user_id: "user-1",
       runtime_profile: "java21-node22", status: "READY",
       created_at: "2026-09-29T18:00:00.000Z", expires_at: "2026-09-29T18:30:00.000Z",
       destroyed_at: null,
