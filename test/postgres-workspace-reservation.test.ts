@@ -42,9 +42,9 @@ describe("PostgresWorkspaceRepository quota reservation", () => {
     assert.match(db.text, /hashtextextended\(\$1, 0\)/);
     assert.match(db.text, /status in \('CREATING','READY'\)/);
     assert.match(db.text, /select \$2,\$1,null,null/);
-    assert.match(db.text, /active\.count < \$10/);
+    assert.match(db.text, /active\.count < \$9/);
     assert.equal(db.values[0], "user-1");
-    assert.equal(db.values[9], 3);
+    assert.equal(db.values[8], 3);
   });
 
   it("returns false when the atomic insert did not reserve capacity", async () => {
