@@ -164,8 +164,8 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
     await this.db.query(
       `insert into workspace
          (id, user_id, provider_id, provider_workspace_id, runtime_profile, status,
-          created_at, expires_at, destroyed_at, project_json, prototype_json)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb)
+          created_at, expires_at, destroyed_at, project_json)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)
        on conflict (id) do update set
          provider_id = excluded.provider_id,
          provider_workspace_id = excluded.provider_workspace_id,
@@ -173,8 +173,7 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
          status = excluded.status,
          expires_at = excluded.expires_at,
          destroyed_at = excluded.destroyed_at,
-         project_json = excluded.project_json,
-         prototype_json = excluded.prototype_json`,
+         project_json = excluded.project_json`,
       [
         workspace.id,
         workspace.userId,
@@ -185,8 +184,7 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
         workspace.createdAt,
         workspace.expiresAt,
         workspace.destroyedAt ?? null,
-        workspace.project ? JSON.stringify(workspace.project) : null,
-        null
+        workspace.project ? JSON.stringify(workspace.project) : null
       ]
     );
   }
@@ -203,10 +201,10 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
        )
        insert into workspace
          (id, user_id, provider_id, provider_workspace_id, runtime_profile, status,
-          created_at, expires_at, destroyed_at, project_json, prototype_json)
-       select $2,$1,null,null,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb
+          created_at, expires_at, destroyed_at, project_json)
+       select $2,$1,null,null,$3,$4,$5,$6,$7,$8::jsonb
        from active
-       where active.count < $10
+       where active.count < $9
        returning id`,
       [
         workspace.userId,
@@ -217,7 +215,6 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
         workspace.expiresAt,
         workspace.destroyedAt ?? null,
         workspace.project ? JSON.stringify(workspace.project) : null,
-        null,
         maxActiveWorkspaces
       ]
     );
@@ -239,7 +236,7 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
   async findByIdForUser(workspaceId: string, userId: string): Promise<PersistedWorkspace | undefined> {
     const result = await this.db.query<WorkspaceRow>(
       `select id, user_id, provider_id, provider_workspace_id, runtime_profile, status,
-              created_at, expires_at, destroyed_at, project_json, prototype_json
+              created_at, expires_at, destroyed_at, project_json
        from workspace where id = $1 and user_id = $2`,
       [workspaceId, userId]
     );
@@ -250,7 +247,7 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
   async listExpiredActive(nowIso: string, limit = 100): Promise<PersistedWorkspace[]> {
     const result = await this.db.query<WorkspaceRow>(
       `select id, user_id, provider_id, provider_workspace_id, runtime_profile, status,
-              created_at, expires_at, destroyed_at, project_json, prototype_json
+              created_at, expires_at, destroyed_at, project_json
        from workspace
        where status in ('CREATING','READY') and expires_at <= $1
        order by expires_at asc
@@ -281,7 +278,6 @@ type WorkspaceRow = {
   runtime_profile: PersistedWorkspace["runtimeProfile"]; status: PersistedWorkspace["status"];
   created_at: string | Date; expires_at: string | Date; destroyed_at: string | Date | null;
   project_json: NonNullable<PersistedWorkspace["project"]> | string | null;
-  prototype_json: unknown;
 };
 
 function toIso(value: string | Date): string {
