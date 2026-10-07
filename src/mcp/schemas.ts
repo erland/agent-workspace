@@ -111,10 +111,10 @@ export const PrototypePreviewOutputSchema = z.object({
 export const ProjectBuildInputSchema = z.object({
   workspaceId: z.string().min(1),
   outputs: z.array(z.object({
-    path: z.string().min(1).max(512),
-    name: z.string().min(1).max(120).optional(),
-    kind: z.string().min(1).max(80).optional()
-  }).strict()).max(12).optional()
+    path: z.string().min(1).max(512).describe("Project-relative path to a build output. May name either a single file or a directory. Files are published unchanged; directories are packaged as .tar.gz artifacts."),
+    name: z.string().min(1).max(120).optional().describe("Optional human-readable artifact name. For directories this also forms the archive filename."),
+    kind: z.string().min(1).max(80).optional().describe("Optional artifact kind label such as static-web, jar, war, zip, or report.")
+  }).strict()).max(12).optional().describe("Explicit build outputs to publish. When omitted, Agent Workspace detects conventional npm or Maven outputs.")
 }).strict();
 
 export const ArtifactIdInputSchema = z.object({
