@@ -27,7 +27,6 @@ export interface AgentWorkspaceCapabilities {
     defaultLifetimeMinutes: number;
     maxLifetimeMinutes: number;
     executionModel: "lazy-ephemeral";
-    interactiveSandboxMaxLifetimeMinutes: number;
   };
   artifacts: {
     temporaryStorage: boolean;
