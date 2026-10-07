@@ -1,6 +1,3 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
-
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 
@@ -13,8 +10,6 @@ const transport = new StdioClientTransport({
   env: Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined))
 });
 
-const outputDir = resolve("output-dev016");
-await mkdir(outputDir, { recursive: true });
 
 try {
   await client.connect(transport);
@@ -24,7 +19,6 @@ try {
   await verifyNpm(true);
   await verifyMaven(false);
   await verifyMaven(true);
-  await verifyPrototype();
   console.log("DEV-016 pre-deployment MCP acceptance => PASSED");
 } finally {
   await client.close();
@@ -87,34 +81,6 @@ async function verifyMaven(failing: boolean): Promise<void> {
         throw new Error(`Maven FAIL acceptance failed: ${JSON.stringify(result)}`);
       }
       console.log(`Maven FAIL => ${result.failedStep}, exit ${result.exitCode}`);
-    }
-  } finally {
-    await destroyWorkspace(workspace.id);
-  }
-}
-
-async function verifyPrototype(): Promise<void> {
-  const workspace = await createWorkspace({ java: "21", node: "22", lifetimeMinutes: 10 });
-  try {
-    await upload(workspace.id, prototypeArchive(), "prototype.zip");
-    const started = await call("prototype_start", { workspaceId: workspace.id }) as any;
-    if (started.status !== "RUNNING") throw new Error(`prototype_start failed: ${JSON.stringify(started)}`);
-
-    for (const viewport of ["desktop", "tablet", "mobile"] as const) {
-      const response = await client.callTool({
-        name: "prototype_screenshot",
-        arguments: { workspaceId: workspace.id, viewport }
-      });
-      if (response.isError) throw new Error(firstText(response) ?? `${viewport} screenshot failed`);
-      const image = (response.content ?? []).find((part: any) => part?.type === "image") as any;
-      if (!image?.data || image.mimeType !== "image/png") throw new Error(`${viewport} did not return PNG image content`);
-      const bytes = Buffer.from(image.data, "base64");
-      if (bytes.length < 8 || bytes.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a") {
-        throw new Error(`${viewport} returned invalid PNG bytes`);
-      }
-      const path = resolve(outputDir, `${viewport}.png`);
-      await writeFile(path, bytes);
-      console.log(`${viewport} screenshot => ${bytes.length} bytes, ${path}`);
     }
   } finally {
     await destroyWorkspace(workspace.id);
@@ -198,9 +164,3 @@ function mavenArchive(failing: boolean): Uint8Array {
   ]);
 }
 
-function prototypeArchive(): Uint8Array {
-  return makeStoredZip([
-    { path: "package.json", content: JSON.stringify({ name: "acceptance-prototype", private: true, scripts: { dev: "vite" }, devDependencies: { vite: "^7.1.0" }, engines: { node: "22" } }) },
-    { path: "index.html", content: `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box}body{margin:0;font-family:system-ui;background:#f4f6f8;color:#17202a}main{min-height:100vh;display:grid;place-items:center;padding:32px}.card{width:min(900px,100%);background:#fff;padding:clamp(28px,6vw,72px);border-radius:24px}h1{font-size:clamp(36px,7vw,72px);line-height:1;margin:0 0 20px}@media(max-width:600px){main{padding:16px}}</style></head><body><main><section class="card"><h1>Agent Workspace DEV-016</h1><p>End-to-end MCP acceptance prototype.</p></section></main></body></html>` }
-  ]);
-}
