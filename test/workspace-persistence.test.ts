@@ -33,7 +33,6 @@ describe("WorkspaceService persistence", () => {
     const workspace = await restarted.get("ws-persisted");
 
     assert.equal(workspace.userId, "user-1");
-    assert.equal(workspace.providerWorkspaceId, undefined);
     assert.equal(workspace.status, "READY");
   });
 
@@ -65,11 +64,11 @@ describe("WorkspaceService persistence", () => {
     assert.equal(provider.terminated.length, 0);
   });
 
-  it("reconciles an expired persisted workspace after restart", async () => {
+  it("reconciles an expired persisted logical workspace after restart", async () => {
     const repository = new InMemoryWorkspaceRepository();
     const provider = new FakeProvider();
     await repository.upsert({
-      id: "ws-expired-db", userId: "user-1", providerId: "fake", providerWorkspaceId: "provider-expired",
+      id: "ws-expired-db", userId: "user-1",
       runtimeProfile: "java21-node22", status: "READY",
       createdAt: "2026-09-29T17:00:00.000Z", expiresAt: "2026-09-29T17:30:00.000Z"
     });
@@ -81,7 +80,7 @@ describe("WorkspaceService persistence", () => {
     const stored = await repository.findByIdForUser("ws-expired-db", "user-1");
 
     assert.equal(cleaned, 1);
-    assert.equal(provider.terminated[0]?.providerWorkspaceId, "provider-expired");
+    assert.equal(provider.terminated.length, 0);
     assert.equal(stored?.status, "EXPIRED");
   });
 
