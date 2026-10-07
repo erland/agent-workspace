@@ -33,6 +33,7 @@ class BuildProvider implements SandboxProvider {
       return { exitCode: 0, stdout: "dist\n", stderr: "" };
     }
     if (text.includes("if [ -f") && text.includes("elif [ -d")) {
+      if (text.includes("missing-output")) return { exitCode: 2, stdout: "", stderr: "" };
       return { exitCode: 0, stdout: text.includes("dist/app.zip") ? "file" : "dir", stderr: "" };
     }
     if (command.argv[0] === "stat") {
@@ -74,6 +75,23 @@ describe("ProjectBuildService", () => {
     assert.deepEqual(provider.reads, ["/tmp/agent-workspace-build-0.tar.gz"]);
   });
 
+  it("collects an explicitly requested directory and packages it as tar.gz", async () => {
+    const provider = new BuildProvider();
+    const result = await new ProjectBuildService(provider, "/workspace/project").build(
+      handle,
+      "NPM",
+      [{ path: "dist", name: "frontend", kind: "static-web" }]
+    );
+
+    assert.equal(result.outputs.length, 1);
+    assert.equal(result.outputs[0]?.name, "frontend");
+    assert.equal(result.outputs[0]?.kind, "static-web");
+    assert.equal(result.outputs[0]?.filename, "frontend.tar.gz");
+    assert.equal(result.outputs[0]?.mediaType, "application/gzip");
+    assert.equal(result.outputs[0]?.sourcePath, "dist");
+    assert.deepEqual(provider.reads, ["/tmp/agent-workspace-build-0.tar.gz"]);
+  });
+
   it("collects an explicitly requested file without repackaging it", async () => {
     const provider = new BuildProvider();
     const result = await new ProjectBuildService(provider, "/workspace/project").build(
@@ -87,6 +105,18 @@ describe("ProjectBuildService", () => {
     assert.equal(result.outputs[0]?.kind, "zip");
     assert.equal(result.outputs[0]?.mediaType, "application/zip");
     assert.deepEqual(provider.reads, ["/workspace/project/dist/app.zip"]);
+  });
+
+  it("reports a missing explicitly requested output", async () => {
+    const provider = new BuildProvider();
+    await assert.rejects(
+      () => new ProjectBuildService(provider, "/workspace/project").build(
+        handle,
+        "NPM",
+        [{ path: "missing-output" }]
+      ),
+      /Requested build output does not exist: missing-output/
+    );
   });
 
   it("rejects requested outputs that can escape the project root", async () => {
