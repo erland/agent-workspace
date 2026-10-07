@@ -3,7 +3,6 @@ import type { ExecutionProviderFactory } from "../execution/execution-provider-f
 import type { ArtifactRepository, ExecutionAccountRepository, UserRepository, WorkspaceRepository } from "../persistence/repositories.js";
 import { IdentityService } from "../persistence/identity-service.js";
 import { RepositoryProfileProvider } from "../persistence/profile-provider.js";
-import type { ScreenshotViewport } from "../prototype/screenshot-service.js";
 import { WorkspaceService } from "../workspace/workspace-service.js";
 import {
   decodeBase64Archive,
@@ -126,40 +125,6 @@ export class AuthenticatedAgentWorkspaceToolService {
         };
       }
     );
-  }
-
-  async startPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
-    return this.withWorkspaceService("prototype_start", input.workspaceId, (service) => service.startPrototype(input.workspaceId));
-  }
-
-  async previewPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
-    return this.withWorkspaceService(
-      "prototype_preview_link",
-      input.workspaceId,
-      (service) => service.prototypePreviewLink(input.workspaceId)
-    );
-  }
-
-  async stopPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
-    return this.withWorkspaceService(
-      "prototype_stop",
-      input.workspaceId,
-      (service) => service.stopPrototype(input.workspaceId)
-    );
-  }
-
-  async screenshotPrototype(input: { workspaceId: string; viewport?: ScreenshotViewport }): Promise<ToolResult<unknown>> {
-    return this.withWorkspaceService("prototype_screenshot", input.workspaceId, (service) => service.screenshotPrototype(input.workspaceId, input.viewport));
-  }
-
-  async readScreenshotArtifact(input: { workspaceId: string; artifactId: string }): Promise<Uint8Array> {
-    const result = await this.withWorkspaceService(
-      "prototype_screenshot_resource",
-      input.workspaceId,
-      (service) => service.readScreenshotArtifact(input.workspaceId, input.artifactId)
-    );
-    if (!result.ok) throw new Error(result.error.message);
-    return result.result;
   }
 
   async destroyWorkspace(input: { workspaceId: string }): Promise<ToolResult<unknown>> {

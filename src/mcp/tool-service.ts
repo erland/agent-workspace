@@ -1,5 +1,4 @@
 import { getCapabilities } from "../core/capabilities.js";
-import type { ScreenshotViewport } from "../prototype/screenshot-service.js";
 import type { WorkspaceService } from "../workspace/workspace-service.js";
 import {
   decodeBase64Archive,
@@ -31,11 +30,6 @@ export interface AgentWorkspaceTools {
   getArtifact(input: { artifactId: string }): Promise<ToolResult<unknown>>;
   artifactDownloadLink(input: { artifactId: string }): Promise<ToolResult<unknown>>;
   readArtifact(input: { artifactId: string }): Promise<{ artifact: any; bytes: Uint8Array }>;
-  startPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
-  previewPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
-  stopPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
-  screenshotPrototype(input: { workspaceId: string; viewport?: ScreenshotViewport }): Promise<ToolResult<unknown>>;
-  readScreenshotArtifact(input: { workspaceId: string; artifactId: string }): Promise<Uint8Array>;
   destroyWorkspace(input: { workspaceId: string }): Promise<ToolResult<unknown>>;
 }
 
@@ -101,32 +95,6 @@ export class AgentWorkspaceToolService implements AgentWorkspaceTools {
 
   public async readArtifact(input: { artifactId: string }): Promise<{ artifact: any; bytes: Uint8Array }> {
     return this.workspaces.readArtifact(input.artifactId);
-  }
-
-  public async startPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
-    try { return { ok: true, result: await this.workspaces.startPrototype(input.workspaceId) }; }
-    catch (error) { return this.failure(error); }
-  }
-
-  public async previewPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
-    try { return { ok: true, result: await this.workspaces.prototypePreviewLink(input.workspaceId) }; }
-    catch (error) { return this.failure(error); }
-  }
-
-  public async stopPrototype(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
-    try { return { ok: true, result: await this.workspaces.stopPrototype(input.workspaceId) }; }
-    catch (error) { return this.failure(error); }
-  }
-
-  public async screenshotPrototype(input: { workspaceId: string; viewport?: ScreenshotViewport }): Promise<ToolResult<unknown>> {
-    try {
-      const result = await this.workspaces.screenshotPrototype(input.workspaceId, input.viewport);
-      return { ok: true, result };
-    } catch (error) { return this.failure(error); }
-  }
-
-  public async readScreenshotArtifact(input: { workspaceId: string; artifactId: string }): Promise<Uint8Array> {
-    return this.workspaces.readScreenshotArtifact(input.workspaceId, input.artifactId);
   }
 
   public async destroyWorkspace(input: { workspaceId: string }): Promise<ToolResult<unknown>> {

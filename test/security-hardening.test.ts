@@ -92,7 +92,7 @@ describe("DEV-014 security hardening", () => {
     assert.throws(() => limiter.check("u1", "project_verify"), /Rate limit exceeded/);
   });
 
-  it("marks destroy state even when active interactive provider termination reports an error", async () => {
+  it("marks destroy state even when provider termination reports an error", async () => {
     const provider = new FakeProvider();
     const repo = new InMemoryWorkspaceRepository();
     await repo.upsert({
@@ -103,16 +103,7 @@ describe("DEV-014 security hardening", () => {
       runtimeProfile: "java21-node22",
       status: "READY",
       createdAt: "2026-01-01T00:00:00Z",
-      expiresAt: "2026-01-01T01:00:00Z",
-      prototype: {
-        status: "RUNNING",
-        strategy: "dev",
-        port: 4173,
-        url: "http://127.0.0.1:4173",
-        processId: 1,
-        startedAt: "2026-01-01T00:00:00Z",
-        expiresAt: "2026-01-01T00:20:00Z"
-      }
+      expiresAt: "2026-01-01T01:00:00Z"
     });
     const service = new WorkspaceService(provider, { userId: "u1", repository: repo, schedule: () => ({}) });
     provider.failTerminate = true;

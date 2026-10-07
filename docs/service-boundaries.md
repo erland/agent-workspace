@@ -139,7 +139,7 @@ Agent Workspace must not retain a second browser/screenshot subsystem after the 
 
 ## Capabilities to retire from Agent Workspace
 
-The following current Agent Workspace MCP tools are transitional and will be removed after the artifact handoff is verified:
+The following former Agent Workspace MCP tools have been retired after the artifact handoff was established:
 
 - `prototype_start`
 - `prototype_preview_link`
@@ -147,7 +147,7 @@ The following current Agent Workspace MCP tools are transitional and will be rem
 - `prototype_screenshot_gallery`
 - `prototype_stop`
 
-Related prototype hosting, screenshot resources, screenshot gallery UI, Playwright/Chromium-specific code, tests, dependencies, and documentation should then be removed.
+Prototype hosting, screenshot MCP resources/UI, implementation code, and dedicated tests are removed from Agent Workspace. Runtime-image browser dependencies are cleaned up separately so that API removal and image changes can be verified independently.
 
 ## Runtime boundary
 
@@ -157,13 +157,10 @@ After the prototype/screenshot migration is complete, Playwright and Chromium sh
 
 ## Migration rule
 
-This document describes the target state. Existing prototype tools remain available until the artifact contract and Agent Workspace -> PWA Preview handoff have been strengthened and verified.
+The MCP/API migration to the target state is complete: Agent Workspace exposes build/artifact capabilities, while preview and screenshot responsibilities live in the dedicated services.
 
-The migration order is therefore:
+The remaining cleanup is:
 
-1. establish service boundaries,
-2. strengthen `project_build` output/artifact behavior,
-3. verify signed artifact handoff to PWA Preview,
-4. retire Agent Workspace preview tools,
-5. retire Agent Workspace screenshot tools and browser runtime,
-6. remove obsolete implementation, tests, dependencies, storage, and documentation.
+1. verify the reduced MCP surface and artifact handoff in CI/deployed acceptance,
+2. remove Playwright/Chromium from Agent Workspace runtime images,
+3. remove or archive remaining historical prototype-specific development documentation where useful.

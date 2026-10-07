@@ -186,7 +186,7 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
         workspace.expiresAt,
         workspace.destroyedAt ?? null,
         workspace.project ? JSON.stringify(workspace.project) : null,
-        workspace.prototype ? JSON.stringify(workspace.prototype) : null
+        null
       ]
     );
   }
@@ -217,7 +217,7 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
         workspace.expiresAt,
         workspace.destroyedAt ?? null,
         workspace.project ? JSON.stringify(workspace.project) : null,
-        workspace.prototype ? JSON.stringify(workspace.prototype) : null,
+        null,
         maxActiveWorkspaces
       ]
     );
@@ -281,7 +281,7 @@ type WorkspaceRow = {
   runtime_profile: PersistedWorkspace["runtimeProfile"]; status: PersistedWorkspace["status"];
   created_at: string | Date; expires_at: string | Date; destroyed_at: string | Date | null;
   project_json: NonNullable<PersistedWorkspace["project"]> | string | null;
-  prototype_json: NonNullable<PersistedWorkspace["prototype"]> | string | null;
+  prototype_json: unknown;
 };
 
 function toIso(value: string | Date): string {
@@ -320,7 +320,6 @@ function parseJson<T>(value: T | string | null): T | undefined {
 }
 function mapWorkspace(row: WorkspaceRow): PersistedWorkspace {
   const project = parseJson<NonNullable<PersistedWorkspace["project"]>>(row.project_json);
-  const prototype = parseJson<NonNullable<PersistedWorkspace["prototype"]>>(row.prototype_json);
   return {
     id: row.id,
     userId: row.user_id,
@@ -331,8 +330,7 @@ function mapWorkspace(row: WorkspaceRow): PersistedWorkspace {
     createdAt: toIso(row.created_at),
     expiresAt: toIso(row.expires_at),
     ...(row.destroyed_at ? { destroyedAt: toIso(row.destroyed_at) } : {}),
-    ...(project ? { project } : {}),
-    ...(prototype ? { prototype } : {})
+    ...(project ? { project } : {})
   };
 }
 
