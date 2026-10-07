@@ -172,7 +172,7 @@ Run the authenticated six-profile Modal smoke with:
 npm run verify:dev007
 ```
 
-Browser and screenshot capabilities intentionally remain disabled until the prototype steps are implemented.
+Preview hosting and screenshots are delegated to PWA Preview and Browser Screenshot rather than Agent Workspace.
 
 ## Lazy execution and temporary artifact storage
 
@@ -182,28 +182,7 @@ A logical Agent Workspace no longer implies a live Modal Sandbox. `workspace_cre
 
 Published build artifacts have independent 60-minute TTL metadata. They can be consumed through `agent-workspace://artifacts/{artifactId}` or through a short-lived signed HTTPS link returned by `artifact_download_link`.
 
-Interactive prototypes are the exception: `prototype_start` creates a Sandbox that may stay alive for at most 20 minutes. `prototype_stop` releases it immediately while leaving the logical workspace and stored artifacts intact. Screenshots are copied into Agent Workspace storage immediately, so gallery/resource reads no longer depend on the prototype Sandbox remaining alive.
-
-## DEV-008 prototype start
-
-An uploaded npm project can now be started as a local web prototype with `WorkspaceService.startPrototype()`. The service installs dependencies, chooses `dev` → `start` → `preview`, starts the process in the sandbox and reports `RUNNING` only after localhost readiness succeeds. Screenshots are added in DEV-009.
-
-## DEV-009 screenshot support
-
-A running prototype can now be captured as PNG through Playwright/Chromium with the `desktop` (1440×900), `tablet` (1024×768), and `mobile` (390×844) presets, stable device profiles, or an explicit viewport up to 4096×4096.
-
-Device profiles are `iphone` (393×852), `iphone-large` (430×932), `ipad` (820×1180), `android` (412×915), and `android-large` (480×1040). They default to `portrait`; `landscape` swaps width and height. These are stable UI viewport profiles rather than claims about one exact hardware model.
-
-`prototype_screenshot` captures exactly one requested viewport. Generic `mobile` or `tablet` requests are not expanded automatically into multiple devices or orientations. Additional portrait/landscape or device variants should only be requested when the user explicitly asks for them. Screenshot bytes stay provider-neutral and are returned as `image/png`; the Modal provider reads the generated PNG through the Sandbox filesystem API.
-
-Run the authenticated live smoke on your Mac with:
-
-```bash
-npm ci
-npm run verify:dev009
-```
-
-Successful live verification writes `output-dev009/desktop.png`, `tablet.png`, and `mobile.png`.
+For static web applications, the intended downstream flow is `project_build` → `artifact_download_link` → PWA Preview `preview_create(sourceUrl)`. Screenshots of the resulting public URL belong to Browser Screenshot.
 
 ## MCP development server
 
@@ -213,7 +192,7 @@ After `npm ci`, start the local stdio MCP server with:
 npm run mcp:stdio
 ```
 
-DEV-010 exposes: `get_capabilities`, `get_profile`, `workspace_create`, `workspace_upload_zip`, `workspace_upload_zip_from_url`, `project_verify`, `project_build`, `artifact_get`, `artifact_download_link`, `prototype_start`, `prototype_stop`, `prototype_preview_link`, `prototype_screenshot`, `prototype_screenshot_gallery`, and `workspace_destroy`.
+DEV-010 exposes: `get_capabilities`, `get_profile`, `workspace_create`, `workspace_upload_zip`, `workspace_upload_zip_from_url`, `project_verify`, `project_build`, `artifact_get`, `artifact_download_link`, and `workspace_destroy`.
 
 
 ### OpenAI plugin packages
@@ -234,22 +213,9 @@ For MCP hosts that do not support OpenAI file parameters, including Claude-compa
 
 The provider-neutral workspace layer remains unchanged: every transport is normalized to ZIP bytes before `WorkspaceService.uploadZip()`, so project detection, validation and Modal extraction use the same path regardless of MCP host.
 
-### Screenshot return transport
+### Static preview and screenshot handoff
 
-`prototype_screenshot` copies the PNG into Agent Workspace temporary storage and returns it as a normal inline MCP image block for compatible clients. It deliberately does **not** advertise the screenshot as a `resource_link` in the tool result, because hosts such as ChatGPT may treat returned file resources as materializable attachments and ask the user for an extra approval. The screenshot still has a protected `resourceUri` in structured metadata and remains available through `resources/read` for clients that explicitly need it while the logical workspace is alive. Screenshot resources remain protected by the same MCP OAuth/user isolation and no longer depend on the Modal Sandbox remaining alive.
-
-For ChatGPT and other MCP Apps-compatible hosts, `prototype_screenshot` is capture-only: it returns screenshot metadata plus the resource/image content needed by the model and non-UI clients, but it deliberately has no UI template. This prevents each individual capture from creating its own visible widget.
-
-All visible screenshot presentation goes through `prototype_screenshot_gallery`. The gallery accepts one or more artifact IDs returned by earlier `prototype_screenshot` calls, reads those artifacts server-side, and sends the image data to the widget through tool metadata without returning `resource_link` content blocks. It keeps the selected image as widget state, provides desktop/tablet/mobile-style tabs when several captures are present, and can request ChatGPT fullscreen mode from either the image or the “Open larger” action. This keeps screenshot capture independent from presentation, avoids unnecessary file-materialization prompts, and guarantees one visible gallery widget for the final result.
-
-### Interactive prototype preview
-
-Workspaces now expose the prototype port (4173) through a Modal encrypted HTTPS tunnel. `prototype_start` still starts and verifies the prototype inside the sandbox; `prototype_preview_link` is a separate opt-in tool that returns the clickable tunnel URL only when the user asks to try or interact with the prototype.
-
-The logical workspace default and maximum lifetime are 60 minutes. The interactive preview Sandbox is independently capped at 20 minutes. The preview URL is valid only while that Sandbox is alive and returns the prototype execution `expiresAt` timestamp. The tunnel is temporary but public to anyone who has the URL, so the tool result explicitly labels access as `temporary-public`. No Modal credentials, Agent Workspace OAuth tokens or application secrets are embedded in the link.
-
-Vite prototypes bind to `0.0.0.0` when a tunnel is available and receive the exact Modal tunnel hostname through `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS`; localhost readiness checks remain unchanged.
-
+Agent Workspace no longer runs interactive web prototypes or captures screenshots. Build a static web output with `project_build`, create a short-lived URL with `artifact_download_link`, and hand that URL to PWA Preview. Use Browser Screenshot against the resulting preview URL when visual verification is needed.
 
 ## DEV-011: user-specific Modal accounts
 
@@ -296,7 +262,7 @@ The authorization server / identity provider is deliberately external. Selection
 
 ## DEV-014 security baseline
 
-Public/multi-user v1 now applies a security baseline for untrusted npm/Maven/prototype code: bounded workspace lifetime/resources, maximum active workspaces per user, per-operation rate limiting, bounded/redacted logs, periodic TTL cleanup, structured audit events and a Modal outbound dependency-domain allowlist.
+Public/multi-user v1 now applies a security baseline for untrusted npm/Maven build code: bounded workspace lifetime/resources, maximum active workspaces per user, per-operation rate limiting, bounded/redacted logs, periodic TTL cleanup, structured audit events and a Modal outbound dependency-domain allowlist.
 
 See `docs/security-baseline.md` and `docs/dev-014-verification.md` for the exact controls, known limitations and live verification requirements.
 
@@ -356,7 +322,7 @@ No Nginx layer is required inside the Agent Workspace container. PostgreSQL is n
 
 ## Prebuilt Modal runtime images
 
-Workspace startup does not install Java, Node, Maven, Playwright or Chromium. Six prebuilt runtime images are published to GitHub Container Registry by `.github/workflows/runtime-images.yml`:
+Workspace startup does not install Java, Node or Maven during normal execution; supported build toolchains come from prebuilt runtime images. Six prebuilt runtime images are published to GitHub Container Registry by `.github/workflows/runtime-images.yml`:
 
 ```text
 java17-node20
