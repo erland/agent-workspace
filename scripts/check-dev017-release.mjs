@@ -16,6 +16,7 @@ const requiredFiles = [
   "docs/release-readiness.md",
   "runtime-images/Dockerfile",
   "runtime-images/version.txt",
+  "db/migrations/007_remove_prototype_json.sql",
   ".github/workflows/runtime-images.yml",
   ".github/workflows/security-scan.yml",
   ".github/workflows/release-image.yml",
@@ -71,6 +72,16 @@ for (const name of [
   if (!envExample.includes(`${name}=`)) {
     throw new Error(`.env.example is missing ${name}`);
   }
+}
+
+const workspaceRepository = await readFile("src/persistence/postgres/repositories.ts", "utf8");
+if (/prototype_json/i.test(workspaceRepository)) {
+  throw new Error("Active workspace persistence must not reference retired prototype_json state");
+}
+
+const prototypeRemovalMigration = await readFile("db/migrations/007_remove_prototype_json.sql", "utf8");
+if (!/drop column if exists prototype_json/i.test(prototypeRemovalMigration)) {
+  throw new Error("Prototype persistence removal migration must drop workspace.prototype_json");
 }
 
 const runtimeProfile = await readFile("src/core/runtime-profile.ts", "utf8");
