@@ -83,4 +83,4 @@ If the artifact has expired, rerun `project_build` and create a new handoff URL.
 
 ## Migration significance
 
-Once this handoff is covered by CI and deployment-level acceptance, Agent Workspace no longer needs to keep an interactive prototype sandbox alive for static web previews. That is the prerequisite for removing `prototype_start`, `prototype_preview_link`, and the screenshot-specific prototype tools.
+This handoff is now the supported static-preview boundary. Agent Workspace no longer exposes interactive prototype or screenshot tools; PWA Preview and Browser Screenshot own those responsibilities.
