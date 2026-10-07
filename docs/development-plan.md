@@ -2,14 +2,14 @@
 
 ## Goal and delivery scope
 
-Leverera en säker multi-user MCP-tjänst där AI-assistenter kan verifiera npm/Maven-projekt och köra webprototyper med screenshots via användarens Modal execution account.
+Leverera en säker multi-user MCP-tjänst där AI-assistenter kan verifiera och bygga npm/Maven-projekt via användarens Modal execution account och publicera tillfälliga build-artifacts. Preview-hosting och screenshots ägs av separata tjänster.
 
 ## Planning assumptions
 
 - V1 execution provider är endast Modal.
 - Provider-interface ska vara generiskt nog för framtida providers men inga andra providers implementeras i v1.
 - Default runtime är Java 21 + Node 22.
-- Modal-PoC för npm, Maven, Vite, Chromium och Playwright är redan verifierad.
+- Modal-PoC verifierade ursprungligen npm, Maven, Vite, Chromium och Playwright. Browser/prototype-delarna är historisk evidens och ingår inte längre i Agent Workspace målarkitektur.
 - Per-user Modal account linking behöver en separat feasibility-verifiering innan produktionsauth färdigställs.
 
 ## Step overview
@@ -23,15 +23,15 @@ Leverera en säker multi-user MCP-tjänst där AI-assistenter kan verifiera npm/
 | DEV-005 | npm verification | strukturerat PASS/FAIL för npm |
 | DEV-006 | Maven verification | strukturerat PASS/FAIL för Maven |
 | DEV-007 | Övriga runtime-profiler | Java17/25 och Node20 |
-| DEV-008 | Prototype start | startad lokal webbapp + readiness |
-| DEV-009 | Playwright screenshots | desktop/tablet/mobile PNG |
-| DEV-010 | MCP-kontrakt | åtta v1-tools end-to-end |
+| DEV-008 | Prototype start (historisk) | tidigare verifierad capability, senare retirerad |
+| DEV-009 | Playwright screenshots (historisk) | tidigare verifierad capability, senare flyttad till Browser Screenshot |
+| DEV-010 | MCP-kontrakt | nuvarande build/artifact-orienterade MCP-yta |
 | DEV-011 | Auth/account-linking feasibility spike | verifierat produktionsbart user→Modal flow |
 | DEV-012 | Multi-user identity och persistence | User/ExecutionAccount/Workspace i PostgreSQL |
 | DEV-013 | OAuth-skyddat remote MCP | ChatGPT/andra klienter autentiserar mot tjänsten |
 | DEV-014 | Security hardening | limits, cleanup, secrets, network policy review |
 | DEV-015 | Coolify deployment | containeriserad tjänst + DB |
-| DEV-016 | End-to-end acceptance | npm + Maven + prototype via riktig MCP-klient |
+| DEV-016 | End-to-end acceptance | npm + Maven + build/artifact via riktig MCP-klient |
 | DEV-017 | Release readiness | docs, operations, packaging, release candidate |
 
 ## Development steps
@@ -252,6 +252,9 @@ Utöka från default Java21/Node22 till hela v1-matrisen.
 
 ## DEV-008 – Prototype start
 
+> Historiskt steg. Capabilityn implementerades och verifierades, men har senare retirerats från Agent Workspace när preview-ansvaret flyttades till PWA Preview.
+
+
 ### Mål
 
 Starta kompatibel npm-webbprototyp och verifiera readiness inne i sandboxen.
@@ -277,6 +280,9 @@ Starta kompatibel npm-webbprototyp och verifiera readiness inne i sandboxen.
 - DEV-005.
 
 ## DEV-009 – Playwright screenshots
+
+> Historiskt steg. Capabilityn implementerades och verifierades, men har senare retirerats från Agent Workspace när browser/screenshot-ansvaret flyttades till Browser Screenshot.
+
 
 ### Mål
 
@@ -306,20 +312,25 @@ Returnera PNG-bilder från Chromium för definierade viewports.
 
 ### Mål
 
-Exponera v1:s åtta provider-neutrala tools.
+Exponera ett provider-neutralt MCP-kontrakt för workspace, verification, build och artifacts.
 
 ### Scope
 
+Current retained surface:
 - `get_capabilities`,
 - `get_profile`,
 - `workspace_create`,
 - `workspace_upload_zip`,
+- `workspace_upload_zip_from_url`,
 - `project_verify`,
-- `prototype_start`,
-- `prototype_screenshot`,
+- `project_build`,
+- `artifact_get`,
+- `artifact_download_link`,
 - `workspace_destroy`,
 - Zod schemas,
 - standardiserad felmodell.
+
+Prototype/screenshot tools that existed in the original DEV-010 milestone are historical and have been retired.
 
 ### Verifiering
 
@@ -328,9 +339,9 @@ Exponera v1:s åtta provider-neutrala tools.
 
 ### Klart-kriterier
 
-- [ ] Alla åtta tools har stabil input/output-schema.
+- [ ] Alla retained tools har stabil input/output-schema.
 - [ ] Modal-specifika parametrar exponeras inte.
-- [ ] Screenshot returneras som bild/artifact-kompatibelt resultat.
+- [ ] Build artifacts kan hämtas som MCP resource eller signerad HTTPS-länk.
 
 ### Beroenden
 
@@ -488,8 +499,8 @@ Verifiera fulla v1-flöden via riktig MCP-klient.
 - npm PASS/FAIL,
 - Maven PASS/FAIL,
 - Java/Node runtime selection,
-- prototype start,
-- tre screenshots,
+- build/artifact publication,
+- signed artifact handoff,
 - cleanup.
 
 ### Verifiering
@@ -503,7 +514,7 @@ Verifiera fulla v1-flöden via riktig MCP-klient.
 - [ ] npm PASS/FAIL passes through MCP.
 - [ ] Maven PASS/FAIL passes through MCP.
 - [ ] Runtime selection passes through MCP.
-- [ ] Prototype start + three screenshots pass through MCP.
+- [ ] Build/artifact publication and handoff pass through MCP.
 - [ ] Cleanup passes for every acceptance case.
 - [ ] Final remote/deployed path is verified before DEV-016 is marked complete.
 

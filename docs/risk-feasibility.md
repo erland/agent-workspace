@@ -15,7 +15,7 @@ En separat Modal-PoC har verifierat följande end-to-end:
 - Vite-prototyp kan startas och nås lokalt,
 - screenshots för desktop/tablet/mobile kan hämtas tillbaka till klienten.
 
-PoC-resultatet var PASS för Node, Maven och prototype-flödet.
+PoC-resultatet var PASS för Node, Maven och det dåvarande prototype-flödet. Prototype/screenshot-funktionerna har senare flyttats ut ur Agent Workspace; Browser Screenshot äger browser-runtime och PWA Preview äger preview-livscykel.
 
 ## Huvudrisker
 
@@ -39,10 +39,10 @@ PoC-resultatet var PASS för Node, Maven och prototype-flödet.
 
 **Åtgärd:** v1 börjar med providerens säkra sandbox-isolering och inga server-secrets i sandboxen. Network allowlisting planeras som senare hardening om den inte behövs tidigare för release.
 
-### R-005 – Tool-resultat och bildtransport
-**Risk:** MCP-klienten måste kunna konsumera screenshot som bild/artifact och inte bara base64-text.
+### R-005 – Artifact handoff
+**Risk:** externa preview/deployment-tjänster måste kunna hämta build-output utan att få tillgång till Agent Workspace-interna resurser eller credentials.
 
-**Åtgärd:** verifiera tidigt i MCP-steget med verklig ChatGPT-klient.
+**Åtgärd:** använd kortlivade signerade HTTPS-länkar från `artifact_download_link` och håll preview/browser-funktioner i separata tjänster.
 
 ### R-006 – Workspace recovery
 **Risk:** backend restart medan Modal sandbox lever kan ge stale metadata.

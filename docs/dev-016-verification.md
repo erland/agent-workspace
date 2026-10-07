@@ -1,3 +1,5 @@
+> Historical verification record. The prototype/screenshot capability described here has been retired from the current Agent Workspace surface. Current preview/browser responsibilities are owned by PWA Preview and Browser Screenshot; see `docs/service-boundaries.md`.
+
 # DEV-016 verification
 
 Status: **implementation complete, pre-deployment acceptance pending live Modal execution**.

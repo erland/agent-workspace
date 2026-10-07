@@ -30,10 +30,10 @@ completed_steps:
   evidence: User verified all six Java/Node runtime profiles locally.
 - id: DEV-008
   verification: PASSED
-  evidence: User verified prototype readiness locally after the readiness-script regression fix.
+  evidence: Historical verification passed for the former prototype capability; that capability has since been retired from Agent Workspace.
 - id: DEV-009
   verification: PASSED
-  evidence: User verified the screenshot flow locally against Modal.
+  evidence: Historical verification passed for the former screenshot capability; browser rendering has since moved to Browser Screenshot.
 - id: DEV-010
   verification: PASSED
   evidence: User verified the MCP development flow locally.
@@ -45,7 +45,7 @@ completed_steps:
   evidence: User verified the remote-auth test flow locally.
 - id: DEV-014
   verification: PASSED
-  evidence: User verified DEV-014 locally and subsequently passed the DEV-016 authenticated Modal acceptance path covering representative npm, Maven, prototype, screenshot and cleanup flows.
+  evidence: User verified DEV-014 locally and subsequently passed the then-current DEV-016 authenticated Modal acceptance path. Prototype/screenshot capabilities were later retired from Agent Workspace.
 pending_steps:
 - id: DEV-018
   verification: EXTERNAL_VERIFICATION_PENDING
@@ -55,7 +55,7 @@ pending_steps:
   reason: Local DEV-015 tests passed, but the canonical verification requires a clean deployment to a real Coolify-like environment with PostgreSQL/OAuth configuration and health/auth/provider connectivity checks.
 - id: DEV-016
   verification: REMOTE_ACCEPTANCE_PENDING
-  reason: Local MCP/Modal acceptance passed, but the canonical verification requires final remote acceptance through the deployed OAuth-protected MCP endpoint after DEV-015 deployment verification.
+  reason: Local MCP/Modal acceptance passed for the current verify/build/artifact surface, but the canonical verification requires final remote acceptance through the deployed OAuth-protected MCP endpoint after DEV-015 deployment verification.
 - id: DEV-017
   verification: NOT_READY
   reason: Release readiness cannot be PASS while required DEV-015/DEV-016 production gates remain pending and DEV-011 account-linking feasibility remains deferred.
