@@ -17,7 +17,7 @@ import {
 import { ARTIFACT_RESOURCE_TEMPLATE, artifactResourceUri, singleArtifactTemplateValue } from "./artifact-resource.js";
 
 const AGENT_WORKSPACE_DESCRIPTION =
-  "Creates temporary sandbox workspaces for verifying and building uploaded npm and Maven projects and publishing temporary build artifacts.";
+  "Creates temporary logical workspaces for uploading, verifying, and building npm and Maven projects, and for publishing temporary build artifacts.";
 const AGENT_WORKSPACE_WEBSITE = "https://agent-workspace.apphome.one/about";
 const AGENT_WORKSPACE_ICON_DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAB7UlEQVR4nO2aMU7DUAyGHQQTjCywwsrA0IWBhQmBxAHYkFiBAzBygLYrUjcOgITExMLA0oELwDGYGMKUKI1Iajv2+wPxJ1VK1Dz39//8/JK22dbeSU4DZgUtAE0YgBaAJgxAC0ATBqAFoAkD0ALQrGoGvT4/WOsw4/D4XHS9uAL6nDyRXJ/IgL4nXyDRmXEfhqpBs6uL8jifzmj97bQ8v1zbKY/HowlbiAec5SBeAtXkiagxeSKim/m1NHxyBr8LhAHSAfl0tnD+dfBUHt9/fy68h+4BHFT3AW0mjDvJSU8sAbQANOwlsL254akDxuArIAxAC0ATBqAFoAkD0ALQuBqwOzpjXXd0+16+tDG0uBlQCO+SgEWMZbgYUBfclkB11l/u9lUxupCkB3zMH5OM0WBuQH2muiRSH+tRBaYGSJNvKv+2GNYmmBng3a29PsvMgPpMWa5hz9huFbBsljjlr40twa0CPOllBRD5NCzLXeU3zLdBjgnc8vdOnijRjZCmElLtKi4GWHRtz85fxa0CCsF14ZLu3xTDEtclYCHce3dR/TTWhWWznpr4RggtAE0YgBaAJgzgXpjyed8Crl5RBfwVEyQ6xUug7yZI9al6QF9N0Ohi/1P0vxK7AFoAmjAALQBNGIAWgCYMQAtA8wO6c5LmRtskgAAAAABJRU5ErkJggg==";
 
@@ -59,7 +59,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
 
   registerJsonTool(server, "get_capabilities", "List supported runtimes, build systems and artifact capabilities.", EmptyInputSchema, async () => tools.getCapabilities());
   registerJsonTool(server, "get_profile", "Show the current Agent Workspace identity and execution-provider connection.", EmptyInputSchema, async () => tools.getProfile());
-  registerJsonTool(server, "workspace_create", "Create a temporary sandbox workspace.", WorkspaceCreateInputSchema, async (input: z.infer<typeof WorkspaceCreateInputSchema>) => {
+  registerJsonTool(server, "workspace_create", "Create a temporary logical workspace. No execution sandbox is allocated until project_verify or project_build runs.", WorkspaceCreateInputSchema, async (input: z.infer<typeof WorkspaceCreateInputSchema>) => {
     const normalizedInput: { java?: "17" | "21" | "25"; node?: "20" | "22"; lifetimeMinutes?: number } = {};
     if (input.java !== undefined) normalizedInput.java = input.java;
     if (input.node !== undefined) normalizedInput.node = input.node;
@@ -167,7 +167,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
     async (input: z.infer<typeof ArtifactIdInputSchema>) => jsonToolResult(await tools.artifactDownloadLink(input))
   );
 
-  registerJsonTool(server, "workspace_destroy", "Terminate a workspace and release its sandbox resources.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.destroyWorkspace(input));
+  registerJsonTool(server, "workspace_destroy", "Destroy a logical workspace and remove its temporary source state. Execution sandboxes are operation-scoped and are not owned by the workspace.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.destroyWorkspace(input));
   return server;
 }
 
