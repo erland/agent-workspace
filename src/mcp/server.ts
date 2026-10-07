@@ -3,6 +3,7 @@ import * as z from "zod/v4";
 
 import type { AgentWorkspaceTools, ToolResult } from "./tool-service.js";
 import {
+  ArtifactDownloadLinkOutputSchema,
   ArtifactIdInputSchema,
   ArtifactOutputSchema,
   EmptyInputSchema,
@@ -209,12 +210,15 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
       };
     }
   );
-  registerJsonTool(
-    server,
+  server.registerTool(
     "artifact_download_link",
-    "Create a short-lived signed HTTPS download link for a published artifact. Use this when an external deployment service or user needs to fetch the artifact without MCP resource access.",
-    ArtifactIdInputSchema,
-    async (input: z.infer<typeof ArtifactIdInputSchema>) => tools.artifactDownloadLink(input)
+    {
+      annotations: toolAnnotations("artifact_download_link"),
+      description: "Create a short-lived signed HTTPS URL for a published artifact. The URL is intended for immediate handoff to external consumers such as PWA Preview preview_create(sourceUrl).",
+      inputSchema: ArtifactIdInputSchema,
+      outputSchema: ArtifactDownloadLinkOutputSchema
+    },
+    async (input: z.infer<typeof ArtifactIdInputSchema>) => jsonToolResult(await tools.artifactDownloadLink(input))
   );
 
   registerJsonTool(server, "prototype_start", "Install dependencies and start an uploaded npm web prototype.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.startPrototype(input));
