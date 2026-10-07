@@ -23,15 +23,6 @@ export interface AgentWorkspaceCapabilities {
     };
   };
   buildSystems: readonly ["maven", "npm"];
-  browser: {
-    chromium: boolean;
-    screenshots: boolean;
-    viewportPresets: readonly ["desktop", "tablet", "mobile"];
-    devicePresets: readonly ["iphone", "iphone-large", "ipad", "android", "android-large"];
-    orientations: readonly ["portrait", "landscape"];
-    customViewport: boolean;
-    interactivePreview: boolean;
-  };
   workspace: {
     defaultLifetimeMinutes: number;
     maxLifetimeMinutes: number;
@@ -62,20 +53,10 @@ export function getCapabilities(): AgentWorkspaceCapabilities {
       }
     },
     buildSystems: ["maven", "npm"],
-    browser: {
-      chromium: true,
-      screenshots: true,
-      viewportPresets: ["desktop", "tablet", "mobile"],
-      devicePresets: ["iphone", "iphone-large", "ipad", "android", "android-large"],
-      orientations: ["portrait", "landscape"],
-      customViewport: true,
-      interactivePreview: true
-    },
     workspace: {
       defaultLifetimeMinutes: 60,
       maxLifetimeMinutes: 60,
-      executionModel: "lazy-ephemeral",
-      interactiveSandboxMaxLifetimeMinutes: 20
+      executionModel: "lazy-ephemeral"
     },
     artifacts: {
       temporaryStorage: true,
