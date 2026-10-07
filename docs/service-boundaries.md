@@ -39,6 +39,32 @@ Project / ZIP
 +----------------------+
 ```
 
+## MCP surface before and after migration
+
+The current and target Agent Workspace MCP surfaces are:
+
+| Capability | Current | Target | Owner after migration |
+| --- | --- | --- | --- |
+| `get_capabilities` | keep | keep | Agent Workspace |
+| `get_profile` | keep | keep | Agent Workspace |
+| `workspace_create` | keep | keep | Agent Workspace |
+| `workspace_upload_zip` | keep | keep | Agent Workspace |
+| `workspace_upload_zip_from_url` | keep | keep | Agent Workspace |
+| `project_verify` | keep | keep | Agent Workspace |
+| `project_build` | keep | keep and strengthen output selection | Agent Workspace |
+| `artifact_get` | keep | keep | Agent Workspace |
+| `artifact_download_link` | keep | keep as cross-service handoff | Agent Workspace |
+| `prototype_start` | available | remove | PWA Preview replaces preview execution |
+| `prototype_preview_link` | available | remove | PWA Preview returns preview URL |
+| `prototype_screenshot` | available | remove | Browser Screenshot |
+| `prototype_screenshot_gallery` | available | remove | Browser Screenshot presentation |
+| `prototype_stop` | available | remove | PWA Preview lifecycle |
+| `workspace_destroy` | keep | keep | Agent Workspace |
+
+This reduces Agent Workspace from 15 public MCP tools to 10 target tools and removes the ambiguous overlap where an MCP client can currently choose Agent Workspace or the dedicated services for preview/screenshot work.
+
+No tool is removed in the architecture/documentation steps. Removal happens only after the artifact contract and signed URL handoff are verified.
+
 ## Agent Workspace owns
 
 The target public MCP surface is:
