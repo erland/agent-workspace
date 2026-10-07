@@ -41,8 +41,6 @@ export interface WorkspaceProject {
 export interface Workspace {
   id: string;
   userId: string;
-  providerId?: string;
-  providerWorkspaceId?: string;
   runtimeProfile: RuntimeProfileId;
   status: WorkspaceStatus;
   createdAt: string;
@@ -78,7 +76,6 @@ export interface WorkspaceServiceOptions {
 
 interface WorkspaceRecord {
   workspace: Workspace;
-  handle?: WorkspaceHandle;
   expiryTimer?: { unref?: () => void };
 }
 
@@ -316,23 +313,11 @@ export class WorkspaceService {
       return cloneWorkspace(record.workspace);
     }
 
-    let terminationError: unknown;
-    if (record.handle) {
-      try {
-        await this.provider.terminate(record.handle);
-      } catch (error) {
-        terminationError = error;
-      }
-    }
-    delete record.handle;
-    delete record.workspace.providerId;
-    delete record.workspace.providerWorkspaceId;
     record.workspace.status = "DESTROYED";
     record.workspace.destroyedAt = this.now().toISOString();
     await this.persist(record.workspace);
     await this.objectStore.deletePrefix(this.workspaceStoragePrefix(workspaceId)).catch(() => undefined);
 
-    if (terminationError !== undefined) throw terminationError;
     return cloneWorkspace(record.workspace);
   }
 
@@ -345,12 +330,6 @@ export class WorkspaceService {
       return;
     }
 
-    if (record.handle) {
-      await this.provider.terminate(record.handle).catch(() => undefined);
-    }
-    delete record.handle;
-    delete record.workspace.providerId;
-    delete record.workspace.providerWorkspaceId;
     record.workspace.status = "EXPIRED";
     record.workspace.destroyedAt = this.now().toISOString();
     await this.persist(record.workspace);
@@ -433,18 +412,7 @@ export class WorkspaceService {
   }
 
   private hydrate(workspace: PersistedWorkspace): WorkspaceRecord {
-    const hydrated: Workspace = { ...workspace };
-    const handle =
-      workspace.providerId && workspace.providerWorkspaceId
-        ? {
-            providerId: workspace.providerId,
-            providerWorkspaceId: workspace.providerWorkspaceId
-          }
-        : undefined;
-    return {
-      workspace: cloneWorkspace(hydrated),
-      ...(handle ? { handle } : {})
-    };
+    return { workspace: cloneWorkspace(workspace) };
   }
 
   private async persist(workspace: Workspace): Promise<void> {
