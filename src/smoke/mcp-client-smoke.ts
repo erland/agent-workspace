@@ -6,9 +6,11 @@ const expectedTools = [
   "get_profile",
   "workspace_create",
   "workspace_upload_zip",
+  "workspace_upload_zip_from_url",
   "project_verify",
-  "prototype_start",
-  "prototype_screenshot",
+  "project_build",
+  "artifact_get",
+  "artifact_download_link",
   "workspace_destroy"
 ].sort();
 
