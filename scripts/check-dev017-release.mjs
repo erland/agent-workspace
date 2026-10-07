@@ -17,6 +17,7 @@ const requiredFiles = [
   "runtime-images/Dockerfile",
   "runtime-images/version.txt",
   "db/migrations/007_remove_prototype_json.sql",
+  "db/migrations/008_remove_provider_workspace_handle.sql",
   ".github/workflows/runtime-images.yml",
   ".github/workflows/security-scan.yml",
   ".github/workflows/release-image.yml",
@@ -82,6 +83,18 @@ if (/prototype_json/i.test(workspaceRepository)) {
 const prototypeRemovalMigration = await readFile("db/migrations/007_remove_prototype_json.sql", "utf8");
 if (!/drop column if exists prototype_json/i.test(prototypeRemovalMigration)) {
   throw new Error("Prototype persistence removal migration must drop workspace.prototype_json");
+}
+
+const providerHandleRemovalMigration = await readFile("db/migrations/008_remove_provider_workspace_handle.sql", "utf8");
+for (const column of ["provider_id", "provider_workspace_id"]) {
+  if (!providerHandleRemovalMigration.includes(`drop column if exists ${column}`)) {
+    throw new Error(`Provider workspace handle migration must drop workspace.${column}`);
+  }
+}
+for (const legacyField of ["provider_id", "provider_workspace_id"]) {
+  if (workspaceRepository.includes(legacyField)) {
+    throw new Error(`Active workspace persistence must not reference retired ${legacyField}`);
+  }
 }
 
 const runtimeProfile = await readFile("src/core/runtime-profile.ts", "utf8");
