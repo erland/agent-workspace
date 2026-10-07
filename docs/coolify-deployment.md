@@ -2,7 +2,7 @@
 
 ## Målbild
 
-`agent-workspace` kör som en vanlig Node 22-container i Coolify. PostgreSQL är extern från applikationscontainern. Alla npm/Maven/Chromium-jobb körs hos execution providern (Modal i v1).
+`agent-workspace` kör som en vanlig Node 22-container i Coolify. PostgreSQL är extern från applikationscontainern. Alla npm/Maven-buildjobb körs hos execution providern (Modal i v1). Browser-rendering hanteras separat av Browser Screenshot.
 
 Rekommenderad nätverkstopologi:
 
@@ -92,7 +92,7 @@ AGENT_WORKSPACE_ALLOWED_EMAILS=user1@example.com,user2@example.com
 AGENT_WORKSPACE_OAUTH_CLIENT_METADATA_ORIGINS=https://trusted-client.example
 AGENT_WORKSPACE_MODAL_APP_NAME=agent-workspace
 AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX=ghcr.io/erland/agent-workspace-runtime
-AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION=2
+AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION=3
 HOST=0.0.0.0
 PORT=3000
 AGENT_WORKSPACE_VERSION=<release/version>
@@ -188,7 +188,7 @@ Modal third-party OAuth är fortfarande uppskjutet; se DEV-011. Det behövs inte
 
 ## Runtime images
 
-Runtime toolchains are built by GitHub Actions and published to GHCR; Coolify does not build Java/Node/Maven/Chromium images and the Agent Workspace application does not install those tools when a Modal sandbox starts.
+Runtime build toolchains are built by GitHub Actions and published to GHCR; Coolify does not build Java/Node/Maven runtime images and the Agent Workspace application does not install those tools when a Modal sandbox starts. Runtime image v3 intentionally contains no Playwright or Chromium.
 
 The GHCR package must be public because each pilot user's Modal account resolves the same registry images independently. GitHub Actions uses only `GITHUB_TOKEN` with `packages: write`; no Modal credential is required in GitHub.
 
@@ -200,7 +200,7 @@ When `runtime-images/Dockerfile` changes, increment `runtime-images/version.txt`
 
 Använd en separat persistent PostgreSQL-databas och TLS där providern stödjer det. Agent Workspace-containern innehåller ingen PostgreSQL-server och ingen separat PostgreSQL-resurs behöver skapas i Coolify om en extern databas redan finns. Vid containerstart körs SQL-migrationer från `db/migrations` under PostgreSQL advisory lock. Redan applicerade migrationer spåras i `schema_migration`.
 
-Agent Workspace använder en persistent Coolify-volume för temporära source-ZIP:ar, screenshots och build-artifacts. Montera volymen på `/data` och sätt `AGENT_WORKSPACE_STORAGE_DIR=/data`. Metadata ligger i PostgreSQL. Modal används endast under aktiv exekvering: verify/build skapar kortlivade Sandboxes som termineras direkt efter operationen, medan interaktiv prototype-preview får leva högst 20 minuter.
+Agent Workspace använder en persistent Coolify-volume för temporära source-ZIP:ar och build-artifacts. Montera volymen på `/data` och sätt `AGENT_WORKSPACE_STORAGE_DIR=/data`. Metadata ligger i PostgreSQL. Modal används endast under aktiv build/verifiering: verify/build skapar kortlivade Sandboxes som termineras direkt efter operationen.
 
 Den lokala lagringen ligger bakom `ObjectStore`, så den kan senare bytas mot R2/S3/MinIO utan ändrat MCP-kontrakt.
 

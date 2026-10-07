@@ -322,7 +322,7 @@ No Nginx layer is required inside the Agent Workspace container. PostgreSQL is n
 
 ## Prebuilt Modal runtime images
 
-Workspace startup does not install Java, Node or Maven during normal execution; supported build toolchains come from prebuilt runtime images. Six prebuilt runtime images are published to GitHub Container Registry by `.github/workflows/runtime-images.yml`:
+Workspace startup does not install Java, Node or Maven during normal execution; supported build toolchains come from prebuilt runtime images. Runtime image v3 removes the former Playwright/Chromium browser stack because browser rendering is owned by Browser Screenshot. Six prebuilt runtime images are published to GitHub Container Registry by `.github/workflows/runtime-images.yml`:
 
 ```text
 java17-node20
@@ -347,7 +347,7 @@ Runtime image selection can be overridden for forks or staged rollouts:
 
 ```text
 AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX=ghcr.io/OWNER/agent-workspace-runtime
-AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION=2
+AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION=3
 ```
 
 When the runtime recipe changes, increment `runtime-images/version.txt` and update the application runtime image version in the same change. The runtime-image workflow refuses to publish a tag that already exists in GHCR, so an existing `vN` cannot be repurposed accidentally; publish a new version instead.
