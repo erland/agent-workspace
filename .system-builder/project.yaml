@@ -5,8 +5,8 @@ project:
   complexity: medium
   phase: planning_handoff_complete
   description: >-
-    Multi-user MCP/API workspace service for AI assistants to build/test npm and Maven
-    projects and run browser prototypes in isolated user-owned sandbox accounts.
+    Multi-user MCP/API workspace service for AI assistants to verify and build npm and Maven
+    projects in isolated user-owned sandbox accounts and publish temporary build artifacts.
   language: TypeScript
   runtime: Node 22
   deployment_target: Coolify
