@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 
 import { IdentityService } from "../persistence/identity-service.js";
@@ -10,11 +9,14 @@ import {
   PostgresWorkspaceRepository
 } from "../persistence/postgres/repositories.js";
 import { createPostgresPool, PgSqlClient } from "../persistence/postgres/pool.js";
+import { runMigrations } from "../persistence/postgres/migrate.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
   throw new Error("DATABASE_URL is required. Example: postgres://agent:agent@localhost:5432/agent_workspace");
 }
+
+await runMigrations({ databaseUrl });
 
 const pool = createPostgresPool(databaseUrl);
 const db = new PgSqlClient(pool);
@@ -22,9 +24,6 @@ const suffix = randomUUID().slice(0, 8);
 const createdUsers: string[] = [];
 
 try {
-  const migration = await readFile(new URL("../../db/migrations/001_identity_workspace.sql", import.meta.url), "utf8");
-  await pool.query(migration);
-
   const users = new PostgresUserRepository(db);
   const identities = new PostgresExternalIdentityRepository(db);
   const accounts = new PostgresExecutionAccountRepository(db);
@@ -57,13 +56,13 @@ try {
   assert.equal((await accounts.findByUserId(bob.id))?.credentialRef, `secret://bob-${suffix}`);
 
   await workspaces.upsert({
-    id: `ws-${suffix}-alice`, userId: alice.id, providerId: "modal", providerWorkspaceId: "sb-alice",
+    id: `ws-${suffix}-alice`, userId: alice.id,
     runtimeProfile: "java21-node22", status: "READY",
     createdAt: new Date(now.getTime() - 120000).toISOString(),
     expiresAt: new Date(now.getTime() - 60000).toISOString()
   });
   await workspaces.upsert({
-    id: `ws-${suffix}-bob`, userId: bob.id, providerId: "modal", providerWorkspaceId: "sb-bob",
+    id: `ws-${suffix}-bob`, userId: bob.id,
     runtimeProfile: "java25-node20", status: "READY",
     createdAt: now.toISOString(), expiresAt: new Date(now.getTime() + 1800000).toISOString()
   });
