@@ -9,22 +9,15 @@ import {
   EmptyInputSchema,
   JsonObjectOutputSchema,
   ProjectBuildInputSchema,
-  PrototypePreviewOutputSchema,
-  PrototypeScreenshotGalleryInputSchema,
-  PrototypeScreenshotInputSchema,
-  ScreenshotGalleryOutputSchema,
-  ScreenshotOutputSchema,
   WorkspaceCreateInputSchema,
   WorkspaceIdInputSchema,
   WorkspaceUploadZipFromUrlInputSchema,
   WorkspaceUploadZipInputSchema
 } from "./schemas.js";
-import { SCREENSHOT_RESOURCE_TEMPLATE, screenshotResourceUri, singleTemplateValue } from "./screenshot-resource.js";
 import { ARTIFACT_RESOURCE_TEMPLATE, artifactResourceUri, singleArtifactTemplateValue } from "./artifact-resource.js";
-import { SCREENSHOT_GALLERY_HTML, SCREENSHOT_GALLERY_MIME_TYPE, SCREENSHOT_GALLERY_URI } from "./screenshot-gallery.js";
 
 const AGENT_WORKSPACE_DESCRIPTION =
-  "Creates temporary sandbox workspaces for verifying, building, running and visually inspecting uploaded npm and Maven projects.";
+  "Creates temporary sandbox workspaces for verifying and building uploaded npm and Maven projects and publishing temporary build artifacts.";
 const AGENT_WORKSPACE_WEBSITE = "https://agent-workspace.apphome.one/about";
 const AGENT_WORKSPACE_ICON_DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAB7UlEQVR4nO2aMU7DUAyGHQQTjCywwsrA0IWBhQmBxAHYkFiBAzBygLYrUjcOgITExMLA0oELwDGYGMKUKI1Iajv2+wPxJ1VK1Dz39//8/JK22dbeSU4DZgUtAE0YgBaAJgxAC0ATBqAFoAkD0ALQrGoGvT4/WOsw4/D4XHS9uAL6nDyRXJ/IgL4nXyDRmXEfhqpBs6uL8jifzmj97bQ8v1zbKY/HowlbiAec5SBeAtXkiagxeSKim/m1NHxyBr8LhAHSAfl0tnD+dfBUHt9/fy68h+4BHFT3AW0mjDvJSU8sAbQANOwlsL254akDxuArIAxAC0ATBqAFoAkD0ALQuBqwOzpjXXd0+16+tDG0uBlQCO+SgEWMZbgYUBfclkB11l/u9lUxupCkB3zMH5OM0WBuQH2muiRSH+tRBaYGSJNvKv+2GNYmmBng3a29PsvMgPpMWa5hz9huFbBsljjlr40twa0CPOllBRD5NCzLXeU3zLdBjgnc8vdOnijRjZCmElLtKi4GWHRtz85fxa0CCsF14ZLu3xTDEtclYCHce3dR/TTWhWWznpr4RggtAE0YgBaAJgzgXpjyed8Crl5RBfwVEyQ6xUug7yZI9al6QF9N0Ohi/1P0vxK7AFoAmjAALQBNGIAWgCYMQAtA8wO6c5LmRtskgAAAAABJRU5ErkJggg==";
 
@@ -41,30 +34,6 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
       sizes: ["64x64"]
     }]
   });
-
-  server.registerResource(
-    "prototype-screenshot-gallery",
-    SCREENSHOT_GALLERY_URI,
-    {
-      title: "Prototype screenshot gallery",
-      description: "Selectable gallery for comparing prototype screenshots.",
-      mimeType: SCREENSHOT_GALLERY_MIME_TYPE
-    },
-    async () => ({
-      contents: [{
-        uri: SCREENSHOT_GALLERY_URI,
-        mimeType: SCREENSHOT_GALLERY_MIME_TYPE,
-        text: SCREENSHOT_GALLERY_HTML,
-        _meta: {
-          ui: {
-            prefersBorder: true,
-            csp: { connectDomains: [], resourceDomains: [] }
-          },
-          "openai/ui": { availableDisplayModes: ["inline", "fullscreen"] }
-        }
-      }]
-    })
-  );
 
   server.registerResource(
     "build-artifact",
@@ -88,30 +57,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
     }
   );
 
-  server.registerResource(
-    "prototype-screenshot",
-    new ResourceTemplate(SCREENSHOT_RESOURCE_TEMPLATE, { list: undefined }),
-    {
-      title: "Prototype screenshot",
-      description: "PNG screenshot captured from a running prototype.",
-      mimeType: "image/png"
-    },
-    async (uri, variables) => {
-      const workspaceId = singleTemplateValue(variables.workspaceId);
-      const artifactId = singleTemplateValue(variables.artifactId);
-      if (!workspaceId || !artifactId) throw new Error("Invalid screenshot resource URI");
-      const bytes = await tools.readScreenshotArtifact({ workspaceId, artifactId });
-      return {
-        contents: [{
-          uri: uri.href,
-          mimeType: "image/png",
-          blob: Buffer.from(bytes).toString("base64")
-        }]
-      };
-    }
-  );
-
-  registerJsonTool(server, "get_capabilities", "List supported runtimes, build systems and browser capabilities.", EmptyInputSchema, async () => tools.getCapabilities());
+  registerJsonTool(server, "get_capabilities", "List supported runtimes, build systems and artifact capabilities.", EmptyInputSchema, async () => tools.getCapabilities());
   registerJsonTool(server, "get_profile", "Show the current Agent Workspace identity and execution-provider connection.", EmptyInputSchema, async () => tools.getProfile());
   registerJsonTool(server, "workspace_create", "Create a temporary sandbox workspace.", WorkspaceCreateInputSchema, async (input: z.infer<typeof WorkspaceCreateInputSchema>) => {
     const normalizedInput: { java?: "17" | "21" | "25"; node?: "20" | "22"; lifetimeMinutes?: number } = {};
@@ -221,156 +167,15 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
     async (input: z.infer<typeof ArtifactIdInputSchema>) => jsonToolResult(await tools.artifactDownloadLink(input))
   );
 
-  registerJsonTool(server, "prototype_start", "Install dependencies and start an uploaded npm web prototype.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.startPrototype(input));
-
-  server.registerTool(
-    "prototype_preview_link",
-    {
-      annotations: toolAnnotations("prototype_preview_link"),
-      description: "Return the temporary public HTTPS link for a running prototype. Use only when the user asks to open, try, click through, or interact with the prototype themselves. The link expires when the 20-minute workspace sandbox expires.",
-      inputSchema: WorkspaceIdInputSchema,
-      outputSchema: PrototypePreviewOutputSchema
-    },
-    async (input: z.infer<typeof WorkspaceIdInputSchema>) => {
-      const response = await tools.previewPrototype(input);
-      if (!response.ok) return errorResult(response);
-      const structured = { result: response.result };
-      const result = response.result as any;
-      return {
-        structuredContent: structured,
-        content: [{
-          type: "text" as const,
-          text: `Interactive prototype: ${result.url}\nExpires: ${result.expiresAt}\nAccess: anyone with this temporary link can open it until the sandbox expires.`
-        }]
-      };
-    }
-  );
-
-  server.registerTool(
-    "prototype_screenshot",
-    {
-      annotations: toolAnnotations("prototype_screenshot"),
-      description: "Capture exactly one PNG screenshot of a running prototype. Use desktop/tablet/mobile for generic views, device + orientation for named mobile/tablet profiles, or explicit width/height. Do not create additional orientations or device variants unless the user explicitly requested them.",
-      inputSchema: PrototypeScreenshotInputSchema,
-      outputSchema: ScreenshotOutputSchema
-    },
-    async (input) => {
-      const normalizedInput = input.viewport === undefined
-        ? { workspaceId: input.workspaceId }
-        : { workspaceId: input.workspaceId, viewport: input.viewport };
-      const response = await tools.screenshotPrototype(normalizedInput);
-      if (!response.ok) return errorResult(response);
-      const result = response.result as any;
-      if (result.status === "PASSED") {
-        const resourceUri = screenshotResourceUri(input.workspaceId, result.artifactId);
-        const structured = {
-          result: {
-            status: result.status,
-            mimeType: result.mimeType,
-            width: result.width,
-            height: result.height,
-            durationMs: result.durationMs,
-            resourceUri,
-            fileName: result.fileName,
-            byteSize: result.bytes.byteLength,
-            artifactId: result.artifactId
-          }
-        };
-        const screenshotData = Buffer.from(result.bytes).toString("base64");
-        return {
-          structuredContent: structured,
-          content: [
-            { type: "text" as const, text: JSON.stringify(structured) },
-            { type: "image" as const, data: screenshotData, mimeType: result.mimeType }
-          ]
-        };
-      }
-      const structured = { result: { status: result.status, durationMs: result.durationMs, failureSummary: result.failureSummary, logExcerpt: result.logExcerpt } };
-      return { structuredContent: structured, content: [{ type: "text" as const, text: JSON.stringify(structured) }] };
-    }
-  );
-
-  server.registerTool(
-    "prototype_screenshot_gallery",
-    {
-      annotations: toolAnnotations("prototype_screenshot_gallery"),
-      description: "Render one or more already captured prototype screenshots in the single visible screenshot UI. Always use this after prototype_screenshot when the user wants to see captured screenshots; use labels to distinguish desktop, tablet, mobile, or iterations.",
-      inputSchema: PrototypeScreenshotGalleryInputSchema,
-      outputSchema: ScreenshotGalleryOutputSchema,
-      _meta: {
-        ui: { resourceUri: SCREENSHOT_GALLERY_URI },
-        "openai/outputTemplate": SCREENSHOT_GALLERY_URI
-      }
-    },
-    async (input: z.infer<typeof PrototypeScreenshotGalleryInputSchema>) => {
-      const screenshots = await Promise.all(input.screenshots.map(async (item) => {
-        const bytes = await tools.readScreenshotArtifact({
-          workspaceId: input.workspaceId,
-          artifactId: item.artifactId
-        });
-        return {
-          artifactId: item.artifactId,
-          label: item.label,
-          mimeType: "image/png" as const,
-          ...(item.width !== undefined ? { width: item.width } : {}),
-          ...(item.height !== undefined ? { height: item.height } : {}),
-          resourceUri: screenshotResourceUri(input.workspaceId, item.artifactId),
-          fileName: `prototype-${slugLabel(item.label)}-${item.artifactId}.png`,
-          byteSize: bytes.byteLength,
-          data: Buffer.from(bytes).toString("base64")
-        };
-      }));
-
-      const requested = input.selectedArtifactId;
-      const selectedArtifactId =
-        requested !== undefined && screenshots.some((item) => item.artifactId === requested)
-          ? requested
-          : screenshots[0]!.artifactId;
-
-      const structured = {
-        result: {
-          status: "PASSED" as const,
-          selectedArtifactId,
-          screenshots: screenshots.map(({ data: _data, ...item }) => item)
-        }
-      };
-
-      return {
-        structuredContent: structured,
-        content: [
-          { type: "text" as const, text: JSON.stringify(structured) }
-        ],
-        _meta: { gallery: { screenshots } }
-      };
-    }
-  );
-
-  registerJsonTool(server, "prototype_stop", "Stop the interactive prototype sandbox immediately while keeping the logical workspace and stored source/artifacts.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.stopPrototype(input));
-
   registerJsonTool(server, "workspace_destroy", "Terminate a workspace and release its sandbox resources.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.destroyWorkspace(input));
   return server;
 }
 
 
 function toolAnnotations(name: string) {
-  const readOnly = new Set([
-    "get_capabilities",
-    "get_profile",
-    "artifact_get",
-    "prototype_preview_link",
-    "prototype_screenshot_gallery"
-  ]);
-  const destructive = new Set(["prototype_stop", "workspace_destroy"]);
-  const openWorld = new Set([
-    "workspace_create",
-    "workspace_upload_zip_from_url",
-    "project_verify",
-    "project_build",
-    "prototype_start",
-    "prototype_screenshot",
-    "prototype_stop",
-    "workspace_destroy"
-  ]);
+  const readOnly = new Set(["get_capabilities", "get_profile", "artifact_get"]);
+  const destructive = new Set(["workspace_destroy"]);
+  const openWorld = new Set(["workspace_create", "workspace_upload_zip_from_url", "project_verify", "project_build", "workspace_destroy"]);
   return {
     readOnlyHint: readOnly.has(name),
     openWorldHint: openWorld.has(name),
@@ -399,8 +204,3 @@ function errorResult(response: { ok: false; error: unknown }) {
   return { isError: true as const, content: [{ type: "text" as const, text: JSON.stringify(body) }] };
 }
 
-
-function slugLabel(value: string): string {
-  const slug = value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  return slug || "screenshot";
-}
