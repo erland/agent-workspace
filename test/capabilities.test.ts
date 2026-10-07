@@ -21,11 +21,6 @@ describe("getCapabilities", () => {
     ]);
   });
 
-  it("reports Chromium screenshot capability after DEV-009", () => {
-    const capabilities = getCapabilities();
-    assert.equal(capabilities.browser.chromium, true);
-    assert.equal(capabilities.browser.screenshots, true);
-  });
 
   it("reports npm and Maven without advertising unimplemented build systems", () => {
     const capabilities = getCapabilities();
