@@ -15,8 +15,6 @@ import { ProjectBuildService, type RequestedBuildOutput } from "../artifact/proj
 import { NpmVerifier } from "../verification/npm-verifier.js";
 import { MavenVerifier } from "../verification/maven-verifier.js";
 import type { ProjectVerificationResult } from "../verification/verification-result.js";
-import { DEFAULT_PROTOTYPE_PORT, PrototypeService, type PrototypeStartResult } from "../prototype/prototype-service.js";
-import { ScreenshotService, isPngScreenshot, type PrototypeScreenshotResult, type ScreenshotViewport } from "../prototype/screenshot-service.js";
 import { analyzeProjectArchive, type ProjectAnalysis } from "../project/project-detector.js";
 import {
   resolveRuntimeProfile,
@@ -39,15 +37,6 @@ export interface WorkspaceProject {
   };
 }
 
-export interface WorkspacePrototype {
-  status: "RUNNING";
-  strategy: "dev" | "start" | "preview";
-  port: number;
-  url: string;
-  processId: number;
-  startedAt: string;
-  expiresAt: string;
-}
 
 export interface Workspace {
   id: string;
@@ -60,7 +49,6 @@ export interface Workspace {
   expiresAt: string;
   destroyedAt?: string;
   project?: WorkspaceProject;
-  prototype?: WorkspacePrototype;
 }
 
 export interface CreateWorkspaceRequest {
@@ -97,7 +85,6 @@ interface WorkspaceRecord {
 const DEFAULT_LIFETIME_MINUTES = 60;
 const MAX_LIFETIME_MINUTES = 60;
 const EPHEMERAL_EXECUTION_TIMEOUT_MS = 10 * 60_000;
-const INTERACTIVE_EXECUTION_TIMEOUT_MS = 20 * 60_000;
 
 export class WorkspaceService {
   private readonly records = new Map<string, WorkspaceRecord>();
@@ -329,158 +316,6 @@ export class WorkspaceService {
     return this.requireArtifactService().list(workspaceId);
   }
 
-  public async startPrototype(workspaceId: string): Promise<PrototypeStartResult> {
-    const workspace = await this.requireReadyProject(workspaceId, "prototype start");
-    if (workspace.project!.analysis.projectType !== "NPM") {
-      throw new Error(
-        `Workspace ${workspaceId} project is not npm: ${workspace.project!.analysis.projectType}`
-      );
-    }
-    if (workspace.prototype?.status === "RUNNING") {
-      throw new Error(`Workspace ${workspaceId} already has a running prototype`);
-    }
-
-    const record = await this.requireRecord(workspaceId);
-    const handle = await this.createExecution(workspace, true);
-    try {
-      await this.uploadStoredSource(workspace, handle);
-      const tunnelUrl = this.provider.getTunnelUrl
-        ? await this.provider.getTunnelUrl(handle, DEFAULT_PROTOTYPE_PORT)
-        : undefined;
-      const allowedHost = tunnelUrl ? new URL(tunnelUrl).hostname : undefined;
-      const projectRoot = resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots);
-      const result = await new PrototypeService(this.provider, {
-        projectRoot,
-        host: tunnelUrl ? "0.0.0.0" : "127.0.0.1",
-        ...(allowedHost ? { allowedHost } : {})
-      }).start(handle);
-
-      if (result.status !== "RUNNING") {
-        await this.provider.terminate(handle).catch(() => undefined);
-        return result;
-      }
-
-      const startedAt = this.now();
-      const remainingMs = Math.max(1, Date.parse(workspace.expiresAt) - startedAt.getTime());
-      const expiresAt = new Date(
-        startedAt.getTime() + Math.min(INTERACTIVE_EXECUTION_TIMEOUT_MS, remainingMs)
-      ).toISOString();
-      record.handle = handle;
-      record.workspace.providerId = handle.providerId;
-      record.workspace.providerWorkspaceId = handle.providerWorkspaceId;
-      record.workspace.prototype = {
-        status: "RUNNING",
-        strategy: result.strategy,
-        port: result.port,
-        url: result.url,
-        processId: result.processId,
-        startedAt: startedAt.toISOString(),
-        expiresAt
-      };
-      await this.persist(record.workspace);
-      return result;
-    } catch (error) {
-      await this.provider.terminate(handle).catch(() => undefined);
-      throw error;
-    }
-  }
-
-  public async stopPrototype(workspaceId: string): Promise<Workspace> {
-    const record = await this.requireRecord(workspaceId);
-    if (record.handle) {
-      await this.provider.terminate(record.handle).catch(() => undefined);
-    }
-    delete record.handle;
-    delete record.workspace.providerId;
-    delete record.workspace.providerWorkspaceId;
-    delete record.workspace.prototype;
-    await this.persist(record.workspace);
-    return cloneWorkspace(record.workspace);
-  }
-
-  public async screenshotPrototype(
-    workspaceId: string,
-    viewport?: ScreenshotViewport
-  ): Promise<PrototypeScreenshotResult> {
-    const workspace = await this.get(workspaceId);
-    if (workspace.status !== "READY") {
-      throw new Error(`Workspace ${workspaceId} is not ready for screenshot: ${workspace.status}`);
-    }
-    if (workspace.prototype?.status !== "RUNNING") {
-      throw new Error(`Workspace ${workspaceId} has no running prototype`);
-    }
-
-    const record = await this.requireRecord(workspaceId);
-    const handle = this.requireActiveHandle(record);
-    const projectRoot = resolveWorkspaceProjectRoot(workspace.project?.analysis.projectRoots ?? []);
-    const result = await new ScreenshotService(this.provider, {
-      projectRoot,
-      maxScreenshotBytes: this.securityPolicy.maxScreenshotBytes
-    }).capture(handle, {
-      url: workspace.prototype.url,
-      ...(viewport !== undefined ? { viewport } : {})
-    });
-    if (result.status === "PASSED") {
-      await this.objectStore.put(
-        this.screenshotStorageKey(workspaceId, result.artifactId),
-        result.bytes
-      );
-    }
-    return result;
-  }
-
-  public async readScreenshotArtifact(
-    workspaceId: string,
-    artifactId: string
-  ): Promise<Uint8Array> {
-    const workspace = await this.get(workspaceId);
-    if (workspace.status !== "READY") {
-      throw new Error(`Workspace ${workspaceId} is not ready for screenshot access: ${workspace.status}`);
-    }
-
-    const bytes = await this.objectStore.get(this.screenshotStorageKey(workspaceId, artifactId));
-    if (bytes.byteLength === 0) {
-      throw new Error("Screenshot artifact is empty");
-    }
-    if (bytes.byteLength > this.securityPolicy.maxScreenshotBytes) {
-      throw new Error(`Screenshot output exceeds maximum size of ${this.securityPolicy.maxScreenshotBytes} bytes`);
-    }
-    if (!isPngScreenshot(bytes)) {
-      throw new Error("Screenshot artifact is not a PNG file");
-    }
-    return bytes;
-  }
-
-  public async prototypePreviewLink(workspaceId: string): Promise<{
-    status: "AVAILABLE";
-    url: string;
-    expiresAt: string;
-    access: "temporary-public";
-    port: number;
-  }> {
-    const workspace = await this.get(workspaceId);
-    if (workspace.status !== "READY") {
-      throw new Error(`Workspace ${workspaceId} is not ready for preview: ${workspace.status}`);
-    }
-    if (workspace.prototype?.status !== "RUNNING") {
-      throw new Error(`Workspace ${workspaceId} has no running prototype`);
-    }
-    if (!this.provider.getTunnelUrl) {
-      throw new Error("Execution provider does not support interactive prototype previews");
-    }
-
-    const record = await this.requireRecord(workspaceId);
-    const handle = this.requireActiveHandle(record);
-    const url = await this.provider.getTunnelUrl(handle, workspace.prototype.port);
-    return {
-      status: "AVAILABLE",
-      url,
-      expiresAt: workspace.prototype.expiresAt,
-      access: "temporary-public",
-      port: workspace.prototype.port
-    };
-  }
-
   public async destroy(workspaceId: string): Promise<Workspace> {
     const record = await this.requireRecord(workspaceId);
     if (record.workspace.status === "DESTROYED" || record.workspace.status === "EXPIRED") {
@@ -498,7 +333,6 @@ export class WorkspaceService {
     delete record.handle;
     delete record.workspace.providerId;
     delete record.workspace.providerWorkspaceId;
-    delete record.workspace.prototype;
     record.workspace.status = "DESTROYED";
     record.workspace.destroyedAt = this.now().toISOString();
     await this.persist(record.workspace);
@@ -523,7 +357,6 @@ export class WorkspaceService {
     delete record.handle;
     delete record.workspace.providerId;
     delete record.workspace.providerWorkspaceId;
-    delete record.workspace.prototype;
     record.workspace.status = "EXPIRED";
     record.workspace.destroyedAt = this.now().toISOString();
     await this.persist(record.workspace);
@@ -564,7 +397,7 @@ export class WorkspaceService {
     workspace: Workspace,
     operation: (handle: WorkspaceHandle) => Promise<T>
   ): Promise<T> {
-    const handle = await this.createExecution(workspace, false);
+    const handle = await this.createExecution(workspace);
     try {
       await this.uploadStoredSource(workspace, handle);
       return await operation(handle);
@@ -573,21 +406,17 @@ export class WorkspaceService {
     }
   }
 
-  private async createExecution(workspace: Workspace, interactive: boolean): Promise<WorkspaceHandle> {
+  private async createExecution(workspace: Workspace): Promise<WorkspaceHandle> {
     const profile = RUNTIME_PROFILES[workspace.runtimeProfile];
     const remainingMs = Math.max(1, Date.parse(workspace.expiresAt) - this.now().getTime());
-    const timeoutMs = Math.min(
-      interactive ? INTERACTIVE_EXECUTION_TIMEOUT_MS : EPHEMERAL_EXECUTION_TIMEOUT_MS,
-      remainingMs
-    );
+    const timeoutMs = Math.min(EPHEMERAL_EXECUTION_TIMEOUT_MS, remainingMs);
     return this.provider.createWorkspace({
       imageRef: profile.imageRef,
       timeoutMs,
       cpu: this.securityPolicy.workspaceCpu,
       cpuLimit: this.securityPolicy.workspaceCpuLimit,
       memoryMiB: this.securityPolicy.workspaceMemoryMiB,
-      networkPolicy: this.securityPolicy.networkPolicy,
-      ...(interactive ? { encryptedPorts: [DEFAULT_PROTOTYPE_PORT] } : {})
+      networkPolicy: this.securityPolicy.networkPolicy
     });
   }
 
@@ -719,9 +548,6 @@ function cloneWorkspace(workspace: Workspace): Workspace {
           }
         }
       : {}),
-    ...(workspace.prototype !== undefined
-      ? { prototype: { ...workspace.prototype } }
-      : {})
   };
 }
 
