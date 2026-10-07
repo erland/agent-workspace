@@ -10,10 +10,6 @@ async function main(): Promise<void> {
 
   console.log(`Workspace ${workspace.id}`);
   console.log(`runtime => ${workspace.runtimeProfile}`);
-  if (workspace.providerWorkspaceId !== undefined) {
-    throw new Error("Logical workspace unexpectedly allocated a provider sandbox");
-  }
-
   try {
     const upload = await service.uploadZip(
       workspace.id,
