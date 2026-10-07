@@ -153,7 +153,7 @@ Prototype hosting, screenshot MCP resources/UI, implementation code, and dedicat
 
 Agent Workspace runtime images only need tooling required to verify and build supported projects. Browser runtime dependencies are not part of the target Agent Workspace architecture.
 
-After the prototype/screenshot migration is complete, Playwright and Chromium should be removed from Agent Workspace runtime images unless another retained build/verification capability explicitly requires them.
+Playwright and Chromium are removed from Agent Workspace runtime image v3. Browser runtime dependencies now exist only in Browser Screenshot.
 
 ## Migration rule
 
@@ -162,5 +162,5 @@ The MCP/API migration to the target state is complete: Agent Workspace exposes b
 The remaining cleanup is:
 
 1. verify the reduced MCP surface and artifact handoff in CI/deployed acceptance,
-2. remove Playwright/Chromium from Agent Workspace runtime images,
+2. verify browser-free runtime image v3 across the supported Java/Node matrix,
 3. remove or archive remaining historical prototype-specific development documentation where useful.
