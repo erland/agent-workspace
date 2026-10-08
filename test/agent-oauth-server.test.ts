@@ -16,13 +16,21 @@ class MemoryOAuthStore implements OAuthStore {
   clients = new Map<string, OAuthClientRecord>();
   codes = new Map<string, AuthorizationCodeRecord>();
   refresh = new Map<string, RefreshTokenRecord>();
+  rotated = new Map<string, number>();
 
   async registerClient(record: OAuthClientRecord) { this.clients.set(record.clientId, structuredClone(record)); }
   async findClient(clientId: string) { const x = this.clients.get(clientId); return x ? structuredClone(x) : undefined; }
   async saveAuthorizationCode(record: AuthorizationCodeRecord) { this.codes.set(record.codeHash, structuredClone(record)); }
   async consumeAuthorizationCode(codeHash: string) { const x = this.codes.get(codeHash); this.codes.delete(codeHash); return x ? structuredClone(x) : undefined; }
   async saveRefreshToken(record: RefreshTokenRecord) { this.refresh.set(record.tokenHash, structuredClone(record)); }
-  async consumeRefreshToken(tokenHash: string) { const x = this.refresh.get(tokenHash); this.refresh.delete(tokenHash); return x ? structuredClone(x) : undefined; }
+  async consumeRefreshToken(tokenHash: string, clientId: string, resource?: string) {
+    const x = this.refresh.get(tokenHash);
+    if (!x || x.clientId !== clientId || (resource && x.resource !== resource)) return undefined;
+    const rotatedAt = this.rotated.get(tokenHash);
+    if (rotatedAt && Date.now() - rotatedAt > 30_000) return undefined;
+    this.rotated.set(tokenHash, rotatedAt ?? Date.now());
+    return structuredClone(x);
+  }
 }
 
 function server(store = new MemoryOAuthStore(), registrationRateLimiter?: UserRateLimiter) {
@@ -224,10 +232,21 @@ describe("Agent Workspace OAuth server", () => {
         method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({ grant_type: "refresh_token", client_id: "client-1", refresh_token })
       }));
-      assert.equal((await refresh(token))?.status, 200);
+      const [first, retry] = await Promise.all([refresh(token), refresh(token)]);
+      assert.equal(first?.status, 200);
+      assert.equal(retry?.status, 200);
+      const firstBody = await first!.json() as { refresh_token: string };
+      const retryBody = await retry!.json() as { refresh_token: string };
+      assert.equal(firstBody.refresh_token, retryBody.refresh_token);
+      const wrongClient = await auth.handle(new Request("https://workspace.example/token", {
+        method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ grant_type: "refresh_token", client_id: "other-client", refresh_token: token })
+      }));
+      assert.equal(wrongClient?.status, 400);
+      store.rotated.set(hash, Date.now() - 31_000);
       assert.equal((await refresh(token))?.status, 400);
-      assert.deepEqual(logs.map(line => JSON.parse(line).outcome), ["success", "rejected"]);
-      assert.deepEqual(logs.map(line => JSON.parse(line).reason), ["rotated", "invalid_grant"]);
+      assert.deepEqual(logs.map(line => JSON.parse(line).outcome), ["success", "success", "rejected", "rejected"]);
+      assert.deepEqual(logs.map(line => JSON.parse(line).reason), ["rotated_or_retried", "rotated_or_retried", "invalid_grant", "invalid_grant"]);
       assert.ok(logs.every(line => !line.includes(token) && !line.includes(hash)));
     } finally {
       console.info = original;
