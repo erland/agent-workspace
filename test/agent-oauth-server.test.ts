@@ -17,7 +17,6 @@ class MemoryOAuthStore implements OAuthStore {
   codes = new Map<string, AuthorizationCodeRecord>();
   refresh = new Map<string, RefreshTokenRecord>();
   rotated = new Map<string, number>();
-  rotated = new Map<string, number>();
 
   async registerClient(record: OAuthClientRecord) { this.clients.set(record.clientId, structuredClone(record)); }
   async findClient(clientId: string) { const x = this.clients.get(clientId); return x ? structuredClone(x) : undefined; }
