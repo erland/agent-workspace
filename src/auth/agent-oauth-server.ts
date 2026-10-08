@@ -460,17 +460,42 @@ export class AgentOAuthServer {
   }
 
   private async exchangeRefreshToken(form: FormData): Promise<Response> {
+    const requestId = randomToken(12);
+    const startedAt = Date.now();
+    const diagnostic = (outcome: "success" | "rejected" | "error", reason: string) => {
+      console.info(JSON.stringify({
+        event: "oauth.refresh",
+        request_id: requestId,
+        outcome,
+        reason,
+        duration_ms: Date.now() - startedAt
+      }));
+    };
     const refreshToken = String(form.get("refresh_token") ?? "");
     const clientId = String(form.get("client_id") ?? "");
-    if (!refreshToken || !clientId) return oauthError("invalid_request", "Missing refresh token parameters", 400);
-
-    const record = await this.store.consumeRefreshToken(hashToken(refreshToken));
-    if (!record || record.clientId !== clientId) {
-      return oauthError("invalid_grant", "Refresh token is invalid or expired", 400);
+    if (!refreshToken || !clientId) {
+      diagnostic("rejected", "missing_parameters");
+      return oauthError("invalid_request", "Missing refresh token parameters", 400);
     }
-    const requestedResource = String(form.get("resource") ?? record.resource);
-    if (requestedResource !== record.resource) return oauthError("invalid_target", "Resource mismatch", 400);
-    return this.issueTokens(record);
+
+    try {
+      const record = await this.store.consumeRefreshToken(hashToken(refreshToken));
+      if (!record || record.clientId !== clientId) {
+        diagnostic("rejected", "invalid_grant");
+        return oauthError("invalid_grant", "Refresh token is invalid or expired", 400);
+      }
+      const requestedResource = String(form.get("resource") ?? record.resource);
+      if (requestedResource !== record.resource) {
+        diagnostic("rejected", "resource_mismatch");
+        return oauthError("invalid_target", "Resource mismatch", 400);
+      }
+      const response = await this.issueTokens(record);
+      diagnostic("success", "rotated");
+      return response;
+    } catch (error) {
+      diagnostic("error", "internal_error");
+      throw error;
+    }
   }
 
   private async issueTokens(
