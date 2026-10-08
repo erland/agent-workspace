@@ -206,4 +206,32 @@ describe("Agent Workspace OAuth server", () => {
     }));
     assert.equal(replay?.status, 400);
   });
+  it("logs refresh outcomes without exposing credentials", async () => {
+    const { auth, store } = server();
+    const token = "secret-refresh-token-test";
+    const hash = createHash("sha256").update(token).digest("hex");
+    await store.saveRefreshToken({
+      tokenHash: hash, clientId: "client-1", userId: "usr-1",
+      identityIssuer: "https://accounts.google.com", identitySubject: "sub-1",
+      scope: "agent-workspace", resource: "https://workspace.example/mcp",
+      expiresAt: "2026-10-30T18:00:00.000Z"
+    });
+    const logs: string[] = [];
+    const original = console.info;
+    console.info = (...args: unknown[]) => { logs.push(args.map(String).join(" ")); };
+    try {
+      const refresh = (refresh_token: string) => auth.handle(new Request("https://workspace.example/token", {
+        method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ grant_type: "refresh_token", client_id: "client-1", refresh_token })
+      }));
+      assert.equal((await refresh(token))?.status, 200);
+      assert.equal((await refresh(token))?.status, 400);
+      assert.deepEqual(logs.map(line => JSON.parse(line).outcome), ["success", "rejected"]);
+      assert.deepEqual(logs.map(line => JSON.parse(line).reason), ["rotated", "invalid_grant"]);
+      assert.ok(logs.every(line => !line.includes(token) && !line.includes(hash)));
+    } finally {
+      console.info = original;
+    }
+  });
+
 });
