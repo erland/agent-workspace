@@ -479,7 +479,7 @@ export class AgentOAuthServer {
     }
 
     try {
-      const record = await this.store.consumeRefreshToken(hashToken(refreshToken));
+      const record = await this.store.consumeRefreshToken(hashToken(refreshToken), clientId, String(form.get("resource") ?? "") || undefined);
       if (!record || record.clientId !== clientId) {
         diagnostic("rejected", "invalid_grant");
         return oauthError("invalid_grant", "Refresh token is invalid or expired", 400);
@@ -489,8 +489,8 @@ export class AgentOAuthServer {
         diagnostic("rejected", "resource_mismatch");
         return oauthError("invalid_target", "Resource mismatch", 400);
       }
-      const response = await this.issueTokens(record);
-      diagnostic("success", "rotated");
+      const response = await this.issueTokens(record, refreshToken);
+      diagnostic("success", "rotated_or_retried");
       return response;
     } catch (error) {
       diagnostic("error", "internal_error");
@@ -500,7 +500,8 @@ export class AgentOAuthServer {
 
   private async issueTokens(
     record: Pick<AuthorizationCodeRecord,
-      "clientId" | "userId" | "identityIssuer" | "identitySubject" | "email" | "displayName" | "scope" | "resource">
+      "clientId" | "userId" | "identityIssuer" | "identitySubject" | "email" | "displayName" | "scope" | "resource">,
+    predecessor?: string
   ): Promise<Response> {
     const nowSeconds = Math.floor(this.now().getTime() / 1000);
     const accessToken = await new SignJWT({
@@ -519,7 +520,9 @@ export class AgentOAuthServer {
       .setExpirationTime(nowSeconds + 60 * 60)
       .sign(this.config.signingKey);
 
-    const refreshToken = randomToken(48);
+    const refreshToken = predecessor
+      ? createHmac("sha256", this.config.sessionSecret).update("agent-workspace-refresh-v1:").update(predecessor).digest("base64url")
+      : randomToken(48);
     const refreshRecord: RefreshTokenRecord = {
       tokenHash: hashToken(refreshToken),
       clientId: record.clientId,
