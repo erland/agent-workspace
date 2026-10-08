@@ -40,7 +40,7 @@ export interface OAuthStore {
   saveAuthorizationCode(record: AuthorizationCodeRecord): Promise<void>;
   consumeAuthorizationCode(codeHash: string): Promise<AuthorizationCodeRecord | undefined>;
   saveRefreshToken(record: RefreshTokenRecord): Promise<void>;
-  consumeRefreshToken(tokenHash: string): Promise<RefreshTokenRecord | undefined>;
+  consumeRefreshToken(tokenHash: string, clientId: string, resource?: string): Promise<RefreshTokenRecord | undefined>;
 }
 
 export class PostgresOAuthStore implements OAuthStore {
@@ -143,7 +143,8 @@ export class PostgresOAuthStore implements OAuthStore {
       `insert into oauth_refresh_token
          (token_hash, client_id, user_id, identity_issuer, identity_subject, email, display_name,
           scope, resource, expires_at, created_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       on conflict (token_hash) do nothing`,
       [
         record.tokenHash,
         record.clientId,
@@ -160,7 +161,7 @@ export class PostgresOAuthStore implements OAuthStore {
     );
   }
 
-  async consumeRefreshToken(tokenHash: string): Promise<RefreshTokenRecord | undefined> {
+  async consumeRefreshToken(tokenHash: string, clientId: string, resource?: string): Promise<RefreshTokenRecord | undefined> {
     const result = await this.db.query<{
       token_hash: string;
       client_id: string;
@@ -173,11 +174,13 @@ export class PostgresOAuthStore implements OAuthStore {
       resource: string;
       expires_at: string | Date;
     }>(
-      `delete from oauth_refresh_token
-       where token_hash = $1 and expires_at > now()
+      `update oauth_refresh_token set rotated_at = coalesce(rotated_at, now())
+       where token_hash = $1 and client_id = $2 and ($3::text is null or resource = $3)
+         and expires_at > now()
+         and (rotated_at is null or rotated_at >= now() - interval '30 seconds')
        returning token_hash, client_id, user_id, identity_issuer, identity_subject, email, display_name,
                  scope, resource, expires_at`,
-      [tokenHash]
+      [tokenHash, clientId, resource ?? null]
     );
     const row = result.rows[0];
     return row ? {
