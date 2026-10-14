@@ -1,3 +1,4 @@
+import { timedOperation } from "../../diagnostics/operation-timing.js";
 import { ModalClient, type Sandbox } from "modal";
 
 import { modalClientParamsFromCredentials } from "./modal-credentials.js";
@@ -78,11 +79,11 @@ export class ModalSandboxProvider implements SandboxProvider {
     handle: WorkspaceHandle,
     archive: Uint8Array
   ): Promise<void> {
-    const sandbox = await this.getSandbox(handle);
+    const sandbox = await timedOperation("modal_sandbox_lookup", () => this.getSandbox(handle));
     const archivePath = "/tmp/agent-workspace-project.zip";
-    await sandbox.filesystem.writeBytes(archive, archivePath);
+    await timedOperation("modal_archive_write", () => sandbox.filesystem.writeBytes(archive, archivePath));
 
-    const extraction = await this.exec(handle, {
+    const extraction = await timedOperation("modal_archive_extract", () => this.exec(handle, {
       argv: [
         "bash",
         "-lc",
@@ -95,7 +96,7 @@ export class ModalSandboxProvider implements SandboxProvider {
         ].join(" && ")
       ],
       timeoutMs: 2 * 60 * 1000
-    });
+    }));
 
     if (extraction.exitCode !== 0) {
       throw new Error(
