@@ -1,3 +1,5 @@
+import { performance } from "node:perf_hooks";
+import { withTimingRequest, logCompletedTiming } from "../diagnostics/operation-timing.js";
 import { createMcpHandler, requireBearerAuth, type AuthInfo } from "@modelcontextprotocol/server";
 
 import { isPrincipalAllowed, principalFromAuthInfo } from "../auth/principal.js";
@@ -26,6 +28,10 @@ export function createRemoteMcpHandler(
 
   return {
     async fetch(request: Request): Promise<Response> {
+      return withTimingRequest(async () => {
+        const start = performance.now();
+        let status: "success" | "failure" = "failure";
+        try {
       const url = new URL(request.url);
       if (request.method === "GET" && url.toString() === metadataUrl) {
         return Response.json(protectedResourceMetadata(config), {
@@ -37,7 +43,13 @@ export function createRemoteMcpHandler(
       if (auth instanceof Response) return auth;
       const principal = principalFromAuthInfo(auth);
       if (!isPrincipalAllowed(principal, config.allowedEmails ?? [])) return new Response("Forbidden", { status: 403 });
-      return handler.fetch(request, { authInfo: auth });
+      const response = await handler.fetch(request, { authInfo: auth });
+      status = response.status < 400 ? "success" : "failure";
+      return response;
+        } finally {
+          logCompletedTiming("mcp_http_request", start, status);
+        }
+      });
     },
     close: () => handler.close()
   };
