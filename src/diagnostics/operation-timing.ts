@@ -35,3 +35,14 @@ export function logSynchronousTiming(operation: string, start: number): void {
     // Logging must not affect business operations.
   }
 }
+
+/** Correlation data is limited to server-generated workspace IDs. */
+export function logCompletedTiming(operation: string, start: number, status: "success" | "failure", workspaceId?: string): void {
+  try {
+    console.info(JSON.stringify({
+      event: "agent_workspace_operation_timing", operation, status,
+      durationMs: Math.round((performance.now() - start) * 100) / 100,
+      ...(workspaceId ? { workspaceId } : {})
+    }));
+  } catch { /* diagnostic failures cannot affect operations */ }
+}
