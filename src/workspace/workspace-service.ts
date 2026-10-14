@@ -403,7 +403,7 @@ export class WorkspaceService {
   private async uploadStoredSource(workspace: Workspace, handle: WorkspaceHandle): Promise<void> {
     const key = workspace.project?.sourceStorageKey;
     if (!key) throw new Error(`Workspace ${workspace.id} has no stored source archive`);
-    const archive = await this.objectStore.get(key);
+    const archive = await timedOperation("zip_storage_read", () => this.objectStore.get(key));
     await this.provider.uploadArchive(handle, archive);
   }
 
