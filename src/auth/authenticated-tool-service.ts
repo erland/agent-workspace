@@ -1,3 +1,6 @@
+import { performance } from "node:perf_hooks";
+import { logCompletedTiming } from "../diagnostics/operation-timing.js";
+import { timedOperation } from "../diagnostics/operation-timing.js";
 import { getCapabilities } from "../core/capabilities.js";
 import type { ExecutionProviderFactory } from "../execution/execution-provider-factory.js";
 import type { ArtifactRepository, ExecutionAccountRepository, UserRepository, WorkspaceRepository } from "../persistence/repositories.js";
@@ -65,7 +68,7 @@ export class AuthenticatedAgentWorkspaceToolService {
   async uploadZip(input: WorkspaceUploadZipToolInput): Promise<ToolResult<unknown>> {
     return this.withWorkspaceService("workspace_upload_zip", input.workspaceId, async (service) => {
       const archive = input.archive
-        ? await this.archiveDownloader().download(input.archive.download_url)
+        ? await timedOperation("archive_download", () => this.archiveDownloader().download(input.archive!.download_url))
         : decodeBase64Archive(requireBase64(input.archiveBase64));
       return service.uploadZip(input.workspaceId, archive);
     });
@@ -73,7 +76,7 @@ export class AuthenticatedAgentWorkspaceToolService {
 
   async uploadZipFromUrl(input: { workspaceId: string; url: string; filename?: string }): Promise<ToolResult<unknown>> {
     return this.withWorkspaceService("workspace_upload_zip_from_url", input.workspaceId, async (service) => {
-      const archive = await this.archiveDownloader().download(input.url);
+      const archive = await timedOperation("archive_download", () => this.archiveDownloader().download(input.url));
       return service.uploadZip(input.workspaceId, archive);
     });
   }
@@ -136,6 +139,8 @@ export class AuthenticatedAgentWorkspaceToolService {
   }
 
   private async withWorkspaceService<T>(action: string, workspaceId: string | undefined, operation: (service: WorkspaceService) => Promise<T>): Promise<ToolResult<T>> {
+    const operationStart = performance.now();
+    let outcome: "success" | "failure" = "failure";
     let userId = "unknown";
     let executionAccount: PersistedExecutionAccount | undefined;
     try {
@@ -154,6 +159,7 @@ export class AuthenticatedAgentWorkspaceToolService {
       });
       const result = await operation(service);
       await this.audit(userId, action, "SUCCEEDED", undefined, workspaceId);
+      outcome = "success";
       return { ok: true, result };
     } catch (error) {
       if (executionAccount && isModalAuthenticationError(error)) {
@@ -165,6 +171,8 @@ export class AuthenticatedAgentWorkspaceToolService {
       }
       await this.audit(userId, action, "FAILED", this.failure(error).error.code, workspaceId);
       return this.failure(error);
+    } finally {
+      logCompletedTiming(action, operationStart, outcome, workspaceId);
     }
   }
 
