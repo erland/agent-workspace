@@ -381,8 +381,8 @@ export class WorkspaceService {
 
   private async createExecution(workspace: Workspace): Promise<WorkspaceHandle> {
     const profile = RUNTIME_PROFILES[workspace.runtimeProfile];
-    const remainingMs = Math.max(1, Date.parse(workspace.expiresAt) - this.now().getTime());
-    const timeoutMs = Math.min(EPHEMERAL_EXECUTION_TIMEOUT_MS, remainingMs);
+    const remainingMs = Date.parse(workspace.expiresAt) - this.now().getTime();
+    const timeoutMs = executionTimeoutMs(remainingMs);
     return this.provider.createWorkspace({
       imageRef: profile.imageRef,
       timeoutMs,
@@ -503,4 +503,12 @@ function resolveWorkspaceProjectRoot(projectRoots: readonly string[]): string {
   return relativeRoot.length === 0
     ? "/workspace/project"
     : `/workspace/project/${relativeRoot}`;
+}
+
+/** Modal timeout is limited to whole seconds and must not extend past expiry. */
+export function executionTimeoutMs(remainingMs: number): number {
+  if (!Number.isFinite(remainingMs) || remainingMs < 1000) {
+    throw new Error("Workspace has less than one second remaining; create a new workspace");
+  }
+  return Math.floor(Math.min(remainingMs, EPHEMERAL_EXECUTION_TIMEOUT_MS) / 1000) * 1000;
 }
