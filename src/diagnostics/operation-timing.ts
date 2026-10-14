@@ -21,3 +21,17 @@ export async function timedOperation<T>(operation: string, callback: () => Promi
     }
   }
 }
+
+/** Best-effort logging for synchronous operations. */
+export function logSynchronousTiming(operation: string, start: number): void {
+  try {
+    console.info(JSON.stringify({
+      event: "agent_workspace_operation_timing",
+      operation,
+      status: "success",
+      durationMs: Math.round((performance.now() - start) * 100) / 100
+    }));
+  } catch {
+    // Logging must not affect business operations.
+  }
+}
