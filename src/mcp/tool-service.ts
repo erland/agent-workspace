@@ -1,3 +1,4 @@
+import { timedOperation } from "../diagnostics/operation-timing.js";
 import { getCapabilities } from "../core/capabilities.js";
 import type { WorkspaceService } from "../workspace/workspace-service.js";
 import {
@@ -54,33 +55,33 @@ export class AgentWorkspaceToolService implements AgentWorkspaceTools {
       const runtime = input.java !== undefined || input.node !== undefined
         ? { ...(input.java ? { java: input.java } : {}), ...(input.node ? { node: input.node } : {}) }
         : undefined;
-      return { ok: true, result: await this.workspaces.create({ ...(runtime ? { runtime } : {}), ...(input.lifetimeMinutes ? { lifetimeMinutes: input.lifetimeMinutes } : {}) }) };
+      return { ok: true, result: await timedOperation("workspace_create", () => this.workspaces.create({ ...(runtime ? { runtime } : {}), ...(input.lifetimeMinutes ? { lifetimeMinutes: input.lifetimeMinutes } : {}) })) };
     } catch (error) { return this.failure(error); }
   }
 
   public async uploadZip(input: WorkspaceUploadZipToolInput): Promise<ToolResult<unknown>> {
     try {
       const archive = input.archive
-        ? await this.archiveDownloader.download(input.archive.download_url)
+        ? await timedOperation("archive_download", () => this.archiveDownloader.download(input.archive!.download_url))
         : decodeBase64Archive(requireBase64(input.archiveBase64));
-      return { ok: true, result: await this.workspaces.uploadZip(input.workspaceId, archive) };
+      return { ok: true, result: await timedOperation("workspace_upload_zip", () => this.workspaces.uploadZip(input.workspaceId, archive)) };
     } catch (error) { return this.failure(error); }
   }
 
   public async uploadZipFromUrl(input: { workspaceId: string; url: string; filename?: string }): Promise<ToolResult<unknown>> {
     try {
-      const archive = await this.archiveDownloader.download(input.url);
-      return { ok: true, result: await this.workspaces.uploadZip(input.workspaceId, archive) };
+      const archive = await timedOperation("archive_download", () => this.archiveDownloader.download(input.url));
+      return { ok: true, result: await timedOperation("workspace_upload_zip", () => this.workspaces.uploadZip(input.workspaceId, archive)) };
     } catch (error) { return this.failure(error); }
   }
 
   public async verifyProject(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
-    try { return { ok: true, result: await this.workspaces.verifyProject(input.workspaceId) }; }
+    try { return { ok: true, result: await timedOperation("project_verify", () => this.workspaces.verifyProject(input.workspaceId)) }; }
     catch (error) { return this.failure(error); }
   }
 
   public async buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined }): Promise<ToolResult<unknown>> {
-    try { return { ok: true, result: await this.workspaces.buildProject(input.workspaceId, input.outputs ?? []) }; }
+    try { return { ok: true, result: await timedOperation("project_build", () => this.workspaces.buildProject(input.workspaceId, input.outputs ?? [])) }; }
     catch (error) { return this.failure(error); }
   }
 
@@ -98,7 +99,7 @@ export class AgentWorkspaceToolService implements AgentWorkspaceTools {
   }
 
   public async destroyWorkspace(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
-    try { return { ok: true, result: await this.workspaces.destroy(input.workspaceId) }; }
+    try { return { ok: true, result: await timedOperation("workspace_destroy", () => this.workspaces.destroy(input.workspaceId)) }; }
     catch (error) { return this.failure(error); }
   }
 

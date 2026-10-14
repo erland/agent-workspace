@@ -1,4 +1,7 @@
+import { timedOperation } from "../diagnostics/operation-timing.js";
 import { randomUUID } from "node:crypto";
+import { performance } from "node:perf_hooks";
+import { logSynchronousTiming } from "../diagnostics/operation-timing.js";
 import { DEFAULT_SECURITY_POLICY, type SecurityPolicy } from "../security/security-policy.js";
 
 import {
@@ -193,13 +196,17 @@ export class WorkspaceService {
       throw new Error(`Workspace ${workspaceId} is not ready for upload: ${workspace.status}`);
     }
 
+    const validationStart = performance.now();
     const validation = validateZipArchive(archive, this.archiveLimits);
+    logSynchronousTiming("zip_validation", validationStart);
+    const analysisStart = performance.now();
     const analysis = analyzeProjectArchive(archive, validation, {
       workspaceRuntimeProfile: workspace.runtimeProfile
     });
+    logSynchronousTiming("project_analysis", analysisStart);
     const record = await this.requireRecord(workspaceId);
     const sourceStorageKey = this.sourceStorageKey(workspaceId);
-    await this.objectStore.put(sourceStorageKey, archive);
+    await timedOperation("zip_storage", () => this.objectStore.put(sourceStorageKey, archive));
 
     record.workspace.project = {
       uploadedAt: this.now().toISOString(),
@@ -370,19 +377,19 @@ export class WorkspaceService {
     workspace: Workspace,
     operation: (handle: WorkspaceHandle) => Promise<T>
   ): Promise<T> {
-    const handle = await this.createExecution(workspace);
+    const handle = await timedOperation("sandbox_create", () => this.createExecution(workspace));
     try {
-      await this.uploadStoredSource(workspace, handle);
-      return await operation(handle);
+      await timedOperation("sandbox_upload_archive", () => this.uploadStoredSource(workspace, handle));
+      return await timedOperation("sandbox_project_execution", () => operation(handle));
     } finally {
-      await this.provider.terminate(handle).catch(() => undefined);
+      await timedOperation("sandbox_terminate", () => this.provider.terminate(handle)).catch(() => undefined);
     }
   }
 
   private async createExecution(workspace: Workspace): Promise<WorkspaceHandle> {
     const profile = RUNTIME_PROFILES[workspace.runtimeProfile];
-    const remainingMs = Math.max(1, Date.parse(workspace.expiresAt) - this.now().getTime());
-    const timeoutMs = Math.min(EPHEMERAL_EXECUTION_TIMEOUT_MS, remainingMs);
+    const remainingMs = Date.parse(workspace.expiresAt) - this.now().getTime();
+    const timeoutMs = executionTimeoutMs(remainingMs);
     return this.provider.createWorkspace({
       imageRef: profile.imageRef,
       timeoutMs,
@@ -503,4 +510,12 @@ function resolveWorkspaceProjectRoot(projectRoots: readonly string[]): string {
   return relativeRoot.length === 0
     ? "/workspace/project"
     : `/workspace/project/${relativeRoot}`;
+}
+
+/** Modal timeout is limited to whole seconds and must not extend past expiry. */
+export function executionTimeoutMs(remainingMs: number): number {
+  if (!Number.isFinite(remainingMs) || remainingMs < 1000) {
+    throw new Error("Workspace has less than one second remaining; create a new workspace");
+  }
+  return Math.floor(Math.min(remainingMs, EPHEMERAL_EXECUTION_TIMEOUT_MS) / 1000) * 1000;
 }
