@@ -280,25 +280,27 @@ export class WorkspaceService {
       throw new Error(`Unsupported build project type: ${projectType}`);
     }
     const artifactService = this.requireArtifactService();
-    return this.withEphemeralProject(workspace, async (handle) => {
-      const result = await new ProjectBuildService(
+    // The sandbox is needed only for building and collecting bytes. Persist
+    // artifacts after termination so storage/database latency incurs no Modal time.
+    const result = await this.withEphemeralProject(workspace, async (handle) =>
+      new ProjectBuildService(
         this.provider,
         resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots),
         this.securityPolicy.maxArtifactBytes
-      ).build(handle, projectType, outputs);
-      const artifacts: ArtifactRecord[] = [];
-      for (const output of result.outputs) {
-        artifacts.push(await artifactService.publish({
-          workspaceId,
-          name: output.name,
-          kind: output.kind,
-          filename: output.filename,
-          mediaType: output.mediaType,
-          bytes: output.bytes
-        }));
-      }
-      return { status: "PASSED", projectType, artifacts };
-    });
+      ).build(handle, projectType, outputs)
+    );
+    const artifacts: ArtifactRecord[] = [];
+    for (const output of result.outputs) {
+      artifacts.push(await artifactService.publish({
+        workspaceId,
+        name: output.name,
+        kind: output.kind,
+        filename: output.filename,
+        mediaType: output.mediaType,
+        bytes: output.bytes
+      }));
+    }
+    return { status: "PASSED", projectType, artifacts };
   }
 
   public async getArtifact(artifactId: string): Promise<ArtifactRecord> {
@@ -382,8 +384,26 @@ export class WorkspaceService {
       await timedOperation("sandbox_upload_archive", () => this.uploadStoredSource(workspace, handle));
       return await timedOperation("sandbox_project_execution", () => operation(handle));
     } finally {
-      await timedOperation("sandbox_terminate", () => this.provider.terminate(handle)).catch(() => undefined);
+      // Always attempt termination, and surface failures instead of silently
+      // reporting a successful operation when Modal cleanup may have failed.
+      await timedOperation("sandbox_terminate", () => this.terminateExecution(handle));
     }
+  }
+
+  private async terminateExecution(handle: WorkspaceHandle): Promise<void> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await this.provider.terminate(handle);
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw new Error(
+      `Sandbox termination failed after 3 attempts (provider=${handle.providerId}, sandbox=${handle.providerWorkspaceId})`,
+      { cause: lastError }
+    );
   }
 
   private async createExecution(workspace: Workspace): Promise<WorkspaceHandle> {
