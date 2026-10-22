@@ -364,7 +364,7 @@ export class WorkspaceService {
   }
 
   private async publishExecutionLog(service: ArtifactService, workspaceId: string, operation: string, entries: readonly string[]): Promise<ArtifactRecord> {
-    const bytes = Buffer.from(entries.join("\\n").slice(0, 1024 * 1024) || "(no command output)", "utf8");
+    const bytes = Buffer.from(entries.join("\n").slice(0, 1024 * 1024) || "(no command output)", "utf8");
     return service.publish({
       workspaceId, name: `${operation} log`, kind: "execution-log",
       filename: `${operation}.log`, mediaType: "text/plain", bytes
