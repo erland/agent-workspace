@@ -27,7 +27,7 @@ Use `project_verify` when the user wants to know whether the project compiles, t
 
 Use `project_build` when the user needs built output or an artifact for later handoff. `outputs[].path` may select a project-relative file or directory. Files are published unchanged; directories are packaged as `.tar.gz`.
 
-Use `artifact_get` to inspect produced artifacts. Use `artifact_download_link` when another service or the user needs a short-lived HTTPS download URL. For service-to-service handoff, pass this URL directly; do not materialize the artifact into ChatGPT unless the user explicitly needs the file itself.
+Build and verify return log-artifact metadata and optional captured files (use `captureFiles` to request additional outputs; generated npm `package-lock.json` is captured automatically). Use `file_read` to read selected UTF-8 source files with `workspaceId` and `path`, or saved artifacts with `artifactId` (and optionally `path` inside ZIP/tar.gz). Text reads are bounded and paginated with `offset`/`limit` and never start Modal. Use `artifact_download_link` when another service or the user needs a short-lived HTTPS download URL. For service-to-service handoff, pass this URL directly; do not materialize the artifact into ChatGPT unless the user explicitly needs the file itself.
 
 When PWA Preview is available and the built output is a static web application, use:
 

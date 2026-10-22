@@ -9,7 +9,7 @@ const expectedTools = [
   "workspace_upload_zip_from_url",
   "project_verify",
   "project_build",
-  "artifact_get",
+  "file_read",
   "artifact_download_link",
   "workspace_destroy"
 ].sort();

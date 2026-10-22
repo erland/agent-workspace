@@ -35,7 +35,11 @@ export const WorkspaceUploadZipFromUrlInputSchema = z.object({
 }).strict();
 
 export const JsonObjectOutputSchema = z.object({ result: z.unknown() }).strict();
+export const CaptureFilesSchema = z.array(z.string().min(1).max(512)).max(12).optional();
+export const ProjectVerifyInputSchema = z.object({ workspaceId: z.string().min(1), captureFiles: CaptureFilesSchema }).strict();
+export const FileReadInputSchema = z.object({ workspaceId: z.string().min(1).optional(), artifactId: z.string().min(1).optional(), path: z.string().min(1).max(1024).optional(), offset: z.number().int().nonnegative().optional(), limit: z.number().int().min(1).max(65536).optional() }).strict().refine(x => Boolean(x.workspaceId) !== Boolean(x.artifactId), "Specify exactly one source");
 export const ProjectBuildInputSchema = z.object({
+  captureFiles: CaptureFilesSchema,
   workspaceId: z.string().min(1),
   outputs: z.array(z.object({
     path: z.string().min(1).max(512).describe("Project-relative path to a build output. May name either a single file or a directory. Files are published unchanged; directories are packaged as .tar.gz artifacts."),

@@ -1,3 +1,5 @@
+import { InMemoryArtifactRepository } from "../persistence/in-memory.js";
+import { readTextFile } from "../artifact/file-reader.js";
 import { timedOperation } from "../diagnostics/operation-timing.js";
 import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
@@ -117,13 +119,11 @@ export class WorkspaceService {
     this.repository = options.repository;
     this.securityPolicy = options.securityPolicy ?? DEFAULT_SECURITY_POLICY;
     this.objectStore = options.objectStore ?? new InMemoryObjectStore();
-    this.artifactService = options.artifactRepository
-      ? new ArtifactService(this.userId, options.artifactRepository, this.objectStore, {
+    this.artifactService = new ArtifactService(this.userId, options.artifactRepository ?? new InMemoryArtifactRepository(), this.objectStore, {
           ttlMinutes: options.artifactTtlMinutes ?? 60,
           maxArtifactBytes: this.securityPolicy.maxArtifactBytes,
           now: this.now
-        })
-      : undefined;
+        });
     this.schedule =
       options.schedule ??
       ((callback, delayMs) => {
@@ -226,81 +226,165 @@ export class WorkspaceService {
     };
   }
 
-  public async verifyProject(workspaceId: string): Promise<ProjectVerificationResult> {
-    const workspace = await this.get(workspaceId);
-    if (workspace.project === undefined) {
-      throw new Error(`Workspace ${workspaceId} has no uploaded project`);
-    }
-    if (workspace.project.analysis.projectType === "NPM") {
-      return this.verifyNpm(workspaceId);
-    }
-    if (workspace.project.analysis.projectType === "MAVEN") {
-      return this.verifyMaven(workspaceId);
-    }
-    throw new Error(`Unsupported project type: ${workspace.project.analysis.projectType}`);
+  public async verifyProject(workspaceId: string, captureFiles: readonly string[] = []): Promise<ProjectVerificationResult & { logArtifact?: ArtifactRecord; artifacts?: ArtifactRecord[] }> {
+    const workspace = await this.requireReadyProject(workspaceId, "verification");
+    const kind = workspace.project!.analysis.projectType;
+    if (kind !== "NPM" && kind !== "MAVEN") throw new Error(`Unsupported project type: ${kind}`);
+    const log: string[] = [];
+    const capture = normalizeCaptureFiles(captureFiles, kind);
+    const outcome = await this.withEphemeralProject(workspace, async (handle) => {
+      const recorder = this.recordingProvider(log);
+      let result: ProjectVerificationResult;
+      try {
+        result = kind === "NPM"
+          ? await new NpmVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots) }).verify(handle)
+          : await new MavenVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots) }).verify(handle);
+      } catch (error) {
+        result = { status: "FAILED", projectType: kind, durationMs: 0, steps: [], failureSummary: String(error) };
+        log.push(`Verification error: ${String(error)}`);
+      }
+      const files = await this.captureProjectFiles(handle, workspace, capture, log);
+      return { result, files };
+    });
+    const artifactService = this.requireArtifactService();
+    const artifacts = await this.publishCapturedFiles(workspaceId, outcome.files);
+    const logArtifact = await this.publishExecutionLog(artifactService, workspaceId, "verify", log);
+    return { ...outcome.result, logArtifact, artifacts };
   }
 
   public async verifyNpm(workspaceId: string): Promise<ProjectVerificationResult> {
-    const workspace = await this.requireReadyProject(workspaceId, "verification");
-    if (workspace.project!.analysis.projectType !== "NPM") {
-      throw new Error(
-        `Workspace ${workspaceId} project is not npm: ${workspace.project!.analysis.projectType}`
-      );
-    }
-
-    return this.withEphemeralProject(workspace, async (handle) =>
-      new NpmVerifier(this.provider, {
-        projectRoot: resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots)
-      }).verify(handle)
-    );
+    return this.verifyProject(workspaceId);
   }
 
   public async verifyMaven(workspaceId: string): Promise<ProjectVerificationResult> {
-    const workspace = await this.requireReadyProject(workspaceId, "verification");
-    if (workspace.project!.analysis.projectType !== "MAVEN") {
-      throw new Error(
-        `Workspace ${workspaceId} project is not Maven: ${workspace.project!.analysis.projectType}`
-      );
-    }
-
-    return this.withEphemeralProject(workspace, async (handle) =>
-      new MavenVerifier(this.provider, {
-        projectRoot: resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots)
-      }).verify(handle)
-    );
+    return this.verifyProject(workspaceId);
   }
 
   public async buildProject(
     workspaceId: string,
-    outputs: readonly RequestedBuildOutput[] = []
-  ): Promise<{ status: "PASSED"; projectType: "NPM" | "MAVEN"; artifacts: ArtifactRecord[] }> {
+    outputs: readonly RequestedBuildOutput[] = [],
+    captureFiles: readonly string[] = []
+  ): Promise<{ status: "PASSED" | "FAILED"; projectType: "NPM" | "MAVEN"; artifacts: ArtifactRecord[]; logArtifact: ArtifactRecord; failureSummary?: string }> {
     const workspace = await this.requireReadyProject(workspaceId, "build");
     const projectType = workspace.project!.analysis.projectType;
-    if (projectType !== "NPM" && projectType !== "MAVEN") {
-      throw new Error(`Unsupported build project type: ${projectType}`);
-    }
+    if (projectType !== "NPM" && projectType !== "MAVEN") throw new Error(`Unsupported build project type: ${projectType}`);
+    const log: string[] = [];
+    const capture = normalizeCaptureFiles(captureFiles, projectType);
+    const outcome = await this.withEphemeralProject(workspace, async (handle) => {
+      const recorder = this.recordingProvider(log);
+      let result: Awaited<ReturnType<ProjectBuildService["build"]>> | undefined;
+      let failureSummary: string | undefined;
+      try {
+        result = await new ProjectBuildService(recorder,
+          resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots),
+          this.securityPolicy.maxArtifactBytes).build(handle, projectType, outputs);
+      } catch (error) {
+        failureSummary = String(error);
+        log.push(`Build error: ${failureSummary}`);
+      }
+      const files = await this.captureProjectFiles(handle, workspace, capture, log);
+      return { result, files, failureSummary };
+    });
     const artifactService = this.requireArtifactService();
-    // The sandbox is needed only for building and collecting bytes. Persist
-    // artifacts after termination so storage/database latency incurs no Modal time.
-    const result = await this.withEphemeralProject(workspace, async (handle) =>
-      new ProjectBuildService(
-        this.provider,
-        resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots),
-        this.securityPolicy.maxArtifactBytes
-      ).build(handle, projectType, outputs)
-    );
     const artifacts: ArtifactRecord[] = [];
-    for (const output of result.outputs) {
+    for (const output of outcome.result?.outputs ?? []) {
       artifacts.push(await artifactService.publish({
-        workspaceId,
-        name: output.name,
-        kind: output.kind,
-        filename: output.filename,
-        mediaType: output.mediaType,
-        bytes: output.bytes
+        workspaceId, name: output.name, kind: output.kind,
+        filename: output.filename, mediaType: output.mediaType, bytes: output.bytes
       }));
     }
-    return { status: "PASSED", projectType, artifacts };
+    artifacts.push(...await this.publishCapturedFiles(workspaceId, outcome.files));
+    const logArtifact = await this.publishExecutionLog(artifactService, workspaceId, "build", log);
+    return {
+      status: outcome.result ? "PASSED" : "FAILED", projectType, artifacts, logArtifact,
+      ...(outcome.failureSummary ? { failureSummary: outcome.failureSummary } : {})
+    };
+  }
+
+  private recordingProvider(log: string[]): SandboxProvider {
+    const underlying = this.provider;
+    return {
+      createWorkspace: (options) => underlying.createWorkspace(options),
+      uploadArchive: (handle, archive) => underlying.uploadArchive(handle, archive),
+      readFile: (handle, path) => underlying.readFile(handle, path),
+      terminate: (handle) => underlying.terminate(handle),
+      exec: async (handle, command) => {
+        const started = performance.now();
+        try {
+          const result = await underlying.exec(handle, command);
+          log.push(JSON.stringify({
+            argv: command.argv, exitCode: result.exitCode, durationMs: Math.round(performance.now() - started),
+            stdout: redactLog(result.stdout), stderr: redactLog(result.stderr)
+          }));
+          return result;
+        } catch (error) {
+          log.push(JSON.stringify({ argv: command.argv, error: redactLog(String(error)) }));
+          throw error;
+        }
+      }
+    };
+  }
+
+  private async captureProjectFiles(
+    handle: WorkspaceHandle, workspace: Workspace, paths: readonly string[], log: string[]
+  ): Promise<Array<{ path: string; bytes: Uint8Array }>> {
+    const root = resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots);
+    const captured: Array<{ path: string; bytes: Uint8Array }> = [];
+    for (const path of paths) {
+      const full = `${root}/${path}`;
+      try {
+        const check = await this.provider.exec(handle, {
+          argv: ["bash", "-lc", 'set -e; root=$(realpath -e -- "$1"); file=$(realpath -e -- "$2"); case "$file" in "$root"/*) ;; *) exit 3;; esac; test -f "$file"; stat -c %s "$file"', "_", root, full],
+          timeoutMs: 30_000
+        });
+        if (check.exitCode !== 0) { log.push(`Capture unavailable: ${path}`); continue; }
+        const size = Number(check.stdout.trim());
+        if (!Number.isSafeInteger(size) || size < 0 || size > 5 * 1024 * 1024) {
+          log.push(`Capture over size limit: ${path}`); continue;
+        }
+        const bytes = await this.provider.readFile(handle, full);
+        if (bytes.length === 0) { log.push(`Capture empty: ${path}`); continue; }
+        if (bytes.length > 5 * 1024 * 1024) { log.push(`Capture over size limit: ${path}`); continue; }
+        captured.push({ path, bytes });
+      } catch (error) { log.push(`Capture failed for ${path}: ${redactLog(String(error))}`); }
+    }
+    return captured;
+  }
+
+  private async publishCapturedFiles(workspaceId: string, files: readonly { path: string; bytes: Uint8Array }[]): Promise<ArtifactRecord[]> {
+    const service = this.requireArtifactService();
+    const published: ArtifactRecord[] = [];
+    for (const file of files) {
+      published.push(await service.publish({
+        workspaceId, name: file.path, kind: "captured-file", filename: file.path.split("/").at(-1)!,
+        mediaType: "text/plain", bytes: file.bytes
+      }));
+    }
+    return published;
+  }
+
+  private async publishExecutionLog(service: ArtifactService, workspaceId: string, operation: string, entries: readonly string[]): Promise<ArtifactRecord> {
+    const bytes = Buffer.from(entries.join("\n").slice(0, 1024 * 1024) || "(no command output)", "utf8");
+    return service.publish({
+      workspaceId, name: `${operation} log`, kind: "execution-log",
+      filename: `${operation}.log`, mediaType: "text/plain", bytes
+    });
+  }
+
+  public async fileRead(input: { workspaceId?: string | undefined; artifactId?: string | undefined; path?: string | undefined; offset?: number | undefined; limit?: number | undefined }) {
+    if ((input.workspaceId === undefined) === (input.artifactId === undefined)) {
+      throw new Error("Specify exactly one of workspaceId or artifactId");
+    }
+    if (input.workspaceId) {
+      if (!input.path) throw new Error("path is required to read a workspace source file");
+      const workspace = await this.requireReadyProject(input.workspaceId, "file read");
+      const archive = await this.objectStore.get(workspace.project!.sourceStorageKey);
+      const root = workspace.project!.analysis.projectRoots[0];
+      const path = root ? `${root}/${input.path}` : input.path;
+      return readTextFile(archive, "source.zip", path, input.offset, input.limit);
+    }
+    const { artifact, bytes } = await this.readArtifact(input.artifactId!);
+    return readTextFile(bytes, artifact.filename, input.path, input.offset, input.limit);
   }
 
   public async getArtifact(artifactId: string): Promise<ArtifactRecord> {
@@ -538,4 +622,21 @@ export function executionTimeoutMs(remainingMs: number): number {
     throw new Error("Workspace has less than one second remaining; create a new workspace");
   }
   return Math.floor(Math.min(remainingMs, EPHEMERAL_EXECUTION_TIMEOUT_MS) / 1000) * 1000;
+}
+
+function normalizeCaptureFiles(paths: readonly string[], kind: "NPM" | "MAVEN"): string[] {
+  if (paths.length > 12) throw new Error("captureFiles exceeds 12 entries");
+  const result = new Set<string>(kind === "NPM" ? ["package-lock.json"] : []);
+  for (const path of paths) {
+    if (!path || path.length > 512 || path.startsWith("/") || path.includes("\\\\") ||
+        path.split("/").some((segment) => segment === ".." || segment === "" || segment === ".")) {
+      throw new Error(`Invalid captureFiles path: ${path}`);
+    }
+    result.add(path);
+  }
+  return [...result];
+}
+
+function redactLog(value: string): string {
+  return value.slice(0, 128 * 1024).replace(/(token|password|secret|authorization)(["'=:\\s]+)[^\\s"',]+/gi, "$1$2[REDACTED]");
 }

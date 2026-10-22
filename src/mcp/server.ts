@@ -5,6 +5,8 @@ import type { AgentWorkspaceTools, ToolResult } from "./tool-service.js";
 import {
   ArtifactDownloadLinkOutputSchema,
   ArtifactIdInputSchema,
+  FileReadInputSchema,
+  ProjectVerifyInputSchema,
   ArtifactOutputSchema,
   EmptyInputSchema,
   JsonObjectOutputSchema,
@@ -87,7 +89,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
     async (input: z.infer<typeof WorkspaceUploadZipFromUrlInputSchema>) => tools.uploadZipFromUrl(input)
   );
 
-  registerJsonTool(server, "project_verify", "Compile/test the uploaded npm or Maven project in a short-lived execution sandbox. No build artifact is retained.", WorkspaceIdInputSchema, async (input: z.infer<typeof WorkspaceIdInputSchema>) => tools.verifyProject(input));
+  registerJsonTool(server, "project_verify", "Compile/test the uploaded npm or Maven project and return a persistent execution log artifact and optional captured files.", ProjectVerifyInputSchema, async (input: z.infer<typeof ProjectVerifyInputSchema>) => tools.verifyProject(input));
 
   server.registerTool(
     "project_build",
@@ -117,25 +119,8 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
     }
   );
 
-  server.registerTool(
-    "artifact_get",
-    {
-      annotations: toolAnnotations("artifact_get"),
-      description: "Return metadata for a published artifact without attaching the file. Use artifact_download_link for an explicit URL handoff.",
-      inputSchema: ArtifactIdInputSchema,
-      outputSchema: ArtifactOutputSchema
-    },
-    async (input: z.infer<typeof ArtifactIdInputSchema>) => {
-      const response = await tools.getArtifact(input);
-      if (!response.ok) return errorResult(response);
-      const artifact = response.result as any;
-      const structured = { result: { ...artifact, resourceUri: artifactResourceUri(artifact.id) } };
-      return {
-        structuredContent: structured,
-        content: [{ type: "text" as const, text: JSON.stringify(structured) }]
-      };
-    }
-  );
+  registerJsonTool(server, "file_read", "Read UTF-8 text from a stored workspace source file, an artifact, or a file in ZIP/tar.gz. Does not start Modal.", FileReadInputSchema, async (input: z.infer<typeof FileReadInputSchema>) => tools.fileRead(input));
+
   server.registerTool(
     "artifact_download_link",
     {
@@ -153,7 +138,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
 
 
 function toolAnnotations(name: string) {
-  const readOnly = new Set(["get_capabilities", "get_profile", "artifact_get"]);
+  const readOnly = new Set(["get_capabilities", "get_profile", "file_read"]);
   const destructive = new Set(["workspace_destroy"]);
   const openWorld = new Set(["workspace_create", "workspace_upload_zip_from_url", "project_verify", "project_build", "workspace_destroy"]);
   return {

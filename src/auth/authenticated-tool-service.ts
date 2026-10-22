@@ -81,24 +81,20 @@ export class AuthenticatedAgentWorkspaceToolService {
     });
   }
 
-  async verifyProject(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
-    return this.withWorkspaceService("project_verify", input.workspaceId, (service) => service.verifyProject(input.workspaceId));
+  async verifyProject(input: { workspaceId: string; captureFiles?: string[] | undefined }): Promise<ToolResult<unknown>> {
+    return this.withWorkspaceService("project_verify", input.workspaceId, (service) => service.verifyProject(input.workspaceId, input.captureFiles ?? []));
   }
 
-  async buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined }): Promise<ToolResult<unknown>> {
+  async buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined; captureFiles?: string[] | undefined }): Promise<ToolResult<unknown>> {
     return this.withWorkspaceService(
       "project_build",
       input.workspaceId,
-      (service) => service.buildProject(input.workspaceId, input.outputs ?? [])
+      (service) => service.buildProject(input.workspaceId, input.outputs ?? [], input.captureFiles ?? [])
     );
   }
 
-  async getArtifact(input: { artifactId: string }): Promise<ToolResult<unknown>> {
-    return this.withWorkspaceService(
-      "artifact_get",
-      undefined,
-      (service) => service.getArtifact(input.artifactId)
-    );
+  async fileRead(input: { workspaceId?: string | undefined; artifactId?: string | undefined; path?: string | undefined; offset?: number | undefined; limit?: number | undefined }): Promise<ToolResult<unknown>> {
+    return this.withWorkspaceService("file_read", input.workspaceId, (service) => service.fileRead(input));
   }
 
   async readArtifact(input: { artifactId: string }): Promise<{ artifact: any; bytes: Uint8Array }> {
