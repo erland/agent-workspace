@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
 import { gzipSync } from "node:zlib";
-import { readTextFile } from "../src/artifact/file-reader.js";
+import { readBinaryFile, readTextFile } from "../src/artifact/file-reader.js";
 import { makeStoredZip } from "./zip-fixture.js";
 import { WorkspaceService } from "../src/workspace/workspace-service.js";
 import { InMemoryArtifactRepository } from "../src/persistence/in-memory.js";
@@ -52,4 +52,27 @@ it("reads files inside gzip TAR archives and rejects missing names", () => {
 it("reads direct text artifacts and refuses invalid pagination", () => {
   assert.equal(readTextFile(Buffer.from("hello"), "build.log").text, "hello");
   assert.throws(() => readTextFile(Buffer.from("hello"), "build.log", undefined, -1), /Invalid text read/);
+});
+
+it("reads arbitrary binary bytes with byte-based pagination and exact Base64 roundtrip", () => {
+  const bytes = Buffer.from([0, 255, 128, 1, 2, 3, 254, 0]);
+  const first = readBinaryFile(bytes, "image.png", undefined, 0, 3);
+  assert.equal(first.encoding, "base64");
+  assert.equal(first.sizeBytes, 8);
+  assert.equal(first.nextOffset, 3);
+  assert.deepEqual(Buffer.from(first.content, "base64"), bytes.subarray(0, 3));
+  const second = readBinaryFile(bytes, "image.png", undefined, first.nextOffset!, 5);
+  assert.deepEqual(Buffer.concat([Buffer.from(first.content, "base64"), Buffer.from(second.content, "base64")]), bytes);
+  assert.equal(second.nextOffset, null);
+  assert.equal(second.truncated, false);
+  assert.equal(readBinaryFile(bytes, "image.png", undefined, 100, 10).content, "");
+  assert.throws(() => readTextFile(bytes, "image.png"), /utf-8|encoded data/i);
+  assert.throws(() => readBinaryFile(bytes, "image.png", undefined, 0, 65537), /Invalid binary read/);
+});
+
+it("reads a binary ZIP entry in Base64 without UTF-8 decoding", () => {
+  const data = makeStoredZip([{ path: "image.png", content: "PNG!" }]);
+  const result = readBinaryFile(data, "source.zip", "image.png", 0, 2);
+  assert.equal(Buffer.from(result.content, "base64").toString("utf8"), "PN");
+  assert.equal(result.nextOffset, 2);
 });
