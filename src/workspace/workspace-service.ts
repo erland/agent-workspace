@@ -1,3 +1,10 @@
+export interface CaptureFailure { path: string; reason: "NOT_FOUND" | "EMPTY" | "TOO_LARGE" | "READ_FAILED"; }
+export interface ExecutionDiagnostics {
+  sandboxCreatedAt: string;
+  sandboxTerminatedAt: string;
+  artifactsPublishedAt: string;
+  terminationConfirmed: true;
+}
 import { InMemoryArtifactRepository } from "../persistence/in-memory.js";
 import { readTextFile } from "../artifact/file-reader.js";
 import { timedOperation } from "../diagnostics/operation-timing.js";
@@ -226,12 +233,14 @@ export class WorkspaceService {
     };
   }
 
-  public async verifyProject(workspaceId: string, captureFiles: readonly string[] = []): Promise<ProjectVerificationResult & { logArtifact?: ArtifactRecord; artifacts?: ArtifactRecord[] }> {
+  public async verifyProject(workspaceId: string, captureFiles: readonly string[] = []): Promise<ProjectVerificationResult & { logArtifact?: ArtifactRecord; artifacts?: ArtifactRecord[]; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
     const workspace = await this.requireReadyProject(workspaceId, "verification");
     const kind = workspace.project!.analysis.projectType;
     if (kind !== "NPM" && kind !== "MAVEN") throw new Error(`Unsupported project type: ${kind}`);
     const log: string[] = [];
     const capture = normalizeCaptureFiles(captureFiles, kind);
+    const lifecycle: Partial<ExecutionDiagnostics> = {};
+    const lifecycle: Partial<ExecutionDiagnostics> = {};
     const outcome = await this.withEphemeralProject(workspace, async (handle) => {
       const recorder = this.recordingProvider(log);
       let result: ProjectVerificationResult;
@@ -245,11 +254,12 @@ export class WorkspaceService {
       }
       const files = await this.captureProjectFiles(handle, workspace, capture, log);
       return { result, files };
-    });
+    }, lifecycle);
     const artifactService = this.requireArtifactService();
-    const artifacts = await this.publishCapturedFiles(workspaceId, outcome.files);
+    const artifacts = await this.publishCapturedFiles(workspaceId, outcome.files.files);
     const logArtifact = await this.publishExecutionLog(artifactService, workspaceId, "verify", log);
-    return { ...outcome.result, logArtifact, artifacts };
+    lifecycle.artifactsPublishedAt = this.now().toISOString();
+    return { ...outcome.result, logArtifact, artifacts, missingCaptureFiles: outcome.files.missing.filter(x => captureFiles.includes(x.path)), execution: lifecycle as ExecutionDiagnostics };
   }
 
   public async verifyNpm(workspaceId: string): Promise<ProjectVerificationResult> {
@@ -264,7 +274,7 @@ export class WorkspaceService {
     workspaceId: string,
     outputs: readonly RequestedBuildOutput[] = [],
     captureFiles: readonly string[] = []
-  ): Promise<{ status: "PASSED" | "FAILED"; projectType: "NPM" | "MAVEN"; artifacts: ArtifactRecord[]; logArtifact: ArtifactRecord; failureSummary?: string }> {
+  ): Promise<{ status: "PASSED" | "FAILED"; projectType: "NPM" | "MAVEN"; artifacts: ArtifactRecord[]; logArtifact: ArtifactRecord; failureSummary?: string; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
     const workspace = await this.requireReadyProject(workspaceId, "build");
     const projectType = workspace.project!.analysis.projectType;
     if (projectType !== "NPM" && projectType !== "MAVEN") throw new Error(`Unsupported build project type: ${projectType}`);
@@ -284,7 +294,7 @@ export class WorkspaceService {
       }
       const files = await this.captureProjectFiles(handle, workspace, capture, log);
       return { result, files, failureSummary };
-    });
+    }, lifecycle);
     const artifactService = this.requireArtifactService();
     const artifacts: ArtifactRecord[] = [];
     for (const output of outcome.result?.outputs ?? []) {
@@ -293,9 +303,12 @@ export class WorkspaceService {
         filename: output.filename, mediaType: output.mediaType, bytes: output.bytes
       }));
     }
-    artifacts.push(...await this.publishCapturedFiles(workspaceId, outcome.files));
+    artifacts.push(...await this.publishCapturedFiles(workspaceId, outcome.files.files));
     const logArtifact = await this.publishExecutionLog(artifactService, workspaceId, "build", log);
+    lifecycle.artifactsPublishedAt = this.now().toISOString();
     return {
+      missingCaptureFiles: outcome.files.missing.filter(x => captureFiles.includes(x.path)),
+      execution: lifecycle as ExecutionDiagnostics,
       status: outcome.result ? "PASSED" : "FAILED", projectType, artifacts, logArtifact,
       ...(outcome.failureSummary ? { failureSummary: outcome.failureSummary } : {})
     };
@@ -327,9 +340,10 @@ export class WorkspaceService {
 
   private async captureProjectFiles(
     handle: WorkspaceHandle, workspace: Workspace, paths: readonly string[], log: string[]
-  ): Promise<Array<{ path: string; bytes: Uint8Array }>> {
+  ): Promise<{ files: Array<{ path: string; bytes: Uint8Array }>; missing: CaptureFailure[] }> {
     const root = resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots);
     const captured: Array<{ path: string; bytes: Uint8Array }> = [];
+    const missing: CaptureFailure[] = [];
     for (const path of paths) {
       const full = `${root}/${path}`;
       try {
@@ -337,18 +351,18 @@ export class WorkspaceService {
           argv: ["bash", "-lc", 'set -e; root=$(realpath -e -- "$1"); file=$(realpath -e -- "$2"); case "$file" in "$root"/*) ;; *) exit 3;; esac; test -f "$file"; stat -c %s "$file"', "_", root, full],
           timeoutMs: 30_000
         });
-        if (check.exitCode !== 0) { log.push(`Capture unavailable: ${path}`); continue; }
+        if (check.exitCode !== 0) { log.push(`Capture unavailable: ${path}`); missing.push({path, reason: "NOT_FOUND"}); continue; }
         const size = Number(check.stdout.trim());
         if (!Number.isSafeInteger(size) || size < 0 || size > 5 * 1024 * 1024) {
-          log.push(`Capture over size limit: ${path}`); continue;
+          log.push(`Capture over size limit: ${path}`); missing.push({path, reason: "TOO_LARGE"}); continue;
         }
         const bytes = await this.provider.readFile(handle, full);
-        if (bytes.length === 0) { log.push(`Capture empty: ${path}`); continue; }
+        if (bytes.length === 0) { log.push(`Capture empty: ${path}`); missing.push({path, reason: "EMPTY"}); continue; }
         if (bytes.length > 5 * 1024 * 1024) { log.push(`Capture over size limit: ${path}`); continue; }
         captured.push({ path, bytes });
-      } catch (error) { log.push(`Capture failed for ${path}: ${redactLog(String(error))}`); }
+      } catch (error) { log.push(`Capture failed for ${path}: ${redactLog(String(error))}`); missing.push({path, reason: "READ_FAILED"}); }
     }
-    return captured;
+    return { files: captured, missing };
   }
 
   private async publishCapturedFiles(workspaceId: string, files: readonly { path: string; bytes: Uint8Array }[]): Promise<ArtifactRecord[]> {
@@ -461,9 +475,11 @@ export class WorkspaceService {
 
   private async withEphemeralProject<T>(
     workspace: Workspace,
-    operation: (handle: WorkspaceHandle) => Promise<T>
+    operation: (handle: WorkspaceHandle) => Promise<T>,
+    lifecycle?: Partial<ExecutionDiagnostics>
   ): Promise<T> {
     const handle = await timedOperation("sandbox_create", () => this.createExecution(workspace));
+    if (lifecycle) lifecycle.sandboxCreatedAt = this.now().toISOString();
     try {
       await timedOperation("sandbox_upload_archive", () => this.uploadStoredSource(workspace, handle));
       return await timedOperation("sandbox_project_execution", () => operation(handle));
@@ -471,6 +487,10 @@ export class WorkspaceService {
       // Always attempt termination, and surface failures instead of silently
       // reporting a successful operation when Modal cleanup may have failed.
       await timedOperation("sandbox_terminate", () => this.terminateExecution(handle));
+      if (lifecycle) {
+        lifecycle.sandboxTerminatedAt = this.now().toISOString();
+        lifecycle.terminationConfirmed = true;
+      }
     }
   }
 
