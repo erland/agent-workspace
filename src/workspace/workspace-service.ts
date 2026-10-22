@@ -371,7 +371,7 @@ export class WorkspaceService {
     });
   }
 
-  public async fileRead(input: { workspaceId?: string; artifactId?: string; path?: string; offset?: number; limit?: number }) {
+  public async fileRead(input: { workspaceId?: string | undefined; artifactId?: string | undefined; path?: string | undefined; offset?: number | undefined; limit?: number | undefined }) {
     if ((input.workspaceId === undefined) === (input.artifactId === undefined)) {
       throw new Error("Specify exactly one of workspaceId or artifactId");
     }
