@@ -119,7 +119,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
     }
   );
 
-  registerJsonTool(server, "file_read", "Read UTF-8 text from a stored workspace source file, an artifact, or a file in ZIP/tar.gz. Does not start Modal.", FileReadInputSchema, async (input: z.infer<typeof FileReadInputSchema>) => tools.fileRead(input));
+  registerJsonTool(server, "file_read", "Read UTF-8 text (default) or byte-paginated Base64 binary data from workspace source files or stored artifacts, including ZIP/tar.gz entries. No Modal sandbox.", FileReadInputSchema, async (input: z.infer<typeof FileReadInputSchema>) => tools.fileRead(input));
 
   server.registerTool(
     "artifact_download_link",

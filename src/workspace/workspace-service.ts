@@ -6,7 +6,7 @@ export interface ExecutionDiagnostics {
   terminationConfirmed: true;
 }
 import { InMemoryArtifactRepository } from "../persistence/in-memory.js";
-import { readTextFile } from "../artifact/file-reader.js";
+import { readBinaryFile, readTextFile } from "../artifact/file-reader.js";
 import { timedOperation } from "../diagnostics/operation-timing.js";
 import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
@@ -385,7 +385,10 @@ export class WorkspaceService {
     });
   }
 
-  public async fileRead(input: { workspaceId?: string | undefined; artifactId?: string | undefined; path?: string | undefined; offset?: number | undefined; limit?: number | undefined }) {
+  public fileRead(input: { workspaceId?: string | undefined; artifactId?: string | undefined; path?: string | undefined; offset?: number | undefined; limit?: number | undefined; encoding?: "utf8" | undefined }): Promise<ReturnType<typeof readTextFile>>;
+  public fileRead(input: { workspaceId?: string | undefined; artifactId?: string | undefined; path?: string | undefined; offset?: number | undefined; limit?: number | undefined; encoding: "base64" }): Promise<ReturnType<typeof readBinaryFile>>;
+  public fileRead(input: { workspaceId?: string | undefined; artifactId?: string | undefined; path?: string | undefined; offset?: number | undefined; limit?: number | undefined; encoding?: "utf8" | "base64" | undefined }): Promise<ReturnType<typeof readTextFile> | ReturnType<typeof readBinaryFile>>;
+  public async fileRead(input: { workspaceId?: string | undefined; artifactId?: string | undefined; path?: string | undefined; offset?: number | undefined; limit?: number | undefined; encoding?: "utf8" | "base64" | undefined }) {
     if ((input.workspaceId === undefined) === (input.artifactId === undefined)) {
       throw new Error("Specify exactly one of workspaceId or artifactId");
     }
@@ -395,10 +398,10 @@ export class WorkspaceService {
       const archive = await this.objectStore.get(workspace.project!.sourceStorageKey);
       const root = workspace.project!.analysis.projectRoots[0];
       const path = root ? `${root}/${input.path}` : input.path;
-      return readTextFile(archive, "source.zip", path, input.offset, input.limit);
+      return input.encoding === "base64" ? readBinaryFile(archive, "source.zip", path, input.offset, input.limit) : readTextFile(archive, "source.zip", path, input.offset, input.limit);
     }
     const { artifact, bytes } = await this.readArtifact(input.artifactId!);
-    return readTextFile(bytes, artifact.filename, input.path, input.offset, input.limit);
+    return input.encoding === "base64" ? readBinaryFile(bytes, artifact.filename, input.path, input.offset, input.limit) : readTextFile(bytes, artifact.filename, input.path, input.offset, input.limit);
   }
 
   public async getArtifact(artifactId: string): Promise<ArtifactRecord> {

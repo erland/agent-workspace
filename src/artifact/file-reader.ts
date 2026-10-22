@@ -15,6 +15,28 @@ export function readTextFile(bytes: Uint8Array, filename: string, path?: string,
   return { text: segment, offset, nextOffset: offset + segment.length < text.length ? offset + segment.length : null, totalChars: text.length, truncated: offset + segment.length < text.length };
 }
 
+/**
+ * Binary mode pages by byte offset/limit. The archive selection uses the same
+ * validated ZIP/TAR extraction as UTF-8 mode, without decoding binary as text.
+ */
+export function readBinaryFile(bytes: Uint8Array, filename: string, path?: string, offset = 0, limit = 32768) {
+  if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > MAX_READ_CHARS) {
+    throw new Error("Invalid binary read offset or limit");
+  }
+  const content = path ? extractArchiveFile(bytes, filename, path) : bytes;
+  if (path && content.byteLength > MAX_FILE_BYTES) throw new Error("File exceeds 5 MiB archive-entry limit");
+  const end = Math.min(content.byteLength, offset + limit);
+  const chunk = content.subarray(Math.min(offset, content.byteLength), end);
+  return {
+    encoding: "base64" as const,
+    content: Buffer.from(chunk).toString("base64"),
+    offset,
+    nextOffset: end < content.byteLength ? end : null,
+    sizeBytes: content.byteLength,
+    truncated: end < content.byteLength
+  };
+}
+
 function validPath(path: string) {
   if (!path || path.length > 1024 || path.startsWith("/") || path.includes("\\") ||
       path.split("/").some(p => !p || p === "." || p === "..")) throw new Error("Invalid archive path");
