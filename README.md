@@ -178,7 +178,7 @@ Preview hosting and screenshots are delegated to PWA Preview and Browser Screens
 
 A logical Agent Workspace no longer implies a live Modal Sandbox. `workspace_create` creates metadata only and `workspace_upload_zip` persists the validated source ZIP through the provider-neutral `ObjectStore` abstraction. The production v1 store is a Coolify persistent volume mounted at `/data`.
 
-`project_verify` creates a short-lived Sandbox, uploads the stored source, compiles/tests the project, and always terminates the Sandbox in a `finally` block. Maven verification runs `test` only; packaging is performed by `project_build`. `project_build` similarly uses a short-lived Sandbox, publishes detected or explicitly requested outputs to temporary artifact storage, then terminates the Sandbox.
+`project_verify` creates a short-lived Sandbox, uploads the stored source, compiles/tests the project, and always terminates the Sandbox in a `finally` block. Maven verification runs `test` only; packaging is performed by `project_build`. `project_build` similarly uses a short-lived Sandbox, collects detected or explicitly requested outputs, terminates the Sandbox, then publishes them and execution logs to temporary artifact storage.
 
 Published build artifacts have independent 60-minute TTL metadata. They can be consumed through `agent-workspace://artifacts/{artifactId}` or through a short-lived signed HTTPS link returned by `artifact_download_link`.
 
@@ -192,7 +192,7 @@ After `npm ci`, start the local stdio MCP server with:
 npm run mcp:stdio
 ```
 
-DEV-010 exposes: `get_capabilities`, `get_profile`, `workspace_create`, `workspace_upload_zip`, `workspace_upload_zip_from_url`, `project_verify`, `project_build`, `artifact_get`, `artifact_download_link`, and `workspace_destroy`.
+DEV-010 exposes: `get_capabilities`, `get_profile`, `workspace_create`, `workspace_upload_zip`, `workspace_upload_zip_from_url`, `project_verify`, `project_build`, `file_read`, `artifact_download_link`, and `workspace_destroy`.
 
 
 ### OpenAI plugin packages
