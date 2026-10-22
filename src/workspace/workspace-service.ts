@@ -240,7 +240,6 @@ export class WorkspaceService {
     const log: string[] = [];
     const capture = normalizeCaptureFiles(captureFiles, kind);
     const lifecycle: Partial<ExecutionDiagnostics> = {};
-    const lifecycle: Partial<ExecutionDiagnostics> = {};
     const outcome = await this.withEphemeralProject(workspace, async (handle) => {
       const recorder = this.recordingProvider(log);
       let result: ProjectVerificationResult;
@@ -280,6 +279,7 @@ export class WorkspaceService {
     if (projectType !== "NPM" && projectType !== "MAVEN") throw new Error(`Unsupported build project type: ${projectType}`);
     const log: string[] = [];
     const capture = normalizeCaptureFiles(captureFiles, projectType);
+    const lifecycle: Partial<ExecutionDiagnostics> = {};
     const outcome = await this.withEphemeralProject(workspace, async (handle) => {
       const recorder = this.recordingProvider(log);
       let result: Awaited<ReturnType<ProjectBuildService["build"]>> | undefined;
