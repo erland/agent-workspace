@@ -68,7 +68,7 @@ describe("sandbox lifetime and artifact handoff", () => {
     const { service } = await setup(provider);
     const result = await service.buildProject("ws_lifecycle", [{ path: "dist" }]);
     assert.equal(result.status, "PASSED");
-    assert.equal(result.artifacts.length, 1);
+    assert.equal(result.artifacts.length, 2);
     const terminated = provider.events.indexOf("terminate");
     const published = provider.events.indexOf("publish");
     assert.ok(terminated >= 0 && published > terminated, JSON.stringify(provider.events));
@@ -82,7 +82,7 @@ describe("sandbox lifetime and artifact handoff", () => {
     provider.failures = 2;
     const { service } = await setup(provider);
     const result = await service.buildProject("ws_lifecycle", [{ path: "dist" }]);
-    assert.equal(result.artifacts.length, 1);
+    assert.equal(result.artifacts.length, 2);
     assert.equal(provider.events.filter(x => x === "terminate").length, 3);
     assert.ok(provider.events.indexOf("publish") > provider.events.lastIndexOf("terminate"));
   });
