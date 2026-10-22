@@ -93,12 +93,8 @@ export class AuthenticatedAgentWorkspaceToolService {
     );
   }
 
-  async getArtifact(input: { artifactId: string }): Promise<ToolResult<unknown>> {
-    return this.withWorkspaceService(
-      "artifact_get",
-      undefined,
-      (service) => service.getArtifact(input.artifactId)
-    );
+  async fileRead(input: { workspaceId?: string; artifactId?: string; path?: string; offset?: number; limit?: number }): Promise<ToolResult<unknown>> {
+    return this.withWorkspaceService("file_read", input.workspaceId, (service) => service.fileRead(input));
   }
 
   async readArtifact(input: { artifactId: string }): Promise<{ artifact: any; bytes: Uint8Array }> {
@@ -205,9 +201,4 @@ export class AuthenticatedAgentWorkspaceToolService {
 function requireBase64(value: string | undefined): string {
   if (value === undefined) throw new Error("Exactly one of archive or archiveBase64 must be supplied");
   return value;
-}  public async fileRead(input: { workspaceId?: string; artifactId?: string; path?: string; offset?: number; limit?: number }): Promise<ToolResult<unknown>> {
-    try { return { ok: true, result: await this.workspaces.fileRead(input) }; }
-    catch (error) { return this.failure(error); }
-  }
-
-
+}
