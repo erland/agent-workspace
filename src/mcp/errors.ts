@@ -3,6 +3,10 @@ import { redactSensitiveText } from "../security/redaction.js";
 
 export type AgentWorkspaceErrorCode =
   | "INVALID_INPUT"
+  | "INVALID_PATH"
+  | "FILE_NOT_FOUND"
+  | "ARTIFACT_NOT_FOUND"
+  | "ACCESS_DENIED"
   | "WORKSPACE_NOT_FOUND"
   | "WORKSPACE_EXPIRED"
   | "WORKSPACE_NOT_READY"
@@ -27,6 +31,10 @@ export function normalizeToolError(error: unknown): AgentWorkspaceErrorBody {
     return body("INVALID_ARCHIVE", error.message, false);
   }
   const message = redactSensitiveText(error instanceof Error ? error.message : String(error));
+  if (message.includes("Invalid archive path") || message.includes("Invalid captureFiles path")) return body("INVALID_PATH", message, false);
+  if (message.includes("File not found in")) return body("FILE_NOT_FOUND", message, false);
+  if (message.includes("Artifact not found")) return body("ARTIFACT_NOT_FOUND", message, false);
+  if (message.includes("Access denied") || message.includes("Permission denied")) return body("ACCESS_DENIED", message, false);
   if (message.includes("Rate limit exceeded")) return body("RATE_LIMITED", message, true);
   if (message.includes("active workspace limit") || message.includes("Resource limit")) return body("RESOURCE_LIMIT_EXCEEDED", message, true);
   if (message.includes("archiveBase64") || message.includes("must be valid base64")) return body("INVALID_INPUT", message, false);
