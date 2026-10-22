@@ -112,17 +112,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
       };
       return {
         structuredContent: structured,
-        content: [
-          { type: "text" as const, text: JSON.stringify(structured) },
-          ...(structured.result.artifacts ?? []).map((artifact: any) => ({
-            type: "resource_link" as const,
-            uri: artifact.resourceUri,
-            name: artifact.filename,
-            title: artifact.name,
-            mimeType: artifact.mediaType,
-            size: artifact.sizeBytes
-          }))
-        ]
+        content: [{ type: "text" as const, text: JSON.stringify(structured) }]
       };
     }
   );
@@ -131,7 +121,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
     "artifact_get",
     {
       annotations: toolAnnotations("artifact_get"),
-      description: "Return metadata and an MCP resource link for a previously published temporary build artifact.",
+      description: "Return metadata for a published artifact without attaching the file. Use artifact_download_link for an explicit URL handoff.",
       inputSchema: ArtifactIdInputSchema,
       outputSchema: ArtifactOutputSchema
     },
@@ -142,17 +132,7 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
       const structured = { result: { ...artifact, resourceUri: artifactResourceUri(artifact.id) } };
       return {
         structuredContent: structured,
-        content: [
-          { type: "text" as const, text: JSON.stringify(structured) },
-          {
-            type: "resource_link" as const,
-            uri: structured.result.resourceUri,
-            name: artifact.filename,
-            title: artifact.name,
-            mimeType: artifact.mediaType,
-            size: artifact.sizeBytes
-          }
-        ]
+        content: [{ type: "text" as const, text: JSON.stringify(structured) }]
       };
     }
   );
