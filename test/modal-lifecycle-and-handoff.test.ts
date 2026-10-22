@@ -71,7 +71,7 @@ describe("sandbox lifetime and artifact handoff", () => {
     assert.equal(result.artifacts.length, 2);
     assert.equal(result.logArtifact.filename, "build.log");
     const log = await service.fileRead({ artifactId: result.logArtifact.id });
-    assert.match(log.text, /npm run build/);
+    assert.match(log.text, /"npm","run","build"/);
     const generated = result.artifacts.find(a => a.filename === "package-lock.json");
     assert.ok(generated, "npm lockfile is captured automatically");
     assert.deepEqual([...((await service.readArtifact(generated.id)).bytes)], [1, 2, 3, 4]);
