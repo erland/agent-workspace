@@ -81,15 +81,15 @@ export class AuthenticatedAgentWorkspaceToolService {
     });
   }
 
-  async verifyProject(input: { workspaceId: string }): Promise<ToolResult<unknown>> {
-    return this.withWorkspaceService("project_verify", input.workspaceId, (service) => service.verifyProject(input.workspaceId));
+  async verifyProject(input: { workspaceId: string; captureFiles?: string[] }): Promise<ToolResult<unknown>> {
+    return this.withWorkspaceService("project_verify", input.workspaceId, (service) => service.verifyProject(input.workspaceId, input.captureFiles ?? []));
   }
 
-  async buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined }): Promise<ToolResult<unknown>> {
+  async buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined; captureFiles?: string[] }): Promise<ToolResult<unknown>> {
     return this.withWorkspaceService(
       "project_build",
       input.workspaceId,
-      (service) => service.buildProject(input.workspaceId, input.outputs ?? [])
+      (service) => service.buildProject(input.workspaceId, input.outputs ?? [], input.captureFiles ?? [])
     );
   }
 
@@ -205,4 +205,9 @@ export class AuthenticatedAgentWorkspaceToolService {
 function requireBase64(value: string | undefined): string {
   if (value === undefined) throw new Error("Exactly one of archive or archiveBase64 must be supplied");
   return value;
-}
+}  public async fileRead(input: { workspaceId?: string; artifactId?: string; path?: string; offset?: number; limit?: number }): Promise<ToolResult<unknown>> {
+    try { return { ok: true, result: await this.workspaces.fileRead(input) }; }
+    catch (error) { return this.failure(error); }
+  }
+
+
