@@ -343,6 +343,7 @@ export class WorkspaceService {
           log.push(`Capture over size limit: ${path}`); continue;
         }
         const bytes = await this.provider.readFile(handle, full);
+        if (bytes.length === 0) { log.push(`Capture empty: ${path}`); continue; }
         if (bytes.length > 5 * 1024 * 1024) { log.push(`Capture over size limit: ${path}`); continue; }
         captured.push({ path, bytes });
       } catch (error) { log.push(`Capture failed for ${path}: ${redactLog(String(error))}`); }
