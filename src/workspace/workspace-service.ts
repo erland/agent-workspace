@@ -385,6 +385,9 @@ export class WorkspaceService {
     });
   }
 
+  public fileRead(input: { workspaceId?: string | undefined; artifactId?: string | undefined; path?: string | undefined; offset?: number | undefined; limit?: number | undefined; encoding?: "utf8" | undefined }): Promise<ReturnType<typeof readTextFile>>;
+  public fileRead(input: { workspaceId?: string | undefined; artifactId?: string | undefined; path?: string | undefined; offset?: number | undefined; limit?: number | undefined; encoding: "base64" }): Promise<ReturnType<typeof readBinaryFile>>;
+  public fileRead(input: { workspaceId?: string | undefined; artifactId?: string | undefined; path?: string | undefined; offset?: number | undefined; limit?: number | undefined; encoding?: "utf8" | "base64" | undefined }): Promise<ReturnType<typeof readTextFile> | ReturnType<typeof readBinaryFile>>;
   public async fileRead(input: { workspaceId?: string | undefined; artifactId?: string | undefined; path?: string | undefined; offset?: number | undefined; limit?: number | undefined; encoding?: "utf8" | "base64" | undefined }) {
     if ((input.workspaceId === undefined) === (input.artifactId === undefined)) {
       throw new Error("Specify exactly one of workspaceId or artifactId");
