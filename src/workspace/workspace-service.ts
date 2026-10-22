@@ -1,3 +1,4 @@
+import { InMemoryArtifactRepository } from "../persistence/in-memory.js";
 import { readTextFile } from "../artifact/file-reader.js";
 import { timedOperation } from "../diagnostics/operation-timing.js";
 import { randomUUID } from "node:crypto";
@@ -118,13 +119,11 @@ export class WorkspaceService {
     this.repository = options.repository;
     this.securityPolicy = options.securityPolicy ?? DEFAULT_SECURITY_POLICY;
     this.objectStore = options.objectStore ?? new InMemoryObjectStore();
-    this.artifactService = options.artifactRepository
-      ? new ArtifactService(this.userId, options.artifactRepository, this.objectStore, {
+    this.artifactService = new ArtifactService(this.userId, options.artifactRepository ?? new InMemoryArtifactRepository(), this.objectStore, {
           ttlMinutes: options.artifactTtlMinutes ?? 60,
           maxArtifactBytes: this.securityPolicy.maxArtifactBytes,
           now: this.now
-        })
-      : undefined;
+        });
     this.schedule =
       options.schedule ??
       ((callback, delayMs) => {
