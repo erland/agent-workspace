@@ -68,6 +68,9 @@ describe("sandbox lifetime and artifact handoff", () => {
     const { service } = await setup(provider);
     const result = await service.buildProject("ws_lifecycle", [{ path: "dist" }]);
     assert.equal(result.status, "PASSED");
+    assert.equal(result.execution.terminationConfirmed, true);
+    assert.ok(Date.parse(result.execution.sandboxCreatedAt) <= Date.parse(result.execution.sandboxTerminatedAt));
+    assert.ok(Date.parse(result.execution.sandboxTerminatedAt) <= Date.parse(result.execution.artifactsPublishedAt));
     assert.equal(result.artifacts.length, 2);
     assert.equal(result.logArtifact.filename, "build.log");
     const log = await service.fileRead({ artifactId: result.logArtifact.id });
@@ -81,6 +84,25 @@ describe("sandbox lifetime and artifact handoff", () => {
     const artifactId = result.artifacts[0]!.id;
     assert.equal((await service.getArtifact(artifactId)).id, artifactId);
     assert.deepEqual([...((await service.readArtifact(artifactId)).bytes)], [1, 2, 3, 4]);
+  });
+
+  it("returns structured missingCaptureFiles on build without losing successful outputs", async () => {
+    class MissingProvider extends LifecycleProvider {
+      override async exec(handle: WorkspaceHandle, command: Command): Promise<ExecutionResult> {
+        if (command.argv.some(arg => arg.endsWith("/does-not-exist.txt"))) {
+          this.events.push("exec");
+          return { exitCode: 1, stdout: "", stderr: "missing" };
+        }
+        return super.exec(handle, command);
+      }
+    }
+    const provider = new MissingProvider();
+    const { service } = await setup(provider);
+    const result = await service.buildProject("ws_lifecycle", [{ path: "dist" }], ["does-not-exist.txt"]);
+    assert.equal(result.status, "PASSED");
+    assert.deepEqual(result.missingCaptureFiles, [{ path: "does-not-exist.txt", reason: "NOT_FOUND" }]);
+    assert.equal(result.execution.terminationConfirmed, true);
+    assert.ok(provider.events.indexOf("publish") > provider.events.indexOf("terminate"));
   });
 
   it("retries a transient termination failure before publishing", async () => {
