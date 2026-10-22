@@ -1,3 +1,4 @@
+import { readTextFile } from "../artifact/file-reader.js";
 import { timedOperation } from "../diagnostics/operation-timing.js";
 import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
@@ -368,6 +369,22 @@ export class WorkspaceService {
       workspaceId, name: `${operation} log`, kind: "execution-log",
       filename: `${operation}.log`, mediaType: "text/plain", bytes
     });
+  }
+
+  public async fileRead(input: { workspaceId?: string; artifactId?: string; path?: string; offset?: number; limit?: number }) {
+    if ((input.workspaceId === undefined) === (input.artifactId === undefined)) {
+      throw new Error("Specify exactly one of workspaceId or artifactId");
+    }
+    if (input.workspaceId) {
+      if (!input.path) throw new Error("path is required to read a workspace source file");
+      const workspace = await this.requireReadyProject(input.workspaceId, "file read");
+      const archive = await this.objectStore.get(workspace.project!.sourceStorageKey);
+      const root = workspace.project!.analysis.projectRoots[0];
+      const path = root ? `${root}/${input.path}` : input.path;
+      return readTextFile(archive, "source.zip", path, input.offset, input.limit);
+    }
+    const { artifact, bytes } = await this.readArtifact(input.artifactId!);
+    return readTextFile(bytes, artifact.filename, input.path, input.offset, input.limit);
   }
 
   public async getArtifact(artifactId: string): Promise<ArtifactRecord> {
