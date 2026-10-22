@@ -89,7 +89,7 @@ describe("sandbox lifetime and artifact handoff", () => {
   it("returns structured missingCaptureFiles on build without losing successful outputs", async () => {
     class MissingProvider extends LifecycleProvider {
       override async exec(handle: WorkspaceHandle, command: Command): Promise<ExecutionResult> {
-        if (command.argv.includes("does-not-exist.txt")) {
+        if (command.argv.some(arg => arg.endsWith("/does-not-exist.txt"))) {
           this.events.push("exec");
           return { exitCode: 1, stdout: "", stderr: "missing" };
         }
