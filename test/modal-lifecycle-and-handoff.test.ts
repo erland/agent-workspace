@@ -69,6 +69,12 @@ describe("sandbox lifetime and artifact handoff", () => {
     const result = await service.buildProject("ws_lifecycle", [{ path: "dist" }]);
     assert.equal(result.status, "PASSED");
     assert.equal(result.artifacts.length, 2);
+    assert.equal(result.logArtifact.filename, "build.log");
+    const log = await service.fileRead({ artifactId: result.logArtifact.id });
+    assert.match(log.text, /npm run build/);
+    const generated = result.artifacts.find(a => a.filename === "package-lock.json");
+    assert.ok(generated, "npm lockfile is captured automatically");
+    assert.deepEqual([...((await service.readArtifact(generated.id)).bytes)], [1, 2, 3, 4]);
     const terminated = provider.events.indexOf("terminate");
     const published = provider.events.indexOf("publish");
     assert.ok(terminated >= 0 && published > terminated, JSON.stringify(provider.events));
@@ -85,6 +91,26 @@ describe("sandbox lifetime and artifact handoff", () => {
     assert.equal(result.artifacts.length, 2);
     assert.equal(provider.events.filter(x => x === "terminate").length, 3);
     assert.ok(provider.events.indexOf("publish") > provider.events.lastIndexOf("terminate"));
+  });
+
+  it("retains a readable failure log after a failed build", async () => {
+    class FailedBuildProvider extends LifecycleProvider {
+      override async exec(handle: WorkspaceHandle, command: Command): Promise<ExecutionResult> {
+        if (command.argv.join(" ") === "npm run build") {
+          this.events.push("exec");
+          return { exitCode: 1, stdout: "", stderr: "compilation error" };
+        }
+        return super.exec(handle, command);
+      }
+    }
+    const provider = new FailedBuildProvider();
+    const { service } = await setup(provider);
+    const result = await service.buildProject("ws_lifecycle", [{ path: "dist" }]);
+    assert.equal(result.status, "FAILED");
+    assert.equal(result.artifacts.some(a => a.filename === "dist.tar.gz"), false);
+    assert.ok(provider.events.indexOf("terminate") < provider.events.indexOf("publish"));
+    const log = await service.fileRead({ artifactId: result.logArtifact.id });
+    assert.match(log.text, /compilation error/);
   });
 
   it("fails visibly and never publishes if termination cannot be confirmed", async () => {
