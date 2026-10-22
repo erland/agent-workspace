@@ -93,7 +93,7 @@ export class AuthenticatedAgentWorkspaceToolService {
     );
   }
 
-  async fileRead(input: { workspaceId?: string | undefined; artifactId?: string | undefined; path?: string | undefined; offset?: number | undefined; limit?: number | undefined }): Promise<ToolResult<unknown>> {
+  async fileRead(input: { workspaceId?: string | undefined; artifactId?: string | undefined; path?: string | undefined; offset?: number | undefined; limit?: number | undefined; encoding?: "utf8" | "base64" | undefined }): Promise<ToolResult<unknown>> {
     return this.withWorkspaceService("file_read", input.workspaceId, (service) => service.fileRead(input));
   }
 
