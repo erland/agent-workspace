@@ -100,7 +100,7 @@ jobs:
             fi
           else
             if jq -e --arg tag "${IMAGE_TAG}" '.[] | select(any(.metadata.container.tags[]?; . == $tag))' "${tmp}" >/dev/null; then
-              echo "::error::Runtime image tag ${IMAGE_TAG} already exists in GHCR."
+              echo "::error::Runtime image tag ${IMAGE_TAG} already exists in GHCR. Increment runtime-images/version.txt before publishing a changed runtime image."
               rm -f "${tmp}" gh-api-error.txt
               exit 1
             fi
