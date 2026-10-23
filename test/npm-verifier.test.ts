@@ -111,3 +111,25 @@ test("step logs are bounded", async () => {
 test("boundLog keeps short logs unchanged", () => {
   assert.equal(boundLog("short", 10), "short");
 });
+
+test("pnpm verifier installs from frozen lockfile and runs pnpm scripts", async () => {
+  const provider = new ScriptedProvider([
+    ok(JSON.stringify({packageManager:"pnpm@10.34.5",hasPnpmLock:true,scripts:{test:"node test.js",build:"node build.js"}})),
+    ok("installed"),
+    ok("tested"),
+    ok("built")
+  ]);
+  const result = await new NpmVerifier(provider).verify(handle);
+  assert.equal(result.status, "PASSED");
+  assert.deepEqual(provider.commands.slice(1).map(command => command.argv), [
+    ["pnpm", "install", "--frozen-lockfile"],
+    ["pnpm", "test"],
+    ["pnpm", "run", "build"]
+  ]);
+});
+
+test("pnpm verifier rejects unsupported package manager before installation", async () => {
+  const provider = new ScriptedProvider([ok(JSON.stringify({packageManager:"yarn@4.0.0",scripts:{}}))]);
+  await assert.rejects(() => new NpmVerifier(provider).verify(handle), /Unsupported packageManager/);
+  assert.equal(provider.commands.length, 1);
+});

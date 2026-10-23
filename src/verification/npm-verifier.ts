@@ -1,3 +1,4 @@
+import { NODE_PROJECT_INSPECTION, selectNodePackageManager } from "../project/node-package-manager.js";
 import type {
   Command,
   SandboxProvider,
@@ -52,9 +53,8 @@ export class NpmVerifier {
     const steps: VerificationStepResult[] = [];
 
     const packageInfo = await this.inspectPackage(handle);
-    const installArgv = packageInfo.hasPackageLock
-      ? ["npm", "ci", "--no-audit", "--no-fund"] as const
-      : ["npm", "install", "--no-audit", "--no-fund"] as const;
+    const selected = selectNodePackageManager(packageInfo);
+    const installArgv = selected.install;
 
     const install = await this.runStep(handle, "install", {
       argv: installArgv,
@@ -68,7 +68,7 @@ export class NpmVerifier {
 
     if (packageInfo.scripts.test !== undefined) {
       const test = await this.runStep(handle, "test", {
-        argv: ["npm", "test"],
+        argv: selected.test,
         workdir: this.projectRoot,
         timeoutMs: this.commandTimeoutMs
       });
@@ -80,7 +80,7 @@ export class NpmVerifier {
 
     if (packageInfo.scripts.build !== undefined) {
       const build = await this.runStep(handle, "build", {
-        argv: ["npm", "run", "build"],
+        argv: selected.build,
         workdir: this.projectRoot,
         timeoutMs: this.commandTimeoutMs
       });
@@ -100,17 +100,11 @@ export class NpmVerifier {
 
   private async inspectPackage(handle: WorkspaceHandle): Promise<{
     hasPackageLock: boolean;
+    hasPnpmLock: boolean;
+    packageManager?: string;
     scripts: PackageScripts;
   }> {
-    const command = [
-      "node",
-      "-e",
-      [
-        "const fs=require('fs');",
-        "const p=JSON.parse(fs.readFileSync('package.json','utf8'));",
-        "process.stdout.write(JSON.stringify({hasPackageLock:fs.existsSync('package-lock.json'),scripts:p.scripts||{}}));"
-      ].join("")
-    ];
+    const command = ["node", "-e", NODE_PROJECT_INSPECTION];
     const result = await this.provider.exec(handle, {
       argv: command,
       workdir: this.projectRoot,
@@ -122,10 +116,14 @@ export class NpmVerifier {
     try {
       const parsed = JSON.parse(result.stdout) as {
         hasPackageLock?: unknown;
+        hasPnpmLock?: unknown;
+        packageManager?: unknown;
         scripts?: Record<string, unknown>;
       };
       return {
         hasPackageLock: parsed.hasPackageLock === true,
+        hasPnpmLock: parsed.hasPnpmLock === true,
+        ...(typeof parsed.packageManager === "string" ? { packageManager: parsed.packageManager } : {}),
         scripts: {
           ...(typeof parsed.scripts?.test === "string" ? { test: parsed.scripts.test } : {}),
           ...(typeof parsed.scripts?.build === "string" ? { build: parsed.scripts.build } : {})

@@ -1,3 +1,4 @@
+import { NODE_PROJECT_INSPECTION, selectNodePackageManager } from "../project/node-package-manager.js";
 import type { SandboxProvider, WorkspaceHandle } from "../core/sandbox-provider.js";
 import type { ProjectType } from "../project/project-detector.js";
 
@@ -42,13 +43,14 @@ export class ProjectBuildService {
   private async buildNpm(handle: WorkspaceHandle, requested: readonly RequestedBuildOutput[]): Promise<ProjectBuildResult> {
     const info = await this.exec(handle, [
       "node", "-e",
-      "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));process.stdout.write(JSON.stringify({lock:fs.existsSync('package-lock.json'),build:typeof p.scripts?.build==='string'}));"
+      NODE_PROJECT_INSPECTION
     ]);
-    const parsed = JSON.parse(info.stdout) as { lock?: boolean; build?: boolean };
-    if (!parsed.build) throw new Error("NPM project has no build script");
+    const parsed = JSON.parse(info.stdout) as { hasPackageLock?: boolean; hasPnpmLock?: boolean; packageManager?: string; scripts?: { build?: string } };
+    if (typeof parsed.scripts?.build !== "string") throw new Error("NPM project has no build script");
+    const selected = selectNodePackageManager(parsed);
 
-    await this.mustExec(handle, parsed.lock ? ["npm","ci","--no-audit","--no-fund"] : ["npm","install","--no-audit","--no-fund"]);
-    await this.mustExec(handle, ["npm","run","build"]);
+    await this.mustExec(handle, selected.install);
+    await this.mustExec(handle, selected.build);
 
     const outputs = requested.length > 0
       ? [...requested]

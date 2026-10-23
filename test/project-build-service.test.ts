@@ -12,6 +12,7 @@ import { ProjectBuildService } from "../src/artifact/project-build-service.js";
 class BuildProvider implements SandboxProvider {
   public readonly commands: Command[] = [];
   public readonly reads: string[] = [];
+  public metadata = { hasPackageLock: true, hasPnpmLock: false, scripts: { build: 'node build.js' } };
 
   async createWorkspace(_options: CreateWorkspaceOptions): Promise<WorkspaceHandle> {
     return { providerId: "fake", providerWorkspaceId: "sb-1" };
@@ -25,7 +26,7 @@ class BuildProvider implements SandboxProvider {
     if (command.argv[0] === "node" && command.argv[1] === "-e") {
       return {
         exitCode: 0,
-        stdout: JSON.stringify({ lock: true, build: true }),
+        stdout: JSON.stringify(this.metadata),
         stderr: ""
       };
     }
@@ -130,4 +131,13 @@ describe("ProjectBuildService", () => {
       /Invalid build output path/
     );
   });
+  it("runs pnpm install and build for a pnpm lockfile", async () => {
+    const provider = new BuildProvider();
+    provider.metadata = { hasPackageLock: false, hasPnpmLock: true, scripts: { build: "node build.js" } };
+    const result = await new ProjectBuildService(provider, "/workspace/project").build(handle, "NPM");
+    assert.equal(result.status, "PASSED");
+    assert.ok(provider.commands.some(command => command.argv.join(" ") === "pnpm install --frozen-lockfile"));
+    assert.ok(provider.commands.some(command => command.argv.join(" ") === "pnpm run build"));
+  });
+
 });
