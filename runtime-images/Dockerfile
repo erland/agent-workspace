@@ -3,6 +3,7 @@ FROM eclipse-temurin:${JAVA_VERSION}-jdk-noble
 
 ARG NODE_MAJOR=22
 ARG NPM_VERSION=11.21.0
+ARG PNPM_VERSION=10.18.3
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -10,7 +11,7 @@ RUN set -eux; \
     find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -i 's|http://|https://|g' {} +; \
     apt-get update; \
     apt-get upgrade -y; \
-    apt-get install -y --no-install-recommends ca-certificates curl gnupg maven unzip; \
+    apt-get install -y --no-install-recommends ca-certificates curl gnupg maven unzip git python3 jq zip tar gzip; \
     curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -; \
     apt-get install -y --no-install-recommends nodejs; \
     npm install -g "npm@${NPM_VERSION}"; \
@@ -33,6 +34,10 @@ RUN set -eux; \
     node --version; \
     npm --version; \
     mvn --version; \
+    pnpm --version; \
+    git --version; \
+    python3 --version; \
+    jq --version; \
     rm -rf /var/lib/apt/lists/* /root/.npm/_cacache; \
     groupadd --system agent-workspace; \
     useradd --system --gid agent-workspace --create-home --home-dir /home/agent-workspace agent-workspace; \
