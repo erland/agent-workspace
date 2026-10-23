@@ -648,7 +648,8 @@ function selectProjectRoot(
     throw new Error(`No project manifest for projectRoot ${JSON.stringify(requested)}. Available: ${manifests.map(x=>x.root || ".").join(", ")}`);
   }
   const selected = requested !== undefined ? requested : (() => {
-    const possible = [...new Set(manifests.map(x => x.root))].filter(root =>
+    const sameKind = new Set(manifests.map(x => x.type)).size === 1;
+    const possible = (sameKind ? [...new Set(manifests.map(x => x.root))] : []).filter(root =>
       manifests.every(item => root === item.root || root === "" || item.root.startsWith(root + "/")));
     return possible.length === 1 ? possible[0]! : candidates.length === 1 ? candidates[0]!.root : undefined;
   })();
