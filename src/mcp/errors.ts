@@ -3,6 +3,7 @@ import { redactSensitiveText } from "../security/redaction.js";
 
 export type AgentWorkspaceErrorCode =
   | "INVALID_INPUT"
+  | "INVALID_ARGUMENT"
   | "INVALID_PATH"
   | "FILE_NOT_FOUND"
   | "ARTIFACT_NOT_FOUND"
@@ -31,6 +32,7 @@ export function normalizeToolError(error: unknown): AgentWorkspaceErrorBody {
     return body("INVALID_ARCHIVE", error.message, false);
   }
   const message = redactSensitiveText(error instanceof Error ? error.message : String(error));
+  if (message.startsWith("Invalid projectRoot:") || message.startsWith("No project manifest for projectRoot") || message.startsWith("Multiple project roots:") || message.startsWith("Mixed Maven/npm manifests at")) return body("INVALID_ARGUMENT", message, false);
   if (message.includes("Invalid archive path") || message.includes("Invalid captureFiles path")) return body("INVALID_PATH", message, false);
   if (message.includes("File not found in")) return body("FILE_NOT_FOUND", message, false);
   if (message.includes("Artifact not found")) return body("ARTIFACT_NOT_FOUND", message, false);
