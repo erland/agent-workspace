@@ -293,7 +293,7 @@ export class WorkspaceService {
         failureSummary = String(error);
         log.push(`Build error: ${failureSummary}`);
       }
-      const files = await this.captureProjectFiles(handle, workspace, capture, log);
+      const files = await this.captureProjectFiles(handle, workspace, capture, log, selected.root);
       return { result, files, failureSummary };
     }, lifecycle);
     const artifactService = this.requireArtifactService();
