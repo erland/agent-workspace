@@ -18,7 +18,7 @@ class LifecycleProvider implements SandboxProvider {
     this.events.push("exec");
     const cmd = command.argv.join(" ");
     if (command.argv[0] === "node" && command.argv[1] === "-e") {
-      return { exitCode: 0, stdout: JSON.stringify({ lock: false, build: true }), stderr: "" };
+      return { exitCode: 0, stdout: JSON.stringify({ hasPackageLock: false, hasPnpmLock: false, scripts: { build: "echo built" } }), stderr: "" };
     }
     if (cmd.includes("if [ -f") && cmd.includes("elif [ -d")) {
       return { exitCode: 0, stdout: "dir", stderr: "" };
