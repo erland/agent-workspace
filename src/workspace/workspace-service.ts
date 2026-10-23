@@ -342,7 +342,7 @@ export class WorkspaceService {
   private async captureProjectFiles(
     handle: WorkspaceHandle, workspace: Workspace, paths: readonly string[], log: string[], selectedRoot: string
   ): Promise<{ files: Array<{ path: string; bytes: Uint8Array }>; missing: CaptureFailure[] }> {
-    const root = resolveWorkspaceProjectRoot(selected.root);
+    const root = resolveWorkspaceProjectRoot(selectedRoot);
     const captured: Array<{ path: string; bytes: Uint8Array }> = [];
     const missing: CaptureFailure[] = [];
     for (const path of paths) {
