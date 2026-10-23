@@ -2,7 +2,7 @@ export interface NodeProjectMetadata {
   packageManager?: unknown;
   hasPackageLock?: unknown;
   hasPnpmLock?: unknown;
-  scripts?: Record<string, unknown>;
+  scripts?: unknown;
 }
 
 export type NodePackageManager = "npm" | "pnpm";
@@ -14,7 +14,7 @@ export function selectNodePackageManager(info: NodeProjectMetadata): {
   build: string[];
 } {
   const declared = typeof info.packageManager === "string" ? info.packageManager.trim() : "";
-  const name = declared.split("@")[0];
+  const name = declared.split("@")[0] ?? "";
   // Do not silently run npm when the manifest explicitly requires an unsupported manager.
   if (declared && !["npm", "pnpm"].includes(name)) {
     throw new Error(`Unsupported packageManager: ${declared}`);
