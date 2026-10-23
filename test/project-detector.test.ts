@@ -94,7 +94,7 @@ describe("project/runtime detection", () => {
       { path:"api/pom.xml", content:"<project/>" },
       { path:"web/package.json", content:"{}" }
     ]);
-    assert.deepEqual(result.projectManifests, [{root:"",type:"MAVEN"},{root:"api",type:"MAVEN"},{root:"web",type:"NPM"}]);
+    assert.deepEqual(result.projectManifests, [{root:"api",type:"MAVEN"},{root:"",type:"MAVEN"},{root:"web",type:"NPM"}]);
   });
 
   it("reports ambiguous multi-manifest projects", () => {
