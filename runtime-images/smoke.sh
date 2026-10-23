@@ -43,5 +43,6 @@ const assert = require('node:assert/strict');
 test('runtime works', () => assert.equal(2 + 2, 4));
 JS
 (cd "$root/npm" && npm install --package-lock-only --ignore-scripts --no-audit --no-fund && npm ci --ignore-scripts --no-audit --no-fund && npm test && npm run build)
+(cd "$root/npm" && pnpm install --ignore-scripts --offline --frozen-lockfile=false && pnpm test)
 test "$(cat "$root/npm/dist.txt")" = ok
 echo "Runtime smoke: PASS"
