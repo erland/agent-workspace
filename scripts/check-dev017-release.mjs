@@ -99,11 +99,11 @@ for (const legacyField of ["provider_id", "provider_workspace_id"]) {
 
 const runtimeProfile = await readFile("src/core/runtime-profile.ts", "utf8");
 const runtimeVersion = (await readFile("runtime-images/version.txt", "utf8")).trim();
-const activeVersion = runtimeProfile.match(/DEFAULT_RUNTIME_IMAGE_VERSION = "(\\d+)"/)?.[1];
+const activeVersion = runtimeProfile.match(/DEFAULT_RUNTIME_IMAGE_VERSION = "(\d+)"/)?.[1];
 const stagedVersion = await readFile("runtime-images/staged-version.txt", "utf8").catch(() => "");
 const staged = stagedVersion.trim() === runtimeVersion
-  && /^\\d+$/.test(runtimeVersion)
-  && /^\\d+$/.test(activeVersion ?? "")
+  && /^\d+$/.test(runtimeVersion)
+  && /^\d+$/.test(activeVersion ?? "")
   && Number(runtimeVersion) === Number(activeVersion) + 1;
 if (!runtimeVersion || (!runtimeProfile.includes(`DEFAULT_RUNTIME_IMAGE_VERSION = "${runtimeVersion}"`) && !staged)) {
   throw new Error("runtime-images/version.txt must match active profile, or be exactly one staged version ahead");
