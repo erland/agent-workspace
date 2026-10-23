@@ -2,6 +2,10 @@ name: Runtime Images
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "runtime-images/**"
+      - ".github/workflows/runtime-images.yml"
   push:
     branches:
       - main
@@ -35,7 +39,35 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Build locally for functional validation
+        uses: docker/build-push-action@v6
+        with:
+          context: runtime-images
+          file: runtime-images/Dockerfile
+          platforms: linux/amd64
+          load: true
+          push: false
+          build-args: |
+            JAVA_VERSION=${{ matrix.java }}
+            NODE_MAJOR=${{ matrix.node }}
+          tags: agent-workspace-runtime:smoke
+          cache-from: type=gha,scope=runtime-java${{ matrix.java }}-node${{ matrix.node }}
+          cache-to: type=gha,mode=max,scope=runtime-java${{ matrix.java }}-node${{ matrix.node }}
+
+      - name: Run unprivileged Maven and npm smoke tests
+        run: docker run --rm --mount type=bind,source="${{ github.workspace }}/runtime-images/smoke.sh",target=/tmp/smoke.sh,readonly agent-workspace-runtime:smoke bash /tmp/smoke.sh
+
+      - name: Scan image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: agent-workspace-runtime:smoke
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          trivyignores: security/trivy-runtime-ignore.yaml
+
       - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -43,6 +75,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Refuse overwrite of existing runtime tag
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           IMAGE_TAG: java${{ matrix.java }}-node${{ matrix.node }}-v${{ steps.version.outputs.value }}
@@ -57,7 +90,6 @@ jobs:
           gh api --paginate "${endpoint}" > "${tmp}" 2>gh-api-error.txt
           status=$?
           set -e
-
           if [ "${status}" -ne 0 ]; then
             if grep -q "HTTP 404" gh-api-error.txt; then
               rm -f "${tmp}" gh-api-error.txt
@@ -67,7 +99,7 @@ jobs:
               exit "${status}"
             fi
           else
-            if jq -e --arg tag "${IMAGE_TAG}"               '.[] | select(any(.metadata.container.tags[]?; . == $tag))'               "${tmp}" >/dev/null; then
+            if jq -e --arg tag "${IMAGE_TAG}" '.[] | select(any(.metadata.container.tags[]?; . == $tag))' "${tmp}" >/dev/null; then
               echo "::error::Runtime image tag ${IMAGE_TAG} already exists in GHCR. Increment runtime-images/version.txt before publishing a changed runtime image."
               rm -f "${tmp}" gh-api-error.txt
               exit 1
@@ -75,22 +107,14 @@ jobs:
             rm -f "${tmp}" gh-api-error.txt
           fi
 
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: runtime-images
-          file: runtime-images/Dockerfile
-          platforms: linux/amd64
-          push: true
-          build-args: |
-            JAVA_VERSION=${{ matrix.java }}
-            NODE_MAJOR=${{ matrix.node }}
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:java${{ matrix.java }}-node${{ matrix.node }}-v${{ steps.version.outputs.value }}
-          cache-from: type=gha,scope=runtime-java${{ matrix.java }}-node${{ matrix.node }}
-          cache-to: type=gha,mode=max,scope=runtime-java${{ matrix.java }}-node${{ matrix.node }}
+      - name: Publish validated image
+        if: github.event_name != 'pull_request'
+        run: |
+          docker tag agent-workspace-runtime:smoke ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:java${{ matrix.java }}-node${{ matrix.node }}-v${{ steps.version.outputs.value }}
+          docker push ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:java${{ matrix.java }}-node${{ matrix.node }}-v${{ steps.version.outputs.value }}
 
       - name: Summary
+        if: github.event_name != 'pull_request'
         run: |
           echo "### Published runtime image" >> "$GITHUB_STEP_SUMMARY"
           echo '`ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:java${{ matrix.java }}-node${{ matrix.node }}-v${{ steps.version.outputs.value }}`' >> "$GITHUB_STEP_SUMMARY"
