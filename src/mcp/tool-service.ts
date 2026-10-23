@@ -26,8 +26,8 @@ export interface AgentWorkspaceTools {
   createWorkspace(input: { java?: "17"|"21"|"25"; node?: "20"|"22"; lifetimeMinutes?: number }): Promise<ToolResult<unknown>>;
   uploadZip(input: WorkspaceUploadZipToolInput): Promise<ToolResult<unknown>>;
   uploadZipFromUrl(input: { workspaceId: string; url: string; filename?: string }): Promise<ToolResult<unknown>>;
-  verifyProject(input: { workspaceId: string; captureFiles?: string[] | undefined }): Promise<ToolResult<unknown>>;
-  buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined; captureFiles?: string[] | undefined }): Promise<ToolResult<unknown>>;
+  verifyProject(input: { workspaceId: string; projectRoot?: string | undefined; captureFiles?: string[] | undefined }): Promise<ToolResult<unknown>>;
+  buildProject(input: { workspaceId: string; projectRoot?: string | undefined; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined; captureFiles?: string[] | undefined }): Promise<ToolResult<unknown>>;
   fileRead(input: { workspaceId?: string | undefined; artifactId?: string | undefined; path?: string | undefined; offset?: number | undefined; limit?: number | undefined; encoding?: "utf8" | "base64" | undefined }): Promise<ToolResult<unknown>>;
   artifactDownloadLink(input: { artifactId: string }): Promise<ToolResult<unknown>>;
   readArtifact(input: { artifactId: string }): Promise<{ artifact: any; bytes: Uint8Array }>;
@@ -75,13 +75,13 @@ export class AgentWorkspaceToolService implements AgentWorkspaceTools {
     } catch (error) { return this.failure(error); }
   }
 
-  public async verifyProject(input: { workspaceId: string; captureFiles?: string[] | undefined }): Promise<ToolResult<unknown>> {
-    try { return { ok: true, result: await timedOperation("project_verify", () => this.workspaces.verifyProject(input.workspaceId, input.captureFiles ?? [])) }; }
+  public async verifyProject(input: { workspaceId: string; projectRoot?: string | undefined; captureFiles?: string[] | undefined }): Promise<ToolResult<unknown>> {
+    try { return { ok: true, result: await timedOperation("project_verify", () => this.workspaces.verifyProject(input.workspaceId, input.captureFiles ?? [], input.projectRoot)) }; }
     catch (error) { return this.failure(error); }
   }
 
-  public async buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined; captureFiles?: string[] | undefined }): Promise<ToolResult<unknown>> {
-    try { return { ok: true, result: await timedOperation("project_build", () => this.workspaces.buildProject(input.workspaceId, input.outputs ?? [], input.captureFiles ?? [])) }; }
+  public async buildProject(input: { workspaceId: string; projectRoot?: string | undefined; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined; captureFiles?: string[] | undefined }): Promise<ToolResult<unknown>> {
+    try { return { ok: true, result: await timedOperation("project_build", () => this.workspaces.buildProject(input.workspaceId, input.outputs ?? [], input.captureFiles ?? [], input.projectRoot)) }; }
     catch (error) { return this.failure(error); }
   }
 

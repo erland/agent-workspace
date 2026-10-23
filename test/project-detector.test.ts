@@ -19,6 +19,7 @@ describe("project/runtime detection", () => {
     ]);
     assert.equal(nestedNpm.projectType, "NPM");
     assert.deepEqual(nestedNpm.projectRoots, ["my-project"]);
+    assert.deepEqual(nestedNpm.projectManifests, [{root:"my-project",type:"NPM"}]);
 
     const rootNpm = analyze([
       { path: "package.json", content: "{}" },
@@ -85,6 +86,15 @@ describe("project/runtime detection", () => {
   it("ignores package.json files inside node_modules", () => {
     const result = analyze([{ path: "node_modules/a/package.json", content: "{}" }]);
     assert.equal(result.projectType, "UNKNOWN");
+  });
+
+  it("records Maven reactor and npm workspace manifests separately", () => {
+    const result = analyze([
+      { path:"pom.xml", content:"<project><modules><module>api</module></modules></project>" },
+      { path:"api/pom.xml", content:"<project/>" },
+      { path:"web/package.json", content:"{}" }
+    ]);
+    assert.deepEqual(result.projectManifests, [{root:"api",type:"MAVEN"},{root:"",type:"MAVEN"},{root:"web",type:"NPM"}]);
   });
 
   it("reports ambiguous multi-manifest projects", () => {

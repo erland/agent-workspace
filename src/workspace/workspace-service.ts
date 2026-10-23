@@ -233,10 +233,10 @@ export class WorkspaceService {
     };
   }
 
-  public async verifyProject(workspaceId: string, captureFiles: readonly string[] = []): Promise<ProjectVerificationResult & { logArtifact?: ArtifactRecord; artifacts?: ArtifactRecord[]; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
+  public async verifyProject(workspaceId: string, captureFiles: readonly string[] = [], projectRoot?: string): Promise<ProjectVerificationResult & { logArtifact?: ArtifactRecord; artifacts?: ArtifactRecord[]; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
     const workspace = await this.requireReadyProject(workspaceId, "verification");
-    const kind = workspace.project!.analysis.projectType;
-    if (kind !== "NPM" && kind !== "MAVEN") throw new Error(`Unsupported project type: ${kind}`);
+    const selected = selectProjectRoot(workspace.project!.analysis, projectRoot);
+    const kind = selected.type;
     const log: string[] = [];
     const capture = normalizeCaptureFiles(captureFiles, kind);
     const lifecycle: Partial<ExecutionDiagnostics> = {};
@@ -245,13 +245,13 @@ export class WorkspaceService {
       let result: ProjectVerificationResult;
       try {
         result = kind === "NPM"
-          ? await new NpmVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots) }).verify(handle)
-          : await new MavenVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots) }).verify(handle);
+          ? await new NpmVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(selected.root) }).verify(handle)
+          : await new MavenVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(selected.root) }).verify(handle);
       } catch (error) {
         result = { status: "FAILED", projectType: kind, durationMs: 0, steps: [], failureSummary: String(error) };
         log.push(`Verification error: ${String(error)}`);
       }
-      const files = await this.captureProjectFiles(handle, workspace, capture, log);
+      const files = await this.captureProjectFiles(handle, workspace, capture, log, selected.root);
       return { result, files };
     }, lifecycle);
     const artifactService = this.requireArtifactService();
@@ -272,11 +272,12 @@ export class WorkspaceService {
   public async buildProject(
     workspaceId: string,
     outputs: readonly RequestedBuildOutput[] = [],
-    captureFiles: readonly string[] = []
+    captureFiles: readonly string[] = [],
+    projectRoot?: string
   ): Promise<{ status: "PASSED" | "FAILED"; projectType: "NPM" | "MAVEN"; artifacts: ArtifactRecord[]; logArtifact: ArtifactRecord; failureSummary?: string; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
     const workspace = await this.requireReadyProject(workspaceId, "build");
-    const projectType = workspace.project!.analysis.projectType;
-    if (projectType !== "NPM" && projectType !== "MAVEN") throw new Error(`Unsupported build project type: ${projectType}`);
+    const selected = selectProjectRoot(workspace.project!.analysis, projectRoot);
+    const projectType = selected.type;
     const log: string[] = [];
     const capture = normalizeCaptureFiles(captureFiles, projectType);
     const lifecycle: Partial<ExecutionDiagnostics> = {};
@@ -286,13 +287,13 @@ export class WorkspaceService {
       let failureSummary: string | undefined;
       try {
         result = await new ProjectBuildService(recorder,
-          resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots),
+          resolveWorkspaceProjectRoot(selected.root),
           this.securityPolicy.maxArtifactBytes).build(handle, projectType, outputs);
       } catch (error) {
         failureSummary = String(error);
         log.push(`Build error: ${failureSummary}`);
       }
-      const files = await this.captureProjectFiles(handle, workspace, capture, log);
+      const files = await this.captureProjectFiles(handle, workspace, capture, log, selected.root);
       return { result, files, failureSummary };
     }, lifecycle);
     const artifactService = this.requireArtifactService();
@@ -339,9 +340,9 @@ export class WorkspaceService {
   }
 
   private async captureProjectFiles(
-    handle: WorkspaceHandle, workspace: Workspace, paths: readonly string[], log: string[]
+    handle: WorkspaceHandle, workspace: Workspace, paths: readonly string[], log: string[], selectedRoot: string
   ): Promise<{ files: Array<{ path: string; bytes: Uint8Array }>; missing: CaptureFailure[] }> {
-    const root = resolveWorkspaceProjectRoot(workspace.project!.analysis.projectRoots);
+    const root = resolveWorkspaceProjectRoot(selectedRoot);
     const captured: Array<{ path: string; bytes: Uint8Array }> = [];
     const missing: CaptureFailure[] = [];
     for (const path of paths) {
@@ -616,6 +617,7 @@ function cloneWorkspace(workspace: Workspace): Workspace {
             analysis: {
               ...workspace.project.analysis,
               projectRoots: [...workspace.project.analysis.projectRoots],
+              projectManifests: workspace.project.analysis.projectManifests.map(item => ({...item})),
               recommendedRuntime: { ...workspace.project.analysis.recommendedRuntime },
               warnings: workspace.project.analysis.warnings.map((warning) => ({ ...warning })),
               ...(workspace.project.analysis.java !== undefined
@@ -632,8 +634,36 @@ function cloneWorkspace(workspace: Workspace): Workspace {
   };
 }
 
-function resolveWorkspaceProjectRoot(projectRoots: readonly string[]): string {
-  const relativeRoot = projectRoots[0] ?? "";
+export function selectProjectRoot(
+  analysis: NonNullable<Workspace["project"]>["analysis"],
+  requested?: string
+): {root: string; type: "MAVEN" | "NPM"} {
+  const manifests = analysis.projectManifests ?? [];
+  if (requested !== undefined && (requested.startsWith("/") || requested.includes("\\") ||
+      requested.split("/").some(part => part === "." || part === ".." || part === "" && requested !== ""))) {
+    throw new Error("Invalid projectRoot: use a relative directory path inside the ZIP");
+  }
+  const candidates = requested === undefined ? manifests : manifests.filter(item => item.root === requested);
+  if (candidates.length === 0) {
+    throw new Error(`No project manifest for projectRoot ${JSON.stringify(requested)}. Available: ${manifests.map(x=>x.root || ".").join(", ")}`);
+  }
+  const selected = requested !== undefined ? requested : (() => {
+    const sameKind = new Set(manifests.map(x => x.type)).size === 1;
+    const possible = (sameKind ? [...new Set(manifests.map(x => x.root))] : []).filter(root =>
+      manifests.every(item => root === item.root || root === "" || item.root.startsWith(root + "/")));
+    return possible.length === 1 ? possible[0]! : candidates.length === 1 ? candidates[0]!.root : undefined;
+  })();
+  if (selected === undefined) {
+    throw new Error(`Multiple project roots: ${[...new Set(manifests.map(x=>x.root || "."))].join(", ")}. Specify projectRoot.`);
+  }
+  const matches = manifests.filter(item => item.root === selected);
+  if (matches.length !== 1) {
+    throw new Error(`Mixed Maven/npm manifests at ${selected || "."}; select a dedicated subproject root`);
+  }
+  return {root: selected, type: matches[0]!.type};
+}
+
+function resolveWorkspaceProjectRoot(relativeRoot: string): string {
   return relativeRoot.length === 0
     ? "/workspace/project"
     : `/workspace/project/${relativeRoot}`;

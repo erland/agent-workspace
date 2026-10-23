@@ -81,15 +81,15 @@ export class AuthenticatedAgentWorkspaceToolService {
     });
   }
 
-  async verifyProject(input: { workspaceId: string; captureFiles?: string[] | undefined }): Promise<ToolResult<unknown>> {
-    return this.withWorkspaceService("project_verify", input.workspaceId, (service) => service.verifyProject(input.workspaceId, input.captureFiles ?? []));
+  async verifyProject(input: { workspaceId: string; projectRoot?: string | undefined; captureFiles?: string[] | undefined }): Promise<ToolResult<unknown>> {
+    return this.withWorkspaceService("project_verify", input.workspaceId, (service) => service.verifyProject(input.workspaceId, input.captureFiles ?? [], input.projectRoot));
   }
 
-  async buildProject(input: { workspaceId: string; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined; captureFiles?: string[] | undefined }): Promise<ToolResult<unknown>> {
+  async buildProject(input: { workspaceId: string; projectRoot?: string | undefined; outputs?: Array<{ path: string; name?: string | undefined; kind?: string | undefined }> | undefined; captureFiles?: string[] | undefined }): Promise<ToolResult<unknown>> {
     return this.withWorkspaceService(
       "project_build",
       input.workspaceId,
-      (service) => service.buildProject(input.workspaceId, input.outputs ?? [], input.captureFiles ?? [])
+      (service) => service.buildProject(input.workspaceId, input.outputs ?? [], input.captureFiles ?? [], input.projectRoot)
     );
   }
 
