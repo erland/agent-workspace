@@ -28,30 +28,29 @@ RUN set -eux; \
       | while read -r dir; do rm -rf "${dir}"; cp -a /tmp/npm-security-patches/undici "${dir}"; done; \
     ! grep -R --include=package.json -l '"version": "5.0.9"' "${npm_root}"/node_modules/brace-expansion 2>/dev/null; \
     ! grep -R --include=package.json -l '"version": "6.28.0"' "${npm_root}"/node_modules/undici 2>/dev/null; \
-    # Replace only known vulnerable nested packages with patched compatible releases.
-        for spec in "brace-expansion:2.1.6" "ip-address:10.3.1" "tar:7.5.21"; do
-          name="${spec%%:*}"; version="${spec#*:}";
-          mkdir -p "/tmp/npm-security-patches/${name}-fixed";
-          cd /tmp/npm-security-patches;
-          npm pack "${name}@${version}" --silent;
-          tar -xzf "${name}-${version}.tgz" -C "/tmp/npm-security-patches/${name}-fixed" --strip-components=1;
+    for spec in "brace-expansion:2.1.6" "ip-address:10.3.1" "tar:7.5.21"; do \
+      name="${spec%%:*}"; version="${spec#*:}"; \
+      mkdir -p "/tmp/npm-security-patches/${name}-fixed"; \
+      cd /tmp/npm-security-patches; \
+      npm pack "${name}@${version}" --silent; \
+      tar -xzf "${name}-${version}.tgz" -C "/tmp/npm-security-patches/${name}-fixed" --strip-components=1; \
+    done; \
+    for global_pkg in npm pnpm; do \
+      pkg_root="$(npm root -g)/${global_pkg}"; \
+      [ -d "${pkg_root}" ] || continue; \
+      for mapping in "brace-expansion:2.1.6" "ip-address:10.3.1" "tar:7.5.21"; do \
+        name="${mapping%%:*}"; \
+        find "${pkg_root}" -type f -path "*/${name}/package.json" -print | while read -r manifest; do \
+          dir="${manifest%/package.json}"; \
+          if [ "${name}" = "brace-expansion" ]; then \
+            installed="$(node -p "require(\'${manifest}\').version")"; \
+            case "${installed}" in 2.*) ;; *) continue ;; esac; \
+          fi; \
+          rm -rf "${dir}"; \
+          cp -a "/tmp/npm-security-patches/${name}-fixed" "${dir}"; \
         done; \
-        for global_pkg in npm pnpm; do
-          pkg_root="$(npm root -g)/${global_pkg}";
-          [ -d "${pkg_root}" ] || continue;
-          for mapping in "brace-expansion:2.1.6" "ip-address:10.3.1" "tar:7.5.21"; do
-            name="${mapping%%:*}";
-            find "${pkg_root}" -type f -path "*/${name}/package.json" -print | while read -r manifest; do
-              dir="${manifest%/package.json}";
-              if [ "${name}" = "brace-expansion" ]; then
-                installed="$(node -p "require('${manifest}').version")";
-                case "${installed}" in 2.*) ;; *) continue ;; esac;
-              fi;
-              rm -rf "${dir}";
-              cp -a "/tmp/npm-security-patches/${name}-fixed" "${dir}";
-            done;
-          done;
-        done; \
+      done; \
+    done; \
     rm -rf /tmp/npm-security-patches; \
     cd /; \
     java -version; \
