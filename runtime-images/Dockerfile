@@ -14,7 +14,7 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends ca-certificates curl gnupg maven unzip git python3 jq zip tar gzip; \
     curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -; \
     apt-get install -y --no-install-recommends nodejs; \
-    npm install -g "npm@${NPM_VERSION}"; \
+    npm install -g "npm@${NPM_VERSION}" "pnpm@${PNPM_VERSION}"; \
     npm_root="$(npm root -g)/npm"; \
     mkdir -p /tmp/npm-security-patches/brace /tmp/npm-security-patches/undici; \
     cd /tmp/npm-security-patches; \
