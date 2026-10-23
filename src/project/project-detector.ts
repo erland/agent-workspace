@@ -32,6 +32,7 @@ export interface ProjectWarning {
 export interface ProjectAnalysis {
   projectType: ProjectType;
   projectRoots: readonly string[];
+  projectManifests: readonly { root: string; type: "MAVEN" | "NPM" }[];
   java?: RuntimeDetection<string>;
   node?: RuntimeDetection<string>;
   recommendedRuntime: {
@@ -65,7 +66,8 @@ export function analyzeProjectArchive(
           ? "NPM"
           : "UNKNOWN";
 
-  const roots = [...new Set([...pomPaths, ...packagePaths].map(parentPath))].sort();
+  const manifests = [...pomPaths.map(path => ({ root: parentPath(path), type: "MAVEN" as const })), ...packagePaths.map(path => ({ root: parentPath(path), type: "NPM" as const }))];
+  const roots = [...new Set(manifests.map(item => item.root))].sort();
   if (pomPaths.length > 1 || packagePaths.length > 1) {
     warnings.push({
       code: "AMBIGUOUS_PROJECT",
@@ -111,6 +113,7 @@ export function analyzeProjectArchive(
   return {
     projectType,
     projectRoots: roots,
+    projectManifests: manifests,
     ...(java !== undefined ? { java } : {}),
     ...(node !== undefined ? { node } : {}),
     recommendedRuntime: { java: recommendedJava, node: recommendedNode },
