@@ -43,7 +43,7 @@ RUN set -eux; \
         find "${pkg_root}" -type f -path "*/${name}/package.json" -print | while read -r manifest; do \
           dir="${manifest%/package.json}"; \
           if [ "${name}" = "brace-expansion" ]; then \
-            installed="$(node -p "require(\'${manifest}\').version")"; \
+            installed="$(node -p 'require(process.argv[1]).version' "${manifest}")"; \
             case "${installed}" in 2.*) ;; *) continue ;; esac; \
           fi; \
           rm -rf "${dir}"; \
