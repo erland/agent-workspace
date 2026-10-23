@@ -25,7 +25,7 @@ class BuildProvider implements SandboxProvider {
     if (command.argv[0] === "node" && command.argv[1] === "-e") {
       return {
         exitCode: 0,
-        stdout: JSON.stringify({ lock: true, build: true }),
+        stdout: JSON.stringify({ hasPackageLock: true, hasPnpmLock: false, scripts: { build: "node build.js" } }),
         stderr: ""
       };
     }
