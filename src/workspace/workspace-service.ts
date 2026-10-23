@@ -634,7 +634,7 @@ function cloneWorkspace(workspace: Workspace): Workspace {
   };
 }
 
-function selectProjectRoot(
+export function selectProjectRoot(
   analysis: NonNullable<Workspace["project"]>["analysis"],
   requested?: string
 ): {root: string; type: "MAVEN" | "NPM"} {
