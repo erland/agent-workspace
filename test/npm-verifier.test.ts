@@ -167,5 +167,5 @@ test("browser test failure is reported as verification failure", async () => {
   assert.equal(result.status,"FAILED");
   assert.equal(result.failedStep,"playwright");
   assert.equal(result.exitCode,3);
-  assert.match(result.failureSummary??"","browser assertion failed");
+  assert.match(result.failureSummary??"",/browser assertion failed/);
 });
