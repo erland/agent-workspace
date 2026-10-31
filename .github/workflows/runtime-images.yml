@@ -127,29 +127,10 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - name: Detect Playwright image source changes
-        id: source_changes
+      - name: Read runtime image version
+        id: version
         shell: bash
-        run: |
-          set -euo pipefail
-          echo "changed=true" >> "$GITHUB_OUTPUT"
-          if [ "${{ github.event_name }}" = "push" ] && git rev-parse HEAD^ >/dev/null 2>&1; then
-            if git diff --quiet HEAD^ HEAD -- \
-              runtime-images/Dockerfile \
-              runtime-images/Dockerfile.playwright \
-              runtime-images/playwright-smoke.sh \
-              runtime-images/playwright-version.txt; then
-              echo "changed=false" >> "$GITHUB_OUTPUT"
-            fi
-          fi
-      - name: Read image versions
-        id: versions
-        shell: bash
-        run: |
-          echo "base=$(tr -d '[:space:]' < runtime-images/version.txt)" >> "$GITHUB_OUTPUT"
-          echo "playwright=$(tr -d '[:space:]' < runtime-images/playwright-version.txt)" >> "$GITHUB_OUTPUT"
+        run: echo "value=$(tr -d '[:space:]' < runtime-images/version.txt)" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v3
       - name: Build base image locally
         uses: docker/build-push-action@v6
@@ -192,11 +173,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Refuse overwrite of existing Playwright runtime tag
-        id: publish_guard
         if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          IMAGE_TAG: playwright-chromium-node22-v${{ steps.versions.outputs.playwright }}
+          IMAGE_TAG: playwright-chromium-node22-v${{ steps.version.outputs.value }}
           PACKAGE_NAME: agent-workspace-runtime
           OWNER: ${{ github.repository_owner }}
         shell: bash
@@ -206,20 +186,15 @@ jobs:
           tmp="$(mktemp)"
           if gh api --paginate "${endpoint}" > "${tmp}" 2>gh-api-error.txt; then
             if jq -e --arg tag "${IMAGE_TAG}" '.[] | select(any(.metadata.container.tags[]?; . == $tag))' "${tmp}" >/dev/null; then
-              if [ "${{ github.event_name }}" = "push" ] && [ "${{ steps.source_changes.outputs.changed }}" = "false" ]; then
-                echo "::notice::Existing Playwright image is unchanged; skipping duplicate publish"
-                echo "skip=true" >> "$GITHUB_OUTPUT"
-              else
-                echo "::error::Image tag ${IMAGE_TAG} already exists; increment playwright-version.txt"
-                exit 1
-              fi
+              echo "::error::Image tag ${IMAGE_TAG} already exists; increment runtime-images/version.txt for all seven runtime images"
+              exit 1
             fi
           elif ! grep -q "HTTP 404" gh-api-error.txt; then
             cat gh-api-error.txt >&2
             exit 1
           fi
       - name: Publish optional Playwright image
-        if: github.event_name != 'pull_request' && steps.publish_guard.outputs.skip != 'true'
+        if: github.event_name != 'pull_request'
         run: |
-          docker tag agent-workspace-runtime:playwright-smoke ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:playwright-chromium-node22-v${{ steps.versions.outputs.playwright }}
-          docker push ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:playwright-chromium-node22-v${{ steps.versions.outputs.playwright }}
+          docker tag agent-workspace-runtime:playwright-smoke ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:playwright-chromium-node22-v${{ steps.version.outputs.value }}
+          docker push ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:playwright-chromium-node22-v${{ steps.version.outputs.value }}
