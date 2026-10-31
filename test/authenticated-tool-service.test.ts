@@ -67,6 +67,21 @@ describe("authenticated MCP tool isolation", () => {
     if (result.ok === false) assert.match(result.error.message, /Execution account is not connected/);
   });
 
+  it("forwards Playwright selection through authenticated workspace creation", async () => {
+    const { deps, accounts } = setup();
+    const service = new AuthenticatedAgentWorkspaceToolService({ issuer: "issuer", subject: "alice", scopes: ["agent-workspace"] }, deps);
+    const profile = await service.getProfile();
+    assert.equal(profile.ok, true);
+    const userId = (profile as any).result.user.id as string;
+    await accounts.upsert({ id: "acct-pw", userId, provider: "modal", credentialRef: "fake:pw", status: "CONNECTED", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    const created = await service.createWorkspace({ playwright: true });
+    assert.equal(created.ok, true);
+    if (created.ok) assert.equal((created.result as any).runtimeProfile, "playwright-chromium-node22");
+    const invalid = await service.createWorkspace({ playwright: true, java: "25" });
+    assert.equal(invalid.ok, false);
+    if (!invalid.ok) assert.match(invalid.error.message, /requires Java 21 and Node 22/);
+  });
+
   it("cannot access another authenticated user's workspace", async () => {
     const { deps, accounts } = setup();
     const alice = new AuthenticatedAgentWorkspaceToolService({ issuer: "issuer", subject: "alice", scopes: ["agent-workspace"] }, deps);
