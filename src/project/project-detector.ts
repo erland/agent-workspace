@@ -254,6 +254,7 @@ function supportedNode(version: string | undefined): NodeVersion | undefined {
 }
 
 function parseRuntimeProfile(id: RuntimeProfileId): { java: JavaVersion; node: NodeVersion } {
+  if (id === "playwright-chromium-node22") return { java: "21", node: "22" };
   const match = /^java(17|21|25)-node(20|22)$/.exec(id);
   if (match === null) throw new Error(`Invalid runtime profile id: ${id}`);
   return { java: match[1] as JavaVersion, node: match[2] as NodeVersion };
