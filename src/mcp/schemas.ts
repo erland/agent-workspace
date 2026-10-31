@@ -8,6 +8,7 @@ export const WorkspaceIdInputSchema = z.object({ workspaceId: z.string().min(1) 
 export const WorkspaceCreateInputSchema = z.object({
   java: z.enum(["17", "21", "25"]).optional(),
   node: z.enum(["20", "22"]).optional(),
+  playwright: z.boolean().optional(),
   lifetimeMinutes: z.number().positive().max(60).optional()
 }).strict();
 
