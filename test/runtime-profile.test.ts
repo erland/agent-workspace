@@ -29,7 +29,7 @@ describe("runtime profiles", () => {
     for (const profile of Object.values(RUNTIME_PROFILES)) {
       assert.equal(
         profile.imageRef,
-        `ghcr.io/erland/agent-workspace-runtime:${profile.id}-v4`
+        `ghcr.io/erland/agent-workspace-runtime:${profile.id}-v5`
       );
       assert.deepEqual(profile.bootstrapCommands, []);
     }
@@ -37,7 +37,7 @@ describe("runtime profiles", () => {
   it("resolves an explicitly requested Java 25 / Node 20 runtime", () => {
     const profile = resolveRuntimeProfile({ java: "25", node: "20" });
     assert.equal(profile.id, "java25-node20");
-    assert.equal(profile.imageRef, "ghcr.io/erland/agent-workspace-runtime:java25-node20-v4");
+    assert.equal(profile.imageRef, "ghcr.io/erland/agent-workspace-runtime:java25-node20-v5");
     assert.deepEqual(profile.bootstrapCommands, []);
   });
 });
