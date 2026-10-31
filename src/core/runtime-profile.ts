@@ -3,7 +3,7 @@ export const SUPPORTED_NODE_VERSIONS = ["20", "22"] as const;
 
 export type JavaVersion = (typeof SUPPORTED_JAVA_VERSIONS)[number];
 export type NodeVersion = (typeof SUPPORTED_NODE_VERSIONS)[number];
-export type RuntimeProfileId = `java${JavaVersion}-node${NodeVersion}`;
+export type RuntimeProfileId = `java${JavaVersion}-node${NodeVersion}` | "playwright-chromium-node22";
 
 export interface RuntimeProfile {
   id: RuntimeProfileId;
@@ -16,6 +16,7 @@ export interface RuntimeProfile {
 export interface RuntimeRequest {
   java?: JavaVersion;
   node?: NodeVersion;
+  playwright?: boolean;
 }
 
 export const DEFAULT_JAVA_VERSION: JavaVersion = "21";
@@ -45,10 +46,17 @@ export const RUNTIME_PROFILES: Readonly<Record<RuntimeProfileId, RuntimeProfile>
   "java21-node20": createProfile("21", "20"),
   "java21-node22": createProfile("21", "22"),
   "java25-node20": createProfile("25", "20"),
-  "java25-node22": createProfile("25", "22")
+  "java25-node22": createProfile("25", "22"),
+  "playwright-chromium-node22": { ...createProfile("21", "22"), id: "playwright-chromium-node22", imageRef: `${process.env.AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX ?? DEFAULT_RUNTIME_IMAGE_PREFIX}:playwright-chromium-node22-v${process.env.AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION ?? DEFAULT_RUNTIME_IMAGE_VERSION}` }
 };
 
 export function resolveRuntimeProfile(request: RuntimeRequest = {}): RuntimeProfile {
+  if (request.playwright) {
+    if ((request.java !== undefined && request.java !== "21") || (request.node !== undefined && request.node !== "22")) {
+      throw new Error("Playwright runtime requires Java 21 and Node 22");
+    }
+    return RUNTIME_PROFILES["playwright-chromium-node22"];
+  }
   const java = request.java ?? DEFAULT_JAVA_VERSION;
   const node = request.node ?? DEFAULT_NODE_VERSION;
   const id = `java${java}-node${node}` as RuntimeProfileId;
