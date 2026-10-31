@@ -2,7 +2,7 @@
 
 ## Scope
 
-Adds `runtime-images/Dockerfile.playwright`, `playwright-smoke.sh` and a separate `playwright-chromium` CI job. **No changes to the six existing image profiles or project_verify selection** (PW-002). The optional image is published as `ghcr.io/<owner>/agent-workspace-runtime:playwright-chromium-node22-v1` only after smoke and image scan pass. Increment `runtime-images/playwright-version.txt` before publishing a changed recipe; image tags are treated as immutable.
+Adds `runtime-images/Dockerfile.playwright`, `playwright-smoke.sh` and a separate `playwright-chromium` CI job. **No changes to the six existing image profiles or project_verify selection** (PW-002). The optional image is published as `ghcr.io/<owner>/agent-workspace-runtime:playwright-chromium-node22-v6` only after smoke and image scan pass. Increment the shared `runtime-images/version.txt` to publish a new complete set of seven images; image tags are immutable.
 
 The optional image inherits Java 21 + Node 22, installs Playwright CLI/package version `1.56.1` with matching Chromium browser assets and OS dependencies into `/opt/ms-playwright`. Smoke uses the same unprivileged `agent-workspace` user as the Modal runtime and launches Chromium headlessly, visits `about:blank`, and evaluates a simple assertion. It does not require an elevated Docker runtime or host socket. Browser sandbox compatibility and Modal resource limits **must still be checked in a real Modal Sandbox**.
 
