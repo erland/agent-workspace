@@ -62,9 +62,10 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
   registerJsonTool(server, "get_capabilities", "List supported runtimes, build systems and artifact capabilities.", EmptyInputSchema, async () => tools.getCapabilities());
   registerJsonTool(server, "get_profile", "Show the current Agent Workspace identity and execution-provider connection.", EmptyInputSchema, async () => tools.getProfile());
   registerJsonTool(server, "workspace_create", "Create a temporary logical workspace. No execution sandbox is allocated until project_verify or project_build runs.", WorkspaceCreateInputSchema, async (input: z.infer<typeof WorkspaceCreateInputSchema>) => {
-    const normalizedInput: { java?: "17" | "21" | "25"; node?: "20" | "22"; lifetimeMinutes?: number } = {};
+    const normalizedInput: { java?: "17" | "21" | "25"; node?: "20" | "22"; playwright?: boolean; lifetimeMinutes?: number } = {};
     if (input.java !== undefined) normalizedInput.java = input.java;
     if (input.node !== undefined) normalizedInput.node = input.node;
+    if (input.playwright !== undefined) normalizedInput.playwright = input.playwright;
     if (input.lifetimeMinutes !== undefined) normalizedInput.lifetimeMinutes = input.lifetimeMinutes;
     return tools.createWorkspace(normalizedInput);
   });
