@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { getCapabilities } from "../src/core/capabilities.js";
 
 describe("getCapabilities", () => {
-  it("reports the complete v1 runtime matrix", () => {
+  it("reports the six standard runtimes and optional Playwright profile", () => {
     const capabilities = getCapabilities();
 
     assert.deepEqual(capabilities.runtimes.java.supported, ["17", "21", "25"]);
@@ -17,7 +17,8 @@ describe("getCapabilities", () => {
       "java21-node20",
       "java21-node22",
       "java25-node20",
-      "java25-node22"
+      "java25-node22",
+      "playwright-chromium-node22"
     ]);
   });
 

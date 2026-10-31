@@ -106,4 +106,13 @@ playwright_runtime:
   pending:
   - Docker image build and Chromium launch in CI.
   - Real Modal Sandbox browser launch and resource/security acceptance.
-  next: Verify PW-001 in CI and Modal before PW-002.
+  next: PW-002 runtime selection and Modal browser verification.
+playwright_selection:
+  step: PW-002a
+  status: IN_PROGRESS
+  implementation: Explicit opt-in Playwright runtime in workspace_create, profile resolution and capabilities.
+  verification: CI_PENDING
+  pending:
+  - CI tests and typecheck.
+  - Live Modal Chromium test after deployment.
+  next: Add Playwright-specific project_verify execution after runtime-selection acceptance.
