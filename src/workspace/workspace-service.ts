@@ -252,6 +252,15 @@ export class WorkspaceService {
         log.push(`Verification error: ${String(error)}`);
       }
       const files = await this.captureProjectFiles(handle, workspace, capture, log, selected.root);
+      // Capture small, machine-readable Playwright failure diagnostics without
+      // collecting screenshots or traces. Missing optional files are normal.
+      if (workspace.runtimeProfile === "playwright-chromium-node22" &&
+          result.steps.some(step => step.name === "playwright")) {
+        const diagnosticPaths = ["test-results/.last-run.json", "playwright-results.json"];
+        const optional = diagnosticPaths.filter(path => !capture.includes(path));
+        const diagnostics = await this.captureProjectFiles(handle, workspace, optional, log, selected.root);
+        files.files.push(...diagnostics.files);
+      }
       return { result, files };
     }, lifecycle);
     const artifactService = this.requireArtifactService();
