@@ -21,3 +21,17 @@ For future PW-002: project `@playwright/test` should match runtime version; use 
 ## Verification state
 
 Static verification only in ZIP delivery environment: Docker daemon and Modal credentials unavailable. Image build, Chromium launch, vulnerability scan, GHCR publish and Modal launch remain **PENDING**. PW-001 is **not marked complete**.
+
+## PW-002: Node and browser verification in one Sandbox
+
+With a workspace created using `playwright: true`, `project_verify` continues to install dependencies and run the project's normal `test` script. If the npm/pnpm project also defines `scripts["test:playwright"]`, it runs that script as a distinct `playwright` verification step, using the same ephemeral Modal Sandbox. A failing browser script fails verification and stops subsequent steps. The existing build script runs after browser tests only when previous steps pass.
+
+Example package.json scripts:
+
+```json
+{ "scripts": { "test": "node --test", "test:playwright": "playwright test" }, "devDependencies": { "@playwright/test": "1.56.1" } }
+```
+
+For reproducibility, projects should include their own matching Playwright test dependency and lockfile. Browser tests are not auto-run in ordinary Java/Node profiles. Existing `test` scripts that already invoke Playwright should not also define a duplicate `test:playwright` script.
+
+Structured browser reports, screenshots, traces and artifacts are separate follow-up work. Live acceptance in Modal is pending until this change is deployed.

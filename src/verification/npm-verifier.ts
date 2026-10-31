@@ -17,11 +17,13 @@ export interface NpmVerifierOptions {
   maxStepLogChars?: number;
   maxFailureExcerptChars?: number;
   nowMs?: () => number;
+  playwrightRuntime?: boolean;
 }
 
 interface PackageScripts {
   test?: string;
   build?: string;
+  playwright?: string;
 }
 
 const DEFAULT_PROJECT_ROOT = "/workspace/project";
@@ -35,6 +37,7 @@ export class NpmVerifier {
   private readonly maxStepLogChars: number | undefined;
   private readonly maxFailureExcerptChars: number | undefined;
   private readonly nowMs: () => number;
+  private readonly playwrightRuntime: boolean;
 
   public constructor(
     private readonly provider: SandboxProvider,
@@ -46,6 +49,7 @@ export class NpmVerifier {
     this.maxStepLogChars = options.maxStepLogChars;
     this.maxFailureExcerptChars = options.maxFailureExcerptChars;
     this.nowMs = options.nowMs ?? (() => Date.now());
+    this.playwrightRuntime = options.playwrightRuntime === true;
   }
 
   public async verify(handle: WorkspaceHandle): Promise<ProjectVerificationResult> {
@@ -75,6 +79,20 @@ export class NpmVerifier {
       steps.push(test);
       if (test.status === "FAILED") {
         return this.failedResult(startedAt, steps, test);
+      }
+    }
+
+    // An explicit browser test script avoids running arbitrary Playwright commands
+    // for ordinary Node projects and prevents a duplicate npm test run.
+    if (this.playwrightRuntime && packageInfo.scripts.playwright !== undefined) {
+      const browserTest = await this.runStep(handle, "playwright", {
+        argv: [selected.manager, "run", "test:playwright"],
+        workdir: this.projectRoot,
+        timeoutMs: this.commandTimeoutMs
+      });
+      steps.push(browserTest);
+      if (browserTest.status === "FAILED") {
+        return this.failedResult(startedAt, steps, browserTest);
       }
     }
 
@@ -126,7 +144,8 @@ export class NpmVerifier {
         ...(typeof parsed.packageManager === "string" ? { packageManager: parsed.packageManager } : {}),
         scripts: {
           ...(typeof parsed.scripts?.test === "string" ? { test: parsed.scripts.test } : {}),
-          ...(typeof parsed.scripts?.build === "string" ? { build: parsed.scripts.build } : {})
+          ...(typeof parsed.scripts?.build === "string" ? { build: parsed.scripts.build } : {}),
+          ...(typeof parsed.scripts?.["test:playwright"] === "string" ? { playwright: parsed.scripts["test:playwright"] } : {})
         }
       };
     } catch (error) {

@@ -133,3 +133,39 @@ test("pnpm verifier rejects unsupported package manager before installation", as
   await assert.rejects(() => new NpmVerifier(provider).verify(handle), /Unsupported packageManager/);
   assert.equal(provider.commands.length, 1);
 });
+
+
+test("Playwright runtime runs regular Node tests then explicit browser tests in one sandbox", async () => {
+  const provider = new ScriptedProvider([
+    ok(JSON.stringify({hasPackageLock:false,scripts:{test:"node unit.cjs","test:playwright":"playwright test"}})),
+    ok("installed"),
+    ok("unit pass"),
+    ok("browser pass")
+  ]);
+  const result = await new NpmVerifier(provider, {playwrightRuntime:true}).verify(handle);
+  assert.equal(result.status,"PASSED");
+  assert.deepEqual(result.steps.map(x=>x.name),["install","test","playwright"]);
+  assert.deepEqual(provider.commands[3]?.argv,["npm","run","test:playwright"]);
+});
+
+test("ordinary Node runtime skips browser test scripts", async () => {
+  const provider = new ScriptedProvider([
+    ok(JSON.stringify({hasPackageLock:false,scripts:{"test:playwright":"playwright test"}})),
+    ok("installed")
+  ]);
+  const result = await new NpmVerifier(provider).verify(handle);
+  assert.equal(result.status,"PASSED");
+  assert.deepEqual(result.steps.map(x=>x.name),["install"]);
+});
+
+test("browser test failure is reported as verification failure", async () => {
+  const provider = new ScriptedProvider([
+    ok(JSON.stringify({hasPackageLock:false,scripts:{test:"node unit.cjs","test:playwright":"playwright test"}})),
+    ok("installed"), ok("unit pass"), fail(3,"","browser assertion failed")
+  ]);
+  const result = await new NpmVerifier(provider,{playwrightRuntime:true}).verify(handle);
+  assert.equal(result.status,"FAILED");
+  assert.equal(result.failedStep,"playwright");
+  assert.equal(result.exitCode,3);
+  assert.match(result.failureSummary??"",/browser assertion failed/);
+});
