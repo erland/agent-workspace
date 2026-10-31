@@ -94,3 +94,16 @@ planning_handoff:
   complete: true
   development_started: true
   source_of_truth: github
+
+# Independent improvement track; DEV-018 release gates unchanged.
+playwright_runtime:
+  step: PW-001
+  status: IN_PROGRESS
+  implemented:
+  - Optional Chromium/Node 22 Docker image recipe with Playwright 1.56.1.
+  - Unprivileged Chromium smoke script and separate CI build/scan/publish job.
+  verification: ENVIRONMENT_PENDING
+  pending:
+  - Docker image build and Chromium launch in CI.
+  - Real Modal Sandbox browser launch and resource/security acceptance.
+  next: Verify PW-001 in CI and Modal before PW-002.

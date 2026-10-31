@@ -19,15 +19,15 @@ RUN set -eux; \
     mkdir -p /tmp/npm-security-patches/brace /tmp/npm-security-patches/undici; \
     cd /tmp/npm-security-patches; \
     npm pack "brace-expansion@5.0.11"; \
-    npm pack "undici@6.28.1"; \
+    npm pack "undici@6.29.1"; \
     tar -xzf brace-expansion-5.0.11.tgz -C brace --strip-components=1; \
-    tar -xzf undici-6.28.1.tgz -C undici --strip-components=1; \
+    tar -xzf undici-6.29.1.tgz -C undici --strip-components=1; \
     find "${npm_root}" -type f -path '*/brace-expansion/package.json' -printf '%h\n' \
       | while read -r dir; do rm -rf "${dir}"; cp -a /tmp/npm-security-patches/brace "${dir}"; done; \
     find "${npm_root}" -type f -path '*/undici/package.json' -printf '%h\n' \
       | while read -r dir; do rm -rf "${dir}"; cp -a /tmp/npm-security-patches/undici "${dir}"; done; \
     ! grep -R --include=package.json -l '"version": "5.0.9"' "${npm_root}"/node_modules/brace-expansion 2>/dev/null; \
-    ! grep -R --include=package.json -l '"version": "6.28.0"' "${npm_root}"/node_modules/undici 2>/dev/null; \
+    ! find "${npm_root}" -type f -path "*/undici/package.json" -exec grep -l '"version": "6.28.1"' {} + | grep -q .; \
     for spec in "brace-expansion:2.1.6" "ip-address:10.3.1" "tar:7.5.21"; do \
       name="${spec%%:*}"; version="${spec#*:}"; \
       mkdir -p "/tmp/npm-security-patches/${name}-fixed"; \
