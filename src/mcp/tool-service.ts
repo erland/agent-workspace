@@ -23,7 +23,7 @@ export interface WorkspaceUploadZipToolInput {
 export interface AgentWorkspaceTools {
   getCapabilities(): Promise<ToolResult<unknown>>;
   getProfile(): Promise<ToolResult<unknown>>;
-  createWorkspace(input: { java?: "17"|"21"|"25"; node?: "20"|"22"; lifetimeMinutes?: number }): Promise<ToolResult<unknown>>;
+  createWorkspace(input: { java?: "17"|"21"|"25"; node?: "20"|"22"; playwright?: boolean; lifetimeMinutes?: number }): Promise<ToolResult<unknown>>;
   uploadZip(input: WorkspaceUploadZipToolInput): Promise<ToolResult<unknown>>;
   uploadZipFromUrl(input: { workspaceId: string; url: string; filename?: string }): Promise<ToolResult<unknown>>;
   verifyProject(input: { workspaceId: string; projectRoot?: string | undefined; captureFiles?: string[] | undefined }): Promise<ToolResult<unknown>>;
@@ -50,10 +50,10 @@ export class AgentWorkspaceToolService implements AgentWorkspaceTools {
     catch (error) { return this.failure(error); }
   }
 
-  public async createWorkspace(input: { java?: "17"|"21"|"25"; node?: "20"|"22"; lifetimeMinutes?: number }): Promise<ToolResult<unknown>> {
+  public async createWorkspace(input: { java?: "17"|"21"|"25"; node?: "20"|"22"; playwright?: boolean; lifetimeMinutes?: number }): Promise<ToolResult<unknown>> {
     try {
-      const runtime = input.java !== undefined || input.node !== undefined
-        ? { ...(input.java ? { java: input.java } : {}), ...(input.node ? { node: input.node } : {}) }
+      const runtime = input.java !== undefined || input.node !== undefined || input.playwright === true
+        ? { ...(input.java ? { java: input.java } : {}), ...(input.node ? { node: input.node } : {}), ...(input.playwright ? { playwright: true } : {}) }
         : undefined;
       return { ok: true, result: await timedOperation("workspace_create", () => this.workspaces.create({ ...(runtime ? { runtime } : {}), ...(input.lifetimeMinutes ? { lifetimeMinutes: input.lifetimeMinutes } : {}) })) };
     } catch (error) { return this.failure(error); }
