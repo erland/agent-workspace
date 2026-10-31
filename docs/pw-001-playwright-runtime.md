@@ -35,3 +35,22 @@ Example package.json scripts:
 For reproducibility, projects should include their own matching Playwright test dependency and lockfile. Browser tests are not auto-run in ordinary Java/Node profiles. Existing `test` scripts that already invoke Playwright should not also define a duplicate `test:playwright` script.
 
 Structured browser reports, screenshots, traces and artifacts are separate follow-up work. Live acceptance in Modal is pending until this change is deployed.
+
+## PW-003: diagnostic artifacts without screenshots
+
+When the explicit `test:playwright` step runs, Agent Workspace automatically attempts to capture these **small text files** before terminating the ephemeral Sandbox:
+
+- `test-results/.last-run.json` (standard Playwright runner run status, if present)
+- `playwright-results.json` (Playwright JSON reporter, if configured)
+
+Files are optional. An absent report does not fail verification or appear in `missingCaptureFiles`. Existing per-file size cap (5 MiB) and artifact TTL still apply. Logs, exit codes, failure summaries and step durations remain available in `project_verify` regardless. No screenshots, video or browser traces are collected automatically.
+
+To make detailed test names, locations, errors and retries available on failure, configure the Playwright Test reporter in the project, for example:
+
+```ts
+// playwright.config.ts
+import { defineConfig } from '@playwright/test';
+export default defineConfig({ reporter: [['line'], ['json']] });
+```
+
+Agent Workspace sets `PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results.json` for the `test:playwright` step; the JSON reporter only produces this file when the project enables that reporter. The report is returned as a normal `artifacts[]` entry and is readable through `file_read` / `artifact_download_link`. Prefer PWA Preview + Browser Screenshot for visual UI troubleshooting. Avoid putting secrets into test logs or reports.
