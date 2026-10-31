@@ -1,0 +1,22 @@
+# Optional Chromium runtime; normal Java/Node images remain unchanged.
+# Build with --build-arg BASE_IMAGE=agent-workspace-runtime:base.
+ARG BASE_IMAGE=ghcr.io/erland/agent-workspace-runtime:java21-node22-v4
+FROM ${BASE_IMAGE}
+
+USER root
+ARG PLAYWRIGHT_VERSION=1.56.1
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
+    PLAYWRIGHT_RUNTIME_VERSION=${PLAYWRIGHT_VERSION}
+
+# Keep the Playwright npm package and its browser binary version in lockstep.
+RUN set -eux; \
+    npm install --global "playwright@${PLAYWRIGHT_VERSION}"; \
+    PLAYWRIGHT_CLI="$(npm root -g)/playwright/cli.js"; \
+    node "$PLAYWRIGHT_CLI" install --with-deps chromium; \
+    chmod -R a+rX "$PLAYWRIGHT_BROWSERS_PATH"; \
+    mkdir -p /home/agent-workspace/.cache; \
+    chown -R agent-workspace:agent-workspace /home/agent-workspace/.cache
+
+USER agent-workspace
+WORKDIR /workspace
+CMD ["sleep", "3600"]
