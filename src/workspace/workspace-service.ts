@@ -245,7 +245,7 @@ export class WorkspaceService {
       let result: ProjectVerificationResult;
       try {
         result = kind === "NPM"
-          ? await new NpmVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(selected.root) }).verify(handle)
+          ? await new NpmVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(selected.root), playwrightRuntime: workspace.runtimeProfile === "playwright-chromium-node22" }).verify(handle)
           : await new MavenVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(selected.root) }).verify(handle);
       } catch (error) {
         result = { status: "FAILED", projectType: kind, durationMs: 0, steps: [], failureSummary: String(error) };
