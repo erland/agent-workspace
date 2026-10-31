@@ -145,16 +145,18 @@ jobs:
           load: true
           tags: agent-workspace-runtime:base
           cache-from: type=gha,scope=runtime-java21-node22
+      # The first build loads the base image into the Docker daemon. Using the
+      # default docker builder here makes that local image visible to FROM.
+      # The isolated build-push-action builder cannot resolve daemon-local tags.
       - name: Build optional Playwright image
-        uses: docker/build-push-action@v6
-        with:
-          context: runtime-images
-          file: runtime-images/Dockerfile.playwright
-          build-args: |
-            BASE_IMAGE=agent-workspace-runtime:base
-            PLAYWRIGHT_VERSION=1.56.1
-          load: true
-          tags: agent-workspace-runtime:playwright-smoke
+        shell: bash
+        run: |
+          docker buildx build --builder default --load \
+            --file runtime-images/Dockerfile.playwright \
+            --build-arg BASE_IMAGE=agent-workspace-runtime:base \
+            --build-arg PLAYWRIGHT_VERSION=1.56.1 \
+            --tag agent-workspace-runtime:playwright-smoke \
+            runtime-images
       - name: Run Chromium as unprivileged user
         run: docker run --rm --mount type=bind,source="${{ github.workspace }}/runtime-images/playwright-smoke.sh",target=/tmp/playwright-smoke.sh,readonly agent-workspace-runtime:playwright-smoke bash /tmp/playwright-smoke.sh
       - name: Scan optional runtime
