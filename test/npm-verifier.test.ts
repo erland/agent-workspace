@@ -146,6 +146,7 @@ test("Playwright runtime runs regular Node tests then explicit browser tests in 
   assert.equal(result.status,"PASSED");
   assert.deepEqual(result.steps.map(x=>x.name),["install","test","playwright"]);
   assert.deepEqual(provider.commands[3]?.argv,["npm","run","test:playwright"]);
+  assert.deepEqual(provider.commands[3]?.env, { PLAYWRIGHT_JSON_OUTPUT_NAME: "playwright-results.json" });
 });
 
 test("ordinary Node runtime skips browser test scripts", async () => {
