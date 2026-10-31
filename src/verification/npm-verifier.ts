@@ -87,6 +87,7 @@ export class NpmVerifier {
     if (this.playwrightRuntime && packageInfo.scripts.playwright !== undefined) {
       const browserTest = await this.runStep(handle, "playwright", {
         argv: [selected.manager, "run", "test:playwright"],
+        env: { PLAYWRIGHT_JSON_OUTPUT_NAME: "playwright-results.json" },
         workdir: this.projectRoot,
         timeoutMs: this.commandTimeoutMs
       });
