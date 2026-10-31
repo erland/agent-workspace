@@ -54,7 +54,7 @@
   "dependencies": {
     "modal": "^0.10.1",
     "@modelcontextprotocol/server": "^2.3.0",
-    "zod": "^4.1.0",
+    "zod": "^4.6.6",
     "@modelcontextprotocol/client": "^2.3.0",
     "pg": "^8.16.3",
     "jose": "^6.1.0"
