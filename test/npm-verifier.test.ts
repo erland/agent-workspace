@@ -139,14 +139,15 @@ test("Playwright runtime runs regular Node tests then explicit browser tests in 
   const provider = new ScriptedProvider([
     ok(JSON.stringify({hasPackageLock:false,scripts:{test:"node unit.cjs","test:playwright":"playwright test"}})),
     ok("installed"),
+    ok("browser downloaded"),
     ok("unit pass"),
     ok("browser pass")
   ]);
   const result = await new NpmVerifier(provider, {playwrightRuntime:true}).verify(handle);
   assert.equal(result.status,"PASSED");
-  assert.deepEqual(result.steps.map(x=>x.name),["install","test","playwright"]);
-  assert.deepEqual(provider.commands[3]?.argv,["npm","run","test:playwright"]);
-  assert.deepEqual(provider.commands[3]?.env, { PLAYWRIGHT_JSON_OUTPUT_NAME: "playwright-results.json" });
+  assert.deepEqual(result.steps.map(x=>x.name),["install","chromium-install","test","playwright"]);
+  assert.deepEqual(provider.commands[4]?.argv,["npm","run","test:playwright"]);
+  assert.deepEqual(provider.commands[4]?.env, { PLAYWRIGHT_JSON_OUTPUT_NAME: "playwright-results.json" });
 });
 
 test("ordinary Node runtime skips browser test scripts", async () => {
@@ -162,11 +163,52 @@ test("ordinary Node runtime skips browser test scripts", async () => {
 test("browser test failure is reported as verification failure", async () => {
   const provider = new ScriptedProvider([
     ok(JSON.stringify({hasPackageLock:false,scripts:{test:"node unit.cjs","test:playwright":"playwright test"}})),
-    ok("installed"), ok("unit pass"), fail(3,"","browser assertion failed")
+    ok("installed"), ok("browser installed"), ok("unit pass"), fail(3,"","browser assertion failed")
   ]);
   const result = await new NpmVerifier(provider,{playwrightRuntime:true}).verify(handle);
   assert.equal(result.status,"FAILED");
   assert.equal(result.failedStep,"playwright");
   assert.equal(result.exitCode,3);
   assert.match(result.failureSummary??"",/browser assertion failed/);
+});
+
+test("Playwright image prepares the browser before a regular npm test that launches Chromium", async () => {
+  const provider = new ScriptedProvider([
+    ok(JSON.stringify({hasPackageLock:true,scripts:{test:"node tests/browser.mjs",build:"vite build"}})),
+    ok("dependencies installed"),
+    ok("Installing Chromium Headless Shell for project Playwright 1.62.1"),
+    ok("browser tests passed"),
+    ok("built")
+  ]);
+  const result = await new NpmVerifier(provider, {playwrightRuntime:true}).verify(handle);
+  assert.equal(result.status,"PASSED");
+  assert.deepEqual(result.steps.map(step=>step.name), ["install","chromium-install","test","build"]);
+  assert.deepEqual(provider.commands[2]?.argv?.slice(0,2), ["node","-e"]);
+  assert.match(provider.commands[2]?.argv?.[2] ?? "", /--only-shell/);
+  assert.deepEqual(provider.commands[3]?.argv, ["npm","test"]);
+});
+
+test("Playwright browser installation failure stops verification before tests", async () => {
+  const provider = new ScriptedProvider([
+    ok(JSON.stringify({hasPackageLock:true,scripts:{test:"node tests/browser.mjs"}})),
+    ok("installed"),
+    fail(1,"","Chromium download failed")
+  ]);
+  const result = await new NpmVerifier(provider, {playwrightRuntime:true}).verify(handle);
+  assert.equal(result.status,"FAILED");
+  assert.equal(result.failedStep,"chromium-install");
+  assert.deepEqual(result.steps.map(step=>step.name), ["install","chromium-install"]);
+  assert.equal(provider.commands.length,3);
+});
+
+test("Playwright runtime skips project browser acquisition when package is absent", async () => {
+  const provider = new ScriptedProvider([
+    ok(JSON.stringify({scripts:{test:"node --test"}})),
+    ok("installed"),
+    ok("Playwright not installed; browser setup skipped"),
+    ok("tests passed")
+  ]);
+  const result = await new NpmVerifier(provider, {playwrightRuntime:true}).verify(handle);
+  assert.equal(result.status,"PASSED");
+  assert.deepEqual(result.steps.map(step=>step.name), ["install","chromium-install","test"]);
 });
