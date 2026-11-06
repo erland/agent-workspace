@@ -52,6 +52,9 @@ describe("DEV-014 security hardening", () => {
     assert.deepEqual(create?.networkPolicy?.outboundDomainAllowlist, DEFAULT_SECURITY_POLICY.networkPolicy.outboundDomainAllowlist);
     assert.ok(create?.networkPolicy?.outboundDomainAllowlist?.includes("archive.ubuntu.com"));
     assert.ok(create?.networkPolicy?.outboundDomainAllowlist?.includes("security.ubuntu.com"));
+    // Playwright 1.62+ can use the Microsoft ESRP mirror after cdn.playwright.dev.
+    assert.ok(create?.networkPolicy?.outboundDomainAllowlist?.includes("cdn.playwright.dev"));
+    assert.ok(create?.networkPolicy?.outboundDomainAllowlist?.includes("playwright.download.prss.microsoft.com"));
     assert.deepEqual(create?.networkPolicy?.outboundCidrAllowlist, []);
     assert.equal(create?.encryptedPorts, undefined);
     assert.equal(provider.terminated.length, 1);
