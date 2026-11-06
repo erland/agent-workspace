@@ -54,7 +54,7 @@ pdftoppm -f 1 -l 1 -singlefile -png -r 120 smoke.pdf smoke-output
 python3 - <<'PY'
 from pathlib import Path
 png = Path("smoke-output.png").read_bytes()
-assert png.startswith(b"\\x89PNG\\r\\n\\x1a\\n"), "pdftoppm output is not PNG"
+assert png.startswith(bytes.fromhex("89504e470d0a1a0a")), "pdftoppm output is not PNG"
 assert len(png) > 50, "pdftoppm produced an empty PNG"
 print("Poppler PDF rasterization smoke: PASS")
 PY
