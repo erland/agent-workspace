@@ -185,6 +185,8 @@ test("Playwright image prepares the browser before a regular npm test that launc
   assert.deepEqual(result.steps.map(step=>step.name), ["install","chromium-install","test","build"]);
   assert.deepEqual(provider.commands[2]?.argv?.slice(0,2), ["node","-e"]);
   assert.match(provider.commands[2]?.argv?.[2] ?? "", /--only-shell/);
+  assert.match(provider.commands[2]?.argv?.[2] ?? "", /Chromium CDN diagnostic/);
+  assert.match(provider.commands[2]?.argv?.[2] ?? "", /redirect:\x27manual\x27/);
   assert.deepEqual(provider.commands[3]?.argv, ["npm","test"]);
 });
 
