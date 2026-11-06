@@ -24,6 +24,7 @@ export const DEFAULT_DEPENDENCY_DOMAINS = [
   "github.com",
   "*.githubusercontent.com",
   "cdn.playwright.dev",
+  "storage.googleapis.com",
   "playwright.download.prss.microsoft.com",
   "playwright.azureedge.net"
 ] as const;
