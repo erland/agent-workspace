@@ -41,9 +41,24 @@ const INSTALL_PROJECT_CHROMIUM = [
   "catch(error) { if(error.code==='MODULE_NOT_FOUND'){console.log('Playwright not installed; browser setup skipped');process.exit(0);}throw error; }",
   "const version=require(manifest).version;",
   "console.log('Installing Chromium Headless Shell for project Playwright '+version);",
-  "const result=spawnSync(process.execPath,[join(dirname(manifest),'cli.js'),'install','chromium','--only-shell'],{stdio:'inherit',env:{...process.env,PLAYWRIGHT_BROWSERS_PATH:process.env.PLAYWRIGHT_BROWSERS_PATH||'/home/agent-workspace/.cache/ms-playwright'}});",
+  "const result=spawnSync(process.execPath,[join(dirname(manifest),'cli.js'),'install','chromium','--only-shell'],{encoding:'utf8',maxBuffer:8*1024*1024,env:{...process.env,PLAYWRIGHT_BROWSERS_PATH:process.env.PLAYWRIGHT_BROWSERS_PATH||'/home/agent-workspace/.cache/ms-playwright'}});",
+  "if(result.stdout)process.stdout.write(result.stdout);",
+  "if(result.stderr)process.stderr.write(result.stderr);",
   "if(result.error)throw result.error;",
-  "process.exit(result.status===null?1:result.status);"
+  "if(result.status===0)process.exit(0);",
+  // On failure probe only the Playwright CDN URL, HEAD only (never download payload).
+  "const urls=[...(result.stdout||'').matchAll(/https:\\/\\/cdn\\.playwright\\.dev\\/[^\\s\\u001b]+/g)];",
+  "const url=urls[0]?.[0];",
+  "const allowed=new Set(['cdn.playwright.dev','storage.googleapis.com','playwright.download.prss.microsoft.com','playwright.azureedge.net']);",
+  "async function diagnose(){ if(!url){console.error('Chromium CDN diagnostic: no download URL in Playwright output');return;}",
+  "let current=new URL(url); for(let hop=0;hop<3;hop++){",
+  "if(!allowed.has(current.hostname)){console.error('Chromium CDN diagnostic: redirect host not approved: '+current.hostname);break;}",
+  "try{const response=await fetch(current,{method:'HEAD',redirect:'manual',signal:AbortSignal.timeout(4000)});",
+  "const location=response.headers.get('location');console.error('Chromium CDN diagnostic: '+current.hostname+' HTTP '+response.status+(location?' redirects to '+new URL(location,current).hostname:''));",
+  "if(!location||response.status<300||response.status>=400)break;current=new URL(location,current);",
+  "}catch(error){console.error('Chromium CDN diagnostic: '+current.hostname+' '+String(error?.cause?.code||error?.code||error?.message||error));break;}",
+  "}}",
+  "diagnose().finally(()=>{process.exitCode=result.status===null?1:result.status;});"
 ].join("\n");
 
 export class NpmVerifier {
