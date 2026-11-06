@@ -64,3 +64,11 @@ In the opted-in Playwright runtime, `project_verify` executes the normal locked 
 This approach supports varying Playwright versions but downloads the matching Headless Shell in each ephemeral sandbox. Tests that need headed Chromium, branded Chrome, Firefox or WebKit are outside this profile's scope. Measure `install`, `chromium-install`, `test`, and `playwright` step durations to evaluate its Modal cost. The smoke job separately checks that a non-root user can download and launch Chromium Headless Shell.
 
 The v7 image must be published by the runtime-images workflow and the application must use the new v7 tag. Full Modal acceptance remains necessary before calling the implementation production-verified.
+
+## PW-005 – Chromium download redirect diagnostics
+
+Modal's dependency allowlist additionally permits `storage.googleapis.com`, a possible redirect target for `cdn.playwright.dev`. Browser installation still uses the project's installed Playwright version; a different Chromium revision is not silently substituted.
+
+If `chromium-install` fails, the verifier captures the Playwright downloader output and sends bounded HEAD-only probes (up to three hops, 4 seconds per hop) for a Playwright CDN URL found in that output. Logs include status, redirect hostname, or network error code. Probes never fetch the browser ZIP and only follow an explicit short list of Playwright CDN hostnames. This diagnostic runs only when installation fails and does not add overhead to successful runs.
+
+Verify the new policy in a **deployed** service using an ephemeral Modal Sandbox. If `ECONNRESET` persists, inspect `Chromium CDN diagnostic:` lines in `chromium-install` and investigate Modal egress/proxy or the upstream network. The change is not evidence that a redirect occurs for every Playwright release.
