@@ -152,10 +152,10 @@ jobs:
           docker buildx build --builder default --load \
             --file runtime-images/Dockerfile.playwright \
             --build-arg BASE_IMAGE=agent-workspace-runtime:base \
-            --build-arg PLAYWRIGHT_VERSION=1.56.1 \
+            --build-arg PLAYWRIGHT_DEPS_VERSION=1.56.1 \
             --tag agent-workspace-runtime:playwright-smoke \
             runtime-images
-      - name: Run Chromium as unprivileged user
+      - name: Run Chromium and PDF rasterization as unprivileged user
         run: docker run --rm --mount type=bind,source="${{ github.workspace }}/runtime-images/playwright-smoke.sh",target=/tmp/playwright-smoke.sh,readonly agent-workspace-runtime:playwright-smoke bash /tmp/playwright-smoke.sh
       - name: Scan optional runtime
         uses: aquasecurity/trivy-action@v0.36.0

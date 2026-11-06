@@ -72,3 +72,13 @@ Modal's dependency allowlist additionally permits `storage.googleapis.com`, a po
 If `chromium-install` fails, the verifier captures the Playwright downloader output and sends bounded HEAD-only probes (up to three hops, 4 seconds per hop) for a Playwright CDN URL found in that output. Logs include status, redirect hostname, or network error code. Probes never fetch the browser ZIP and only follow an explicit short list of Playwright CDN hostnames. This diagnostic runs only when installation fails and does not add overhead to successful runs.
 
 Verify the new policy in a **deployed** service using an ephemeral Modal Sandbox. If `ECONNRESET` persists, inspect `Chromium CDN diagnostic:` lines in `chromium-install` and investigate Modal egress/proxy or the upstream network. The change is not evidence that a redirect occurs for every Playwright release.
+
+## PW-006 – preinstalled PDF rasterization tooling (runtime v8)
+
+The optional Playwright image now installs Debian/Ubuntu `poppler-utils` during the image build, making `pdftoppm` available for browser-driven visual PDF tests without running `apt-get` in Modal. All six standard Java/Node images remain unchanged in their package selection.
+
+The unprivileged image smoke test generates a minimal PDF, runs `pdftoppm -f 1 -l 1 -singlefile -png -r 120`, and verifies the resulting PNG signature. This checks functionality, not just executable presence. Chromium continues to be downloaded according to the project's Playwright version at verification time.
+
+The immutable runtime image tag increments from v7 to v8; all seven profiles are republished by the existing runtime-images workflow. After the image workflow succeeds, deploy the service configured with `AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION=8` (or the matching default) before using the new image in Modal. Until v8 is published and the service updated, requests still run the previously configured image.
+
+Verification: fixture PDF-to-PNG rasterization has been exercised locally; full Docker image build, Trivy scan, and Modal-based Slide Fable tests remain pending CI/deployment.
