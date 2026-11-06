@@ -29,6 +29,22 @@ interface PackageScripts {
 const DEFAULT_PROJECT_ROOT = "/workspace/project";
 const DEFAULT_INSTALL_TIMEOUT_MS = 5 * 60_000;
 const DEFAULT_COMMAND_TIMEOUT_MS = 3 * 60_000;
+const DEFAULT_BROWSER_INSTALL_TIMEOUT_MS = 3 * 60_000;
+
+// Use the project-local Playwright CLI: it knows which Chromium revision is required.
+// Do not invoke a global or downloaded CLI; no browser cache is shared between runs.
+const INSTALL_PROJECT_CHROMIUM = [
+  "const {spawnSync}=require('node:child_process');",
+  "const {dirname,join}=require('node:path');",
+  "let manifest;",
+  "try { manifest=require.resolve('playwright/package.json',{paths:[process.cwd()]}); }",
+  "catch(error) { if(error.code==='MODULE_NOT_FOUND'){console.log('Playwright not installed; browser setup skipped');process.exit(0);}throw error; }",
+  "const version=require(manifest).version;",
+  "console.log('Installing Chromium Headless Shell for project Playwright '+version);",
+  "const result=spawnSync(process.execPath,[join(dirname(manifest),'cli.js'),'install','chromium','--only-shell'],{stdio:'inherit',env:{...process.env,PLAYWRIGHT_BROWSERS_PATH:process.env.PLAYWRIGHT_BROWSERS_PATH||'/home/agent-workspace/.cache/ms-playwright'}});",
+  "if(result.error)throw result.error;",
+  "process.exit(result.status===null?1:result.status);"
+].join("\n");
 
 export class NpmVerifier {
   private readonly projectRoot: string;
@@ -68,6 +84,20 @@ export class NpmVerifier {
     steps.push(install);
     if (install.status === "FAILED") {
       return this.failedResult(startedAt, steps, install);
+    }
+
+    // npm test may itself launch Playwright (for example Slide Fable), so browser
+    // setup must precede both test and test:playwright on the opt-in runtime.
+    if (this.playwrightRuntime) {
+      const browserInstall = await this.runStep(handle, "chromium-install", {
+        argv: ["node", "-e", INSTALL_PROJECT_CHROMIUM],
+        workdir: this.projectRoot,
+        timeoutMs: DEFAULT_BROWSER_INSTALL_TIMEOUT_MS
+      });
+      steps.push(browserInstall);
+      if (browserInstall.status === "FAILED") {
+        return this.failedResult(startedAt, steps, browserInstall);
+      }
     }
 
     if (packageInfo.scripts.test !== undefined) {

@@ -54,3 +54,13 @@ export default defineConfig({ reporter: [['line'], ['json']] });
 ```
 
 Agent Workspace sets `PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results.json` for the `test:playwright` step; the JSON reporter only produces this file when the project enables that reporter. The report is returned as a normal `artifacts[]` entry and is readable through `file_read` / `artifact_download_link`. Prefer PWA Preview + Browser Screenshot for visual UI troubleshooting. Avoid putting secrets into test logs or reports.
+
+## PW-004 – project-matched Chromium without browser-cache (runtime v7)
+
+The optional Playwright image now preinstalls Chromium **OS libraries only** via `playwright install-deps chromium` at image-build time. Its browser directory is writable by the unprivileged sandbox user (`PLAYWRIGHT_BROWSERS_PATH=/home/agent-workspace/.cache/ms-playwright`). Browser binaries are **not** baked into the image.
+
+In the opted-in Playwright runtime, `project_verify` executes the normal locked npm/pnpm dependency install, then resolves the project's own installed `playwright/package.json` and invokes its own CLI with `install chromium --only-shell`. The distinct `chromium-install` verification step (3 minute timeout) precedes **both** the regular `test` script and optional `test:playwright`, because some projects run browser tests as part of `npm test`. If Playwright is not installed, the step is a quick no-op. A failed download stops verification before tests and surfaces its stderr, exit code and duration. No cross-workspace browser cache is used.
+
+This approach supports varying Playwright versions but downloads the matching Headless Shell in each ephemeral sandbox. Tests that need headed Chromium, branded Chrome, Firefox or WebKit are outside this profile's scope. Measure `install`, `chromium-install`, `test`, and `playwright` step durations to evaluate its Modal cost. The smoke job separately checks that a non-root user can download and launch Chromium Headless Shell.
+
+The v7 image must be published by the runtime-images workflow and the application must use the new v7 tag. Full Modal acceptance remains necessary before calling the implementation production-verified.

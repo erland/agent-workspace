@@ -1,21 +1,21 @@
-# Optional Chromium runtime; normal Java/Node images remain unchanged.
-# Build with --build-arg BASE_IMAGE=agent-workspace-runtime:base.
-ARG BASE_IMAGE=ghcr.io/erland/agent-workspace-runtime:java21-node22-v4
+# Optional browser-test runtime. Browser binaries are downloaded for the project's
+# installed Playwright version after npm/pnpm installation, not baked into the image.
+ARG BASE_IMAGE=ghcr.io/erland/agent-workspace-runtime:java21-node22-v7
 FROM ${BASE_IMAGE}
 
 USER root
-ARG PLAYWRIGHT_VERSION=1.56.1
-ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
-    PLAYWRIGHT_RUNTIME_VERSION=${PLAYWRIGHT_VERSION}
+ARG PLAYWRIGHT_DEPS_VERSION=1.56.1
+ENV PLAYWRIGHT_BROWSERS_PATH=/home/agent-workspace/.cache/ms-playwright
 
-# Keep the Playwright npm package and its browser binary version in lockstep.
+# Install OS libraries at image-build time to avoid apt operations in Modal.
+# The temporary CLI is removed after installing the Chromium system dependencies.
 RUN set -eux; \
-    npm install --global "playwright@${PLAYWRIGHT_VERSION}"; \
-    PLAYWRIGHT_CLI="$(npm root -g)/playwright/cli.js"; \
-    node "$PLAYWRIGHT_CLI" install --with-deps chromium; \
-    chmod -R a+rX "$PLAYWRIGHT_BROWSERS_PATH"; \
-    mkdir -p /home/agent-workspace/.cache; \
-    chown -R agent-workspace:agent-workspace /home/agent-workspace/.cache
+    npm install --global "playwright@${PLAYWRIGHT_DEPS_VERSION}"; \
+    node "$(npm root -g)/playwright/cli.js" install-deps chromium; \
+    npm uninstall --global playwright; \
+    mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"; \
+    chown -R agent-workspace:agent-workspace /home/agent-workspace/.cache; \
+    rm -rf /var/lib/apt/lists/* /root/.npm/_cacache
 
 USER agent-workspace
 WORKDIR /workspace
