@@ -36,7 +36,7 @@ objects = [
     b"<< /Type /Catalog /Pages 2 0 R >>",
     b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
     b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 72 72] /Contents 4 0 R /Resources << >> >>",
-    b"<< /Length 25 >>\\nstream\\n0 0 0 rg 10 10 40 40 re f\\nendstream".replace(b"\\n", bytes([10]))
+    b"<< /Length 25 >>" + bytes([10]) + b"stream" + bytes([10]) + b"0 0 0 rg 10 10 40 40 re f" + bytes([10]) + b"endstream"
 ]
 data = bytearray(b"%PDF-1.4\n")
 offsets = [0]
