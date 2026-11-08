@@ -710,7 +710,7 @@ export function aggregateVerification(
   };
 }
 
-function selectProjectRoot(
+export function selectProjectRoot(
   analysis: NonNullable<Workspace["project"]>["analysis"],
   requested?: string,
   allowPython = false
