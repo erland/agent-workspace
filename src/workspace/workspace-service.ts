@@ -235,6 +235,7 @@ export class WorkspaceService {
   public async verifyProject(workspaceId: string, captureFiles: readonly string[] = [], projectRoot?: string): Promise<ProjectVerificationResult & { logArtifact?: ArtifactRecord; artifacts?: ArtifactRecord[]; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
     const workspace = await this.requireReadyProject(workspaceId, "verification");
     const targets = selectVerificationTargets(workspace.project!.analysis, projectRoot);
+    assertRuntimeCompatibility(workspace.runtimeProfile, targets.map(x=>x.type));
     const log: string[] = [];
     // An explicit projectRoot selects one directory. In a coordinated run,
     // captured paths must be interpreted relative to the ZIP root.
@@ -293,10 +294,11 @@ export class WorkspaceService {
     outputs: readonly RequestedBuildOutput[] = [],
     captureFiles: readonly string[] = [],
     projectRoot?: string
-  ): Promise<{ status: "PASSED" | "FAILED"; projectType: "NPM" | "MAVEN" | "PYTHON" | "GRADLE"; artifacts: ArtifactRecord[]; logArtifact: ArtifactRecord; failureSummary?: string; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
+  ): Promise<{ status: "PASSED" | "FAILED"; projectType: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "CARGO"; artifacts: ArtifactRecord[]; logArtifact: ArtifactRecord; failureSummary?: string; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
     const workspace = await this.requireReadyProject(workspaceId, "build");
     const selected = selectProjectRoot(workspace.project!.analysis, projectRoot, true);
     const projectType = selected.type;
+    assertRuntimeCompatibility(workspace.runtimeProfile, [projectType]);
     const log: string[] = [];
     const capture = normalizeCaptureFiles(captureFiles, projectType);
     const lifecycle: Partial<ExecutionDiagnostics> = {};
@@ -653,7 +655,22 @@ function cloneWorkspace(workspace: Workspace): Workspace {
   };
 }
 
-export type VerificationTarget = { root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" };
+/** A workspace has one immutable image; never report PASS from an incompatible toolchain. */
+export function assertRuntimeCompatibility(runtime: RuntimeProfileId, kinds: readonly string[]): void {
+  const hasCargo = kinds.includes("CARGO");
+  const hasOther = kinds.some(x => x !== "CARGO");
+  if (hasCargo && hasOther) {
+    throw new Error("Mixed Cargo and non-Cargo projects require separate workspaces and runtime images; select a projectRoot and use the matching runtime");
+  }
+  if (hasCargo && runtime !== "rust") {
+    throw new Error("Cargo projects require workspace_create({rust:true}); current workspace uses " + runtime);
+  }
+  if (!hasCargo && runtime === "rust") {
+    throw new Error("Rust runtime supports Cargo projects only; choose a Java/Node runtime for this project");
+  }
+}
+
+export type VerificationTarget = { root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO" };
 
 /** One required verifier per detected build system and project root. */
 export function selectVerificationTargets(
@@ -669,7 +686,7 @@ export function selectVerificationTargets(
   if (candidates.length === 0) {
     throw new Error(`No project manifest for projectRoot ${JSON.stringify(requested)}. Available: ${manifests.map(x => x.root || ".").join(", ")}`);
   }
-  const hasPythonMix = new Set(candidates.map(x => x.type)).size > 1 && candidates.some(x => x.type === "PYTHON" || x.type === "GRADLE");
+  const hasPythonMix = new Set(candidates.map(x => x.type)).size > 1 && candidates.some(x => x.type === "PYTHON" || x.type === "GRADLE" || x.type === "CARGO");
   if (!hasPythonMix) return [selectProjectRoot(analysis, requested, true)];
   // Parent Maven/Gradle reactors and npm workspaces are responsible for children of
   // the same build system. Python remains independently required.
@@ -711,7 +728,7 @@ export function selectProjectRoot(
   analysis: NonNullable<Workspace["project"]>["analysis"],
   requested?: string,
   allowPython = false
-): {root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE"} {
+): {root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO"} {
   const manifests = analysis.projectManifests ?? [];
   // PY-002 can verify a standalone Python root. Mixed projects must not
   // silently skip required project verification; PY-003 coordinates them.
@@ -744,7 +761,7 @@ export function selectProjectRoot(
     throw new Error(`Mixed Maven/npm manifests at ${selected || "."}; select a dedicated subproject root`);
   }
   const type = matches[0]!.type;
-  if (type !== "NPM" && type !== "MAVEN" && type !== "PYTHON" && type !== "GRADLE") throw new Error("Unsupported verifier: " + type);
+  if (type !== "NPM" && type !== "MAVEN" && type !== "PYTHON" && type !== "GRADLE" && type !== "CARGO") throw new Error("Unsupported verifier: " + type);
   return {root: selected, type};
 }
 
@@ -762,7 +779,7 @@ export function executionTimeoutMs(remainingMs: number): number {
   return Math.floor(Math.min(remainingMs, EPHEMERAL_EXECUTION_TIMEOUT_MS) / 1000) * 1000;
 }
 
-function normalizeCaptureFiles(paths: readonly string[], kind: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "MIXED"): string[] {
+function normalizeCaptureFiles(paths: readonly string[], kind: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "CARGO" | "MIXED"): string[] {
   if (paths.length > 12) throw new Error("captureFiles exceeds 12 entries");
   const result = new Set<string>(kind === "NPM" ? ["package-lock.json"] : []);
   for (const path of paths) {
