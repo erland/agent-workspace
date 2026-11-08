@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   DEFAULT_RUNTIME_PROFILE_ID,
+  DEFAULT_RUNTIME_IMAGE_VERSION,
   RUNTIME_PROFILES,
   resolveRuntimeProfile
 } from "../src/core/runtime-profile.js";
@@ -30,7 +31,7 @@ describe("runtime profiles", () => {
     for (const profile of Object.values(RUNTIME_PROFILES).filter(profile => profile.id !== "playwright-chromium-node22")) {
       assert.equal(
         profile.imageRef,
-        `ghcr.io/erland/agent-workspace-runtime:${profile.id}-v8`
+        `ghcr.io/erland/agent-workspace-runtime:${profile.id}-v${DEFAULT_RUNTIME_IMAGE_VERSION}`
       );
       assert.deepEqual(profile.bootstrapCommands, []);
     }
@@ -38,13 +39,13 @@ describe("runtime profiles", () => {
   it("selects the versioned Playwright image explicitly and rejects incompatible runtimes", () => {
     const profile = resolveRuntimeProfile({ playwright: true });
     assert.equal(profile.id, "playwright-chromium-node22");
-    assert.equal(profile.imageRef, "ghcr.io/erland/agent-workspace-runtime:playwright-chromium-node22-v8");
+    assert.equal(profile.imageRef, `ghcr.io/erland/agent-workspace-runtime:playwright-chromium-node22-v${DEFAULT_RUNTIME_IMAGE_VERSION}`);
     assert.throws(() => resolveRuntimeProfile({ playwright: true, java: "25" }), /requires Java 21 and Node 22/);
   });
   it("resolves an explicitly requested Java 25 / Node 20 runtime", () => {
     const profile = resolveRuntimeProfile({ java: "25", node: "20" });
     assert.equal(profile.id, "java25-node20");
-    assert.equal(profile.imageRef, "ghcr.io/erland/agent-workspace-runtime:java25-node20-v8");
+    assert.equal(profile.imageRef, `ghcr.io/erland/agent-workspace-runtime:java25-node20-v${DEFAULT_RUNTIME_IMAGE_VERSION}`);
     assert.deepEqual(profile.bootstrapCommands, []);
   });
 });
