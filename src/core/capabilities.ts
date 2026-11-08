@@ -21,6 +21,7 @@ export interface AgentWorkspaceCapabilities {
       supported: readonly string[];
       default: string;
     };
+    rust: { available: boolean; profile: "rust"; };
   };
   buildSystems: readonly ["maven", "npm", "python", "gradle"];
   projectDetection: { supported: readonly ["maven", "npm", "python", "gradle"]; };
@@ -50,7 +51,8 @@ export function getCapabilities(): AgentWorkspaceCapabilities {
       node: {
         supported: [...SUPPORTED_NODE_VERSIONS],
         default: DEFAULT_NODE_VERSION
-      }
+      },
+      rust: { available: true, profile: "rust" }
     },
     buildSystems: ["maven", "npm", "python", "gradle"],
     projectDetection: { supported: ["maven", "npm", "python", "gradle"] },
