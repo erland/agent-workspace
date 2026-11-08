@@ -26,6 +26,6 @@ describe("getCapabilities", () => {
   it("reports Python alongside npm and Maven as a supported verifier", () => {
     const capabilities = getCapabilities();
     assert.deepEqual(capabilities.buildSystems, ["maven", "npm", "python", "gradle"]);
-    assert.deepEqual(capabilities.projectDetection.supported, ["maven", "npm", "python"]);
+    assert.deepEqual(capabilities.projectDetection.supported, ["maven", "npm", "python", "gradle"]);
   });
 });
