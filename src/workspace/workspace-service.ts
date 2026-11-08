@@ -236,32 +236,41 @@ export class WorkspaceService {
 
   public async verifyProject(workspaceId: string, captureFiles: readonly string[] = [], projectRoot?: string): Promise<ProjectVerificationResult & { logArtifact?: ArtifactRecord; artifacts?: ArtifactRecord[]; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
     const workspace = await this.requireReadyProject(workspaceId, "verification");
-    const selected = selectProjectRoot(workspace.project!.analysis, projectRoot, true);
-    const kind = selected.type;
+    const targets = selectVerificationTargets(workspace.project!.analysis, projectRoot);
     const log: string[] = [];
-    const capture = normalizeCaptureFiles(captureFiles, kind);
+    // An explicit projectRoot selects one directory. In a coordinated run,
+    // captured paths must be interpreted relative to the ZIP root.
+    const captureRoot = targets.length === 1 ? targets[0]!.root : "";
+    const capture = normalizeCaptureFiles(captureFiles, targets.length === 1 ? targets[0]!.type : "MIXED");
     const lifecycle: Partial<ExecutionDiagnostics> = {};
     const outcome = await this.withEphemeralProject(workspace, async (handle) => {
       const recorder = this.recordingProvider(log);
-      let result: ProjectVerificationResult;
-      try {
-        result = kind === "NPM"
-          ? await new NpmVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(selected.root), playwrightRuntime: workspace.runtimeProfile === "playwright-chromium-node22" }).verify(handle)
-          : kind === "PYTHON"
-            ? await new PythonVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(selected.root) }).verify(handle)
-            : await new MavenVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(selected.root) }).verify(handle);
-      } catch (error) {
-        result = { status: "FAILED", projectType: kind, durationMs: 0, steps: [], failureSummary: String(error) };
-        log.push(`Verification error: ${String(error)}`);
+      const subResults: Array<{ projectRoot: string; result: ProjectVerificationResult }> = [];
+      // All verifiers share the same ephemeral sandbox, so a required suite
+      // cannot be skipped while a different suite reports aggregate PASS.
+      for (const target of targets) {
+        let result: ProjectVerificationResult;
+        try {
+          result = target.type === "NPM"
+            ? await new NpmVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(target.root), playwrightRuntime: workspace.runtimeProfile === "playwright-chromium-node22" }).verify(handle)
+            : target.type === "PYTHON"
+              ? await new PythonVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(target.root) }).verify(handle)
+              : await new MavenVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(target.root) }).verify(handle);
+        } catch (error) {
+          result = { status: "FAILED", projectType: target.type, durationMs: 0, steps: [], failureSummary: String(error) };
+          log.push(`Verification error [${target.type}:${target.root || "."}]: ${String(error)}`);
+        }
+        subResults.push({ projectRoot: target.root, result });
       }
-      const files = await this.captureProjectFiles(handle, workspace, capture, log, selected.root);
-      // Capture small, machine-readable Playwright failure diagnostics without
-      // collecting screenshots or traces. Missing optional files are normal.
+      const result = aggregateVerification(subResults);
+      const files = await this.captureProjectFiles(handle, workspace, capture, log, captureRoot);
+      // Capture small, machine-readable Playwright diagnostics only when the
+      // run actually contained an npm Playwright verification.
       if (workspace.runtimeProfile === "playwright-chromium-node22" &&
-          result.steps.some(step => step.name === "playwright")) {
+          subResults.some(x => x.result.projectType === "NPM" && x.result.steps.some(step => step.name === "playwright"))) {
         const diagnosticPaths = ["test-results/.last-run.json", "playwright-results.json"];
         const optional = diagnosticPaths.filter(path => !capture.includes(path));
-        const diagnostics = await this.captureProjectFiles(handle, workspace, optional, log, selected.root);
+        const diagnostics = await this.captureProjectFiles(handle, workspace, optional, log, captureRoot);
         files.files.push(...diagnostics.files);
       }
       return { result, files };
@@ -647,6 +656,60 @@ function cloneWorkspace(workspace: Workspace): Workspace {
   };
 }
 
+export type VerificationTarget = { root: string; type: "MAVEN" | "NPM" | "PYTHON" };
+
+/** One required verifier per detected build system and project root. */
+export function selectVerificationTargets(
+  analysis: NonNullable<Workspace["project"]>["analysis"],
+  requested?: string
+): VerificationTarget[] {
+  const manifests = analysis.projectManifests ?? [];
+  if (requested !== undefined && (requested.startsWith("/") || requested.includes("\\") ||
+      requested.split("/").some(part => part === "." || part === ".." || (part === "" && requested !== "")))) {
+    throw new Error("Invalid projectRoot: use a relative directory path inside the ZIP");
+  }
+  const candidates = requested === undefined ? manifests : manifests.filter(x => x.root === requested);
+  if (candidates.length === 0) {
+    throw new Error(`No project manifest for projectRoot ${JSON.stringify(requested)}. Available: ${manifests.map(x => x.root || ".").join(", ")}`);
+  }
+  const hasPythonMix = new Set(candidates.map(x => x.type)).size > 1 && candidates.some(x => x.type === "PYTHON");
+  if (!hasPythonMix) return [selectProjectRoot(analysis, requested, true)];
+  // A parent's Maven reactor/npm workspace is responsible for children of
+  // the same build system. Python remains independently required.
+  const selected = candidates.filter(item => !candidates.some(parent =>
+    parent !== item && parent.type === item.type && parent.root !== item.root &&
+    (parent.root === "" || item.root.startsWith(parent.root + "/"))));
+  const unique = [...new Map(selected.map(x => [x.root + "\u0000" + x.type, x])).values()];
+  if (unique.length > 12) throw new Error("Too many required project verifiers (maximum 12)");
+  return unique;
+}
+
+export function aggregateVerification(
+  results: readonly { projectRoot: string; result: ProjectVerificationResult }[]
+): ProjectVerificationResult {
+  if (results.length === 0) throw new Error("No verification results");
+  if (results.length === 1) return results[0]!.result;
+  const firstFailure = results.find(x => x.result.status === "FAILED");
+  const firstBlocked = results.find(x => x.result.status === "BLOCKED");
+  const selected = firstFailure ?? firstBlocked;
+  const status = firstFailure ? "FAILED" : firstBlocked ? "BLOCKED" : "PASSED";
+  const steps = results.flatMap(x => x.result.steps.map(step => ({
+    ...step, name: `${x.result.projectType.toLowerCase()}:${x.projectRoot || "."}:${step.name}`
+  })));
+  return {
+    status, projectType: "MIXED",
+    durationMs: results.reduce((sum, x) => sum + x.result.durationMs, 0),
+    steps,
+    subResults: [...results],
+    ...(selected ? {
+      failureSummary: `${selected.result.projectType} at ${selected.projectRoot || "."}: ${selected.result.failureSummary || selected.result.status}`,
+      ...(selected.result.exitCode !== undefined ? { exitCode: selected.result.exitCode } : {}),
+      ...(selected.result.failedStep ? { failedStep: `${selected.result.projectType.toLowerCase()}:${selected.projectRoot || "."}:${selected.result.failedStep}` } : {}),
+      ...(selected.result.logExcerpt ? { logExcerpt: selected.result.logExcerpt } : {})
+    } : {})
+  };
+}
+
 export function selectProjectRoot(
   analysis: NonNullable<Workspace["project"]>["analysis"],
   requested?: string,
@@ -702,7 +765,7 @@ export function executionTimeoutMs(remainingMs: number): number {
   return Math.floor(Math.min(remainingMs, EPHEMERAL_EXECUTION_TIMEOUT_MS) / 1000) * 1000;
 }
 
-function normalizeCaptureFiles(paths: readonly string[], kind: "NPM" | "MAVEN" | "PYTHON"): string[] {
+function normalizeCaptureFiles(paths: readonly string[], kind: "NPM" | "MAVEN" | "PYTHON" | "MIXED"): string[] {
   if (paths.length > 12) throw new Error("captureFiles exceeds 12 entries");
   const result = new Set<string>(kind === "NPM" ? ["package-lock.json"] : []);
   for (const path of paths) {
