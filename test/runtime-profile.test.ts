@@ -23,13 +23,14 @@ describe("runtime profiles", () => {
       "java25-node20",
       "java25-node22",
       "playwright-chromium-node22",
-      "rust"
+      "rust",
+      "tauri-linux"
     ]);
   });
 
 
   it("uses prebuilt versioned GHCR images without per-workspace bootstrap", () => {
-    for (const profile of Object.values(RUNTIME_PROFILES).filter(profile => profile.id !== "playwright-chromium-node22" && profile.id !== "rust")) {
+    for (const profile of Object.values(RUNTIME_PROFILES).filter(profile => profile.id !== "playwright-chromium-node22" && profile.id !== "rust" && profile.id !== "tauri-linux")) {
       assert.equal(
         profile.imageRef,
         `ghcr.io/erland/agent-workspace-runtime:${profile.id}-v${DEFAULT_RUNTIME_IMAGE_VERSION}`
@@ -52,6 +53,20 @@ describe("runtime profiles", () => {
     assert.deepEqual(p.bootstrapCommands,[]);
     for (const input of [{rust:true,java:"21" as const},{rust:true,node:"22" as const},{rust:true,playwright:true}]) {
       assert.throws(()=>resolveRuntimeProfile(input),/cannot be combined/);
+    }
+    assert.equal(resolveRuntimeProfile().id,"java21-node22");
+  });
+
+  it("selects the Tauri image with Rust and Node 22 while preserving other profiles", () => {
+    const p = resolveRuntimeProfile({tauri:true});
+    assert.equal(p.id,"tauri-linux");
+    assert.equal(p.java,undefined);
+    assert.equal(p.node,"22");
+    assert.equal(p.imageRef,"ghcr.io/erland/agent-workspace-runtime:tauri-linux-v1");
+    assert.deepEqual(p.bootstrapCommands,[]);
+    assert.equal(resolveRuntimeProfile({tauri:true,node:"22"}).id,"tauri-linux");
+    for(const input of [{tauri:true,java:"21" as const},{tauri:true,rust:true},{tauri:true,playwright:true},{tauri:true,node:"20" as const}]) {
+      assert.throws(()=>resolveRuntimeProfile(input),/Tauri runtime requires/);
     }
     assert.equal(resolveRuntimeProfile().id,"java21-node22");
   });
