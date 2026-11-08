@@ -22,7 +22,7 @@ export class GradleVerifier implements ProjectVerifier {
       return {status: "BLOCKED", projectType: "GRADLE", durationMs: Math.max(0, now() - start), steps,
         failureSummary: "Gradle Wrapper files (gradlew, gradle-wrapper.jar, gradle-wrapper.properties) are required"};
     }
-    const command = ["bash", "./gradlew", "--no-daemon", "--console=plain", "test"];
+    const command = ["bash", "./gradlew", "--no-daemon", "--console=plain", "clean", "test"];
     const began = now();
     const result = await this.provider.exec(handle, {argv: command, workdir: this.options.projectRoot, timeoutMs: 5 * 60_000});
     const step: VerificationStepResult = {
@@ -37,6 +37,31 @@ export class GradleVerifier implements ProjectVerifier {
         failedStep: "test", exitCode: step.exitCode,
         failureSummary: failureSummary(step.stdout, step.stderr),
         logExcerpt: failureExcerpt(step.stdout, step.stderr)};
+    }
+    // Gradle exits successfully for NO-SOURCE test tasks. Only return PASS when
+    // at least one actual test is represented in the generated XML reports.
+    // clean test above prevents stale reports in the supplied archive from
+    // satisfying this check.
+    const reports = await this.provider.exec(handle, {
+      argv: ["python3", "-c", [
+        "from pathlib import Path",
+        "import json, xml.etree.ElementTree as ET",
+        "total = 0",
+        "for p in Path('.').rglob('TEST-*.xml'):",
+        "    if '/build/test-results/' not in '/' + p.as_posix(): continue",
+        "    try: total += int(ET.parse(p).getroot().attrib.get('tests', '0'))",
+        "    except (OSError, ValueError, ET.ParseError): pass",
+        "print(json.dumps({'tests': total}))"
+      ].join("\\n")],
+      workdir: this.options.projectRoot, timeoutMs: 30_000
+    });
+    let tests = 0;
+    try {
+      if (reports.exitCode === 0) tests = Number(JSON.parse(reports.stdout).tests);
+    } catch { /* Treat invalid report inspection as not verified. */ }
+    if (!Number.isSafeInteger(tests) || tests < 1) {
+      return {status: "BLOCKED", projectType: "GRADLE", durationMs: Math.max(0, now() - start), steps,
+        failureSummary: "Gradle completed, but no executed tests were confirmed in test-result XML"};
     }
     return {status: "PASSED", projectType: "GRADLE", durationMs: Math.max(0, now() - start), steps};
   }
