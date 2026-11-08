@@ -52,6 +52,9 @@ För npm-projekt ska tjänsten kunna installera dependencies, köra test när te
 ### FR-016 – Python verification (PY-002)
 Python-projekt med eget projektroot ska verifieras i en ephemeral Modal-sandbox med isolerad virtuell miljö. `requirements.txt` och/eller `pyproject.toml` används vid installation. `uv.lock` utan requirements-fil ger BLOCKED tills uv-stöd implementerats. Kör pytest om installerad, annars unittest discovery. Saknade tester eller omöjlig testidentifiering ska ge BLOCKED, aldrig PASS. Pip-installationsfel ger FAILED med begränsade/redigerade loggar. Blandprojekt kräver explicit projectRoot tills PY-003.
 
+### FR-017 – Coordinated mixed-project verification (PY-003)
+För ZIP-projekt som kombinerar Python med npm och/eller Maven ska `project_verify` automatiskt verifiera samtliga identifierade byggsystem i en och samma tillfälliga sandbox. Delresultat ska innehålla projektrot, byggsystem, steg, status och felinformation. Sammanlagt PASS får endast rapporteras när alla obligatoriska delverifieringar är PASS. Om någon del är FAILED blir helheten FAILED; annars blir den BLOCKED om någon del är BLOCKED. Kända Maven-reaktormoduler ska inte dubbelverifieras när en överordnad Maven-rot redan täcker dem. Vid explicit `projectRoot` begränsas verifieringen till den valda katalogens manifest. Denna funktion omfattar inte Python-byggartefakter.
+
 ### FR-009 – Structured verification result
 Verifiering ska returnera minst:
 - `PASSED`, `FAILED` eller `BLOCKED`,
@@ -135,7 +138,7 @@ V1 är funktionellt accepterad när en autentiserad testanvändare med anslutet 
 - en användare med flera samtidiga providers,
 - Gradle,
 - pnpm/yarn,
-- Python wheel/sdist builds and coordinated mixed-project verification (Python test verification is available from PY-002),
+- Python wheel/sdist builds (Python-testverifiering och samordnade blandprojekt ingår från PY-002 respektive PY-003),
 - Git repository integration,
 - CI/CD-plattform,
 - permanent project hosting,
