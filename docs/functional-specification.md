@@ -29,6 +29,9 @@ Tjänsten ska i v1 detektera:
 - Maven-projekt via `pom.xml`,
 - npm-projekt via `package.json`.
 
+### FR-015 – Python project discovery (PY-001)
+Tjänsten ska identifiera Python-projekt via `pyproject.toml`, `requirements.txt` och `uv.lock`, inklusive undermappar och blandprojekt. Flera Python-manifest i samma katalog räknas som ett projekt. Identifiering innebär inte att Python-kod kan verifieras eller byggas i detta steg. `get_capabilities` skiljer därför `projectDetection` från körbara `buildSystems`. Python i ett blandprojekt får inte tyst ignoreras med ett sammanlagt PASS.
+
 ### FR-006 – Runtime selection
 V1 ska stödja:
 - Java 17, 21, 25,
@@ -129,7 +132,7 @@ V1 är funktionellt accepterad när en autentiserad testanvändare med anslutet 
 - en användare med flera samtidiga providers,
 - Gradle,
 - pnpm/yarn,
-- Python build workflows,
+- Python verification/build workflows (projektidentifiering ingår från PY-001),
 - Git repository integration,
 - CI/CD-plattform,
 - permanent project hosting,
