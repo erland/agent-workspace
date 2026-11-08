@@ -11,6 +11,7 @@ describe("getCapabilities", () => {
     assert.equal(capabilities.runtimes.java.default, "21");
     assert.deepEqual(capabilities.runtimes.node.supported, ["20", "22"]);
     assert.equal(capabilities.runtimes.node.default, "22");
+    assert.deepEqual(capabilities.runtimes.rust,{available:true,profile:"rust"});
     assert.deepEqual(capabilities.provider.runtimeProfiles, [
       "java17-node20",
       "java17-node22",
@@ -18,7 +19,8 @@ describe("getCapabilities", () => {
       "java21-node22",
       "java25-node20",
       "java25-node22",
-      "playwright-chromium-node22"
+      "playwright-chromium-node22",
+      "rust"
     ]);
   });
 
