@@ -56,6 +56,14 @@ The link:
 - expires after a short TTL and never outlives the artifact itself,
 - should be consumed immediately rather than persisted as a long-lived deployment credential.
 
+## Python wheel downloads
+
+Python wheel files (`.whl`) are already published as normal build artifacts by `project_build` with artifact kind `wheel` and MIME type `application/zip`. No special download endpoint or secondary packaging is required. The same `artifact_download_link(artifactId)` operation used for JAR, ZIP, PDF and other artifacts returns a short-lived signed HTTPS URL for the **end user** to download.
+
+When assisting a user, provide the resulting download URL directly as a user-facing link. The assistant does **not** need to make a second HTTP request to the signed URL or proxy the bytes through its own environment. If the link expires, generate a new one for the same artifact while the artifact exists.
+
+The `file_read` tool is independent of downloading: it can optionally inspect individual members of a wheel by treating its `.whl` container as ZIP, with the same path validation and entry-size limits as other ZIP files. This is useful for inspection, not a prerequisite for handing the full wheel to the user.
+
 ## Compatibility requirements for PWA Preview
 
 PWA Preview `preview_create` expects an HTTPS `sourceUrl` that resolves to a ZIP or tar.gz archive.
