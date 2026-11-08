@@ -1,6 +1,6 @@
 # Optional browser-test runtime. Browser binaries are downloaded for the project's
 # installed Playwright version after npm/pnpm installation, not baked into the image.
-ARG BASE_IMAGE=ghcr.io/erland/agent-workspace-runtime:java21-node22-v8
+ARG BASE_IMAGE=ghcr.io/erland/agent-workspace-runtime:java21-node22-v9
 FROM ${BASE_IMAGE}
 
 USER root
