@@ -295,11 +295,10 @@ export class WorkspaceService {
     outputs: readonly RequestedBuildOutput[] = [],
     captureFiles: readonly string[] = [],
     projectRoot?: string
-  ): Promise<{ status: "PASSED" | "FAILED"; projectType: "NPM" | "MAVEN"; artifacts: ArtifactRecord[]; logArtifact: ArtifactRecord; failureSummary?: string; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
+  ): Promise<{ status: "PASSED" | "FAILED"; projectType: "NPM" | "MAVEN" | "PYTHON"; artifacts: ArtifactRecord[]; logArtifact: ArtifactRecord; failureSummary?: string; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
     const workspace = await this.requireReadyProject(workspaceId, "build");
-    const selected = selectProjectRoot(workspace.project!.analysis, projectRoot);
+    const selected = selectProjectRoot(workspace.project!.analysis, projectRoot, true);
     const projectType = selected.type;
-    if (projectType === "PYTHON") throw new Error("Python build is not yet supported");
     const log: string[] = [];
     const capture = normalizeCaptureFiles(captureFiles, projectType);
     const lifecycle: Partial<ExecutionDiagnostics> = {};
