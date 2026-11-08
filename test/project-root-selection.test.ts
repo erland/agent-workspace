@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { selectProjectRoot } from "../src/workspace/workspace-service.js";
+import { selectProjectRoot, selectVerificationTargets, aggregateVerification } from "../src/workspace/workspace-service.js";
 import type { ProjectAnalysis } from "../src/project/project-detector.js";
 
 function analysis(projectManifests: ProjectAnalysis["projectManifests"]): ProjectAnalysis {
@@ -43,4 +43,39 @@ test("mixed Python/Node root is not silently verified", () => {
   const a = analysis([{root:"",type:"NPM"},{root:"",type:"PYTHON"}]);
   assert.throws(() => selectProjectRoot(a, undefined, true), /Mixed projects require explicit projectRoot/);
   assert.throws(() => selectProjectRoot(a, "", true), /Mixed Maven\/npm manifests/);
+});
+
+test("coordinates npm and Python sharing one root", () => {
+  const a = analysis([{root:"",type:"NPM"},{root:"",type:"PYTHON"}]);
+  assert.deepEqual(selectVerificationTargets(a), [{root:"",type:"NPM"},{root:"",type:"PYTHON"}]);
+  assert.deepEqual(selectVerificationTargets(a, ""), [{root:"",type:"NPM"},{root:"",type:"PYTHON"}]);
+});
+
+test("coordinates npm root and nested Python, preserving explicit single-root selection", () => {
+  const a = analysis([{root:"",type:"NPM"},{root:"backend",type:"PYTHON"}]);
+  assert.deepEqual(selectVerificationTargets(a), [{root:"",type:"NPM"},{root:"backend",type:"PYTHON"}]);
+  assert.deepEqual(selectVerificationTargets(a, "backend"), [{root:"backend",type:"PYTHON"}]);
+  assert.deepEqual(selectVerificationTargets(a, ""), [{root:"",type:"NPM"}]);
+});
+
+test("coordinates Maven, npm, Python but avoids duplicate Maven reactor modules", () => {
+  const a = analysis([{root:"",type:"MAVEN"},{root:"api",type:"MAVEN"},{root:"web",type:"NPM"},{root:"checks",type:"PYTHON"}]);
+  assert.deepEqual(selectVerificationTargets(a), [{root:"",type:"MAVEN"},{root:"web",type:"NPM"},{root:"checks",type:"PYTHON"}]);
+});
+
+test("mixed aggregation includes every required sub-result and never hides failures", () => {
+  const passed = {status:"PASSED" as const,projectType:"NPM" as const,durationMs:10,steps:[{name:"test",argv:["npm","test"],status:"PASSED" as const,exitCode:0,durationMs:10,stdout:"ok",stderr:""}]};
+  const blocked = {status:"BLOCKED" as const,projectType:"PYTHON" as const,durationMs:7,steps:[],failureSummary:"no Python tests"};
+  const failed = {status:"FAILED" as const,projectType:"PYTHON" as const,durationMs:8,steps:[],failedStep:"test",exitCode:2,failureSummary:"assertion"};
+  const okResult = aggregateVerification([{projectRoot:"",result:passed},{projectRoot:"backend",result:{...blocked,status:"PASSED" as const}}]);
+  assert.equal(okResult.status,"PASSED");
+  assert.equal(okResult.projectType,"MIXED");
+  assert.deepEqual(okResult.steps.map(s=>s.name),["npm:.:test"]);
+  assert.equal(okResult.subResults?.length,2);
+  const blockedResult = aggregateVerification([{projectRoot:"",result:passed},{projectRoot:"backend",result:blocked}]);
+  assert.equal(blockedResult.status,"BLOCKED");
+  const failResult = aggregateVerification([{projectRoot:"",result:passed},{projectRoot:"backend",result:failed}]);
+  assert.equal(failResult.status,"FAILED");
+  assert.equal(failResult.failedStep,"python:backend:test");
+  assert.equal(failResult.exitCode,2);
 });
