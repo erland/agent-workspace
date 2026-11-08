@@ -54,8 +54,8 @@ export function getCapabilities(): AgentWorkspaceCapabilities {
       },
       rust: { available: true, profile: "rust" }
     },
-    buildSystems: ["maven", "npm", "python", "gradle"],
-    projectDetection: { supported: ["maven", "npm", "python", "gradle"] },
+    buildSystems: ["maven", "npm", "python", "gradle", "cargo"],
+    projectDetection: { supported: ["maven", "npm", "python", "gradle", "cargo"] },
     workspace: {
       defaultLifetimeMinutes: 60,
       maxLifetimeMinutes: 60,
