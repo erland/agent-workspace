@@ -52,7 +52,7 @@ export class GradleVerifier implements ProjectVerifier {
         "    try: total += int(ET.parse(p).getroot().attrib.get('tests', '0'))",
         "    except (OSError, ValueError, ET.ParseError): pass",
         "print(json.dumps({'tests': total}))"
-      ].join("\\n")],
+      ].join("\n")],
       workdir: this.options.projectRoot, timeoutMs: 30_000
     });
     let tests = 0;
