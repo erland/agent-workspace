@@ -19,7 +19,7 @@ export interface BuildArtifactOutput {
 
 export interface ProjectBuildResult {
   status: "PASSED";
-  projectType: "NPM" | "MAVEN";
+  projectType: "NPM" | "MAVEN" | "PYTHON";
   outputs: BuildArtifactOutput[];
 }
 
@@ -37,6 +37,7 @@ export class ProjectBuildService {
   ): Promise<ProjectBuildResult> {
     if (projectType === "NPM") return this.buildNpm(handle, requested);
     if (projectType === "MAVEN") return this.buildMaven(handle, requested);
+    if (projectType === "PYTHON") return this.buildPython(handle, requested);
     throw new Error(`Unsupported build project type: ${projectType}`);
   }
 
@@ -79,6 +80,41 @@ export class ProjectBuildService {
       projectType: "MAVEN",
       outputs: await this.collectOutputs(handle, outputs)
     };
+  }
+
+  private async buildPython(handle: WorkspaceHandle, requested: readonly RequestedBuildOutput[]): Promise<ProjectBuildResult> {
+    // Only pyproject-based projects are distributable Python packages. A lone
+    // requirements.txt is sufficient for verification, not for wheel/sdist.
+    const manifest = await this.exec(handle, ["bash", "-lc", "test -f pyproject.toml"]);
+    if (manifest.exitCode !== 0) throw new Error("Python build requires pyproject.toml");
+
+    const python = ".agent-workspace-build-venv/bin/python";
+    await this.mustExec(handle, ["python3", "-m", "venv", ".agent-workspace-build-venv"]);
+    // A versioned frontend, installed only in the sandbox; PEP 517 manages
+    // the backend requirements specified by each individual project.
+    await this.mustExec(handle, [python, "-m", "pip", "install", "--disable-pip-version-check", "--no-input", "build==1.3.0"]);
+    await this.mustExec(handle, [python, "-m", "build", "--outdir", ".agent-workspace-dist"]);
+
+    const outputs = requested.length > 0 ? [...requested] : await this.detectPythonOutputs(handle);
+    if (outputs.length === 0) throw new Error("Python build completed but no wheel/sdist output was detected");
+    if (outputs.length > 12) throw new Error("Build produced more than 12 publishable outputs");
+    return {
+      status: "PASSED",
+      projectType: "PYTHON",
+      outputs: await this.collectOutputs(handle, outputs)
+    };
+  }
+
+  private async detectPythonOutputs(handle: WorkspaceHandle): Promise<RequestedBuildOutput[]> {
+    const outputDir = ".agent-workspace-dist";
+    const result = await this.exec(handle, ["bash", "-lc",
+      `if [ -d ${outputDir} ]; then find ${outputDir} -maxdepth 1 -type f \\( -name '*.whl' -o -name '*.tar.gz' \\) -printf '%p\\n' | sort; fi`
+    ]);
+    if (result.exitCode !== 0) throw new Error(result.stderr || "Could not discover Python build outputs");
+    return result.stdout.split("\n").map(x => x.trim()).filter(Boolean).map(path => ({
+      path, name: path.split("/").at(-1) ?? "python-package",
+      kind: path.endsWith(".whl") ? "wheel" : "sdist"
+    }));
   }
 
   private async detectNpmOutputs(handle: WorkspaceHandle): Promise<RequestedBuildOutput[]> {
@@ -190,6 +226,8 @@ function shellQuote(value: string): string {
 }
 
 function inferKind(filename: string): string {
+  if (filename.endsWith(".whl")) return "wheel";
+  if (filename.endsWith(".tar.gz")) return "sdist";
   if (filename.endsWith(".jar")) return "jar";
   if (filename.endsWith(".war")) return "war";
   if (filename.endsWith(".zip")) return "zip";
@@ -198,6 +236,8 @@ function inferKind(filename: string): string {
 }
 
 function inferMediaType(filename: string): string {
+  if (filename.endsWith(".whl")) return "application/zip";
+  if (filename.endsWith(".tar.gz")) return "application/gzip";
   if (filename.endsWith(".jar")) return "application/java-archive";
   if (filename.endsWith(".war")) return "application/java-archive";
   if (filename.endsWith(".zip")) return "application/zip";
