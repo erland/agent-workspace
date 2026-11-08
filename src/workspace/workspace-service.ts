@@ -648,6 +648,11 @@ export function selectProjectRoot(
   requested?: string
 ): {root: string; type: "MAVEN" | "NPM"} {
   const manifests = analysis.projectManifests ?? [];
+  // PY-001 reports Python projects but does not execute them. Never silently
+  // report PASS for a mixed project when its Python checks were skipped.
+  if (requested === undefined && manifests.some(item => item.type === "PYTHON")) {
+    throw new Error("Python project detected; automatic Python verification is not supported yet. Select an npm/Maven-only projectRoot explicitly.");
+  }
   if (requested !== undefined && (requested.startsWith("/") || requested.includes("\\") ||
       requested.split("/").some(part => part === "." || part === ".." || part === "" && requested !== ""))) {
     throw new Error("Invalid projectRoot: use a relative directory path inside the ZIP");
@@ -666,10 +671,15 @@ export function selectProjectRoot(
     throw new Error(`Multiple project roots: ${[...new Set(manifests.map(x=>x.root || "."))].join(", ")}. Specify projectRoot.`);
   }
   const matches = manifests.filter(item => item.root === selected);
+  if (matches.some(item => item.type === "PYTHON")) {
+    throw new Error("Python verification is not supported yet for projectRoot " + JSON.stringify(selected));
+  }
   if (matches.length !== 1) {
     throw new Error(`Mixed Maven/npm manifests at ${selected || "."}; select a dedicated subproject root`);
   }
-  return {root: selected, type: matches[0]!.type};
+  const type = matches[0]!.type;
+  if (type !== "NPM" && type !== "MAVEN") throw new Error("Unsupported verifier: " + type);
+  return {root: selected, type};
 }
 
 function resolveWorkspaceProjectRoot(relativeRoot: string): string {
