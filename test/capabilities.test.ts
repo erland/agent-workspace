@@ -23,9 +23,9 @@ describe("getCapabilities", () => {
   });
 
 
-  it("reports npm and Maven without advertising unimplemented build systems", () => {
+  it("reports Python alongside npm and Maven as a supported verifier", () => {
     const capabilities = getCapabilities();
-    assert.deepEqual(capabilities.buildSystems, ["maven", "npm"]);
+    assert.deepEqual(capabilities.buildSystems, ["maven", "npm", "python"]);
     assert.deepEqual(capabilities.projectDetection.supported, ["maven", "npm", "python"]);
   });
 });
