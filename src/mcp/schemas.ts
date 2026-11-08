@@ -10,6 +10,7 @@ export const WorkspaceCreateInputSchema = z.object({
   node: z.enum(["20", "22"]).optional(),
   playwright: z.boolean().optional(),
   rust: z.boolean().optional(),
+  tauri: z.boolean().optional(),
   lifetimeMinutes: z.number().positive().max(60).optional()
 }).strict();
 
