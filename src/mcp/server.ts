@@ -19,7 +19,7 @@ import {
 import { ARTIFACT_RESOURCE_TEMPLATE, artifactResourceUri, singleArtifactTemplateValue } from "./artifact-resource.js";
 
 const AGENT_WORKSPACE_DESCRIPTION =
-  "Creates temporary logical workspaces for uploading, verifying, and building npm and Maven projects, and for publishing temporary build artifacts.";
+  "Creates temporary logical workspaces for uploading, verifying, and building Maven, Gradle, npm, Python and Cargo projects, and for publishing temporary build artifacts.";
 const AGENT_WORKSPACE_WEBSITE = "https://agent-workspace.apphome.one/about";
 const AGENT_WORKSPACE_ICON_DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAB7UlEQVR4nO2aMU7DUAyGHQQTjCywwsrA0IWBhQmBxAHYkFiBAzBygLYrUjcOgITExMLA0oELwDGYGMKUKI1Iajv2+wPxJ1VK1Dz39//8/JK22dbeSU4DZgUtAE0YgBaAJgxAC0ATBqAFoAkD0ALQrGoGvT4/WOsw4/D4XHS9uAL6nDyRXJ/IgL4nXyDRmXEfhqpBs6uL8jifzmj97bQ8v1zbKY/HowlbiAec5SBeAtXkiagxeSKim/m1NHxyBr8LhAHSAfl0tnD+dfBUHt9/fy68h+4BHFT3AW0mjDvJSU8sAbQANOwlsL254akDxuArIAxAC0ATBqAFoAkD0ALQuBqwOzpjXXd0+16+tDG0uBlQCO+SgEWMZbgYUBfclkB11l/u9lUxupCkB3zMH5OM0WBuQH2muiRSH+tRBaYGSJNvKv+2GNYmmBng3a29PsvMgPpMWa5hz9huFbBsljjlr40twa0CPOllBRD5NCzLXeU3zLdBjgnc8vdOnijRjZCmElLtKi4GWHRtz85fxa0CCsF14ZLu3xTDEtclYCHce3dR/TTWhWWznpr4RggtAE0YgBaAJgzgXpjyed8Crl5RBfwVEyQ6xUug7yZI9al6QF9N0Ohi/1P0vxK7AFoAmjAALQBNGIAWgCYMQAtA8wO6c5LmRtskgAAAAABJRU5ErkJggg==";
 
@@ -91,13 +91,13 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
     async (input: z.infer<typeof WorkspaceUploadZipFromUrlInputSchema>) => tools.uploadZipFromUrl(input)
   );
 
-  registerJsonTool(server, "project_verify", "Compile/test the uploaded npm or Maven project and return a persistent execution log artifact and optional captured files.", ProjectVerifyInputSchema, async (input: z.infer<typeof ProjectVerifyInputSchema>) => tools.verifyProject(input));
+  registerJsonTool(server, "project_verify", "Compile/test the uploaded project in its selected runtime and return a persistent execution log artifact and optional captured files.", ProjectVerifyInputSchema, async (input: z.infer<typeof ProjectVerifyInputSchema>) => tools.verifyProject(input));
 
   server.registerTool(
     "project_build",
     {
       annotations: toolAnnotations("project_build"),
-      description: "Build the uploaded project in a short-lived execution sandbox and publish one or more temporary build artifacts. outputs may select project-relative files or directories; files are published unchanged and directories are packaged as .tar.gz. If outputs are omitted, Agent Workspace detects conventional npm or Maven outputs.",
+      description: "Build the uploaded project in a short-lived execution sandbox and publish one or more temporary build artifacts. outputs may select project-relative files or directories; files are published unchanged and directories are packaged as .tar.gz. If outputs are omitted, Agent Workspace detects conventional build outputs.",
       inputSchema: ProjectBuildInputSchema,
       outputSchema: JsonObjectOutputSchema
     },
