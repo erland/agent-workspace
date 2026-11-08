@@ -66,7 +66,10 @@ Verifiering ska returnera minst:
 - failure summary och relevant log excerpt vid fel.
 
 ### FR-010 – Build artifacts
-Tjänsten ska kunna bygga npm- och Maven-projekt och publicera explicit valda eller autodetekterade outputs som tillfälliga artifacts. En output-path får peka på en fil eller katalog; kataloger paketeras för portabel handoff.
+Tjänsten ska kunna bygga npm-, Maven- och paketerbara Python-projekt och publicera explicit valda eller autodetekterade outputs som tillfälliga artifacts. En output-path får peka på en fil eller katalog; kataloger paketeras för portabel handoff.
+
+### FR-018 – Python package builds (PY-004)
+Tjänsten ska kunna bygga standardiserade Python-paket med `pyproject.toml` och PEP 517 via `project_build`. Byggningen körs endast i en sandbox med en separat venv och ett versionsbundet Python-buildverktyg. Projektets egna build-backendberoenden hanteras av PEP 517 och får inte installeras på applikationsservern. Vid lyckad byggning ska wheel (`.whl`) och sdist (`.tar.gz`) automatiskt identifieras och kunna publiceras med korrekt filnamn och MIME-typ. Explicita säkra filvägar stöds. Ett projekt som endast innehåller `requirements.txt` är inte ett paketerbart Python-projekt och ska därför få ett tydligt byggfel. Utebliven eller misslyckad paketering får aldrig rapporteras som PASS.
 
 ### FR-011 – Artifact handoff
 Tjänsten ska kunna ge en kortlivad signerad HTTPS-länk till ett publicerat artifact så att externa tjänster, exempelvis PWA Preview, kan hämta det utan MCP resource access.
@@ -138,7 +141,7 @@ V1 är funktionellt accepterad när en autentiserad testanvändare med anslutet 
 - en användare med flera samtidiga providers,
 - Gradle,
 - pnpm/yarn,
-- Python wheel/sdist builds (Python-testverifiering och samordnade blandprojekt ingår från PY-002 respektive PY-003),
+- Conda-, Poetry- och uv-specifika Python build workflows (wheel/sdist via PEP 517 ingår från PY-004),
 - Git repository integration,
 - CI/CD-plattform,
 - permanent project hosting,
