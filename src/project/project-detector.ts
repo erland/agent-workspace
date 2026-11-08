@@ -161,7 +161,7 @@ function detectGradleJava(paths: readonly string[], contents: ReadonlyMap<string
   for (const path of paths) {
     const script = contents.get(path);
     if (!script) continue;
-    const match = /JavaLanguageVersion\\.of\\(\\s*(17|21|25|\\d{1,3})\\s*\\)/.exec(script);
+    const match = /JavaLanguageVersion\.of\(\s*(\d{1,3})\s*\)/.exec(script);
     if (match?.[1]) return {version: match[1], source: path + ":toolchain",
       supported: supportedJava(match[1]) !== undefined};
   }
@@ -296,7 +296,7 @@ function parentPath(path: string): string {
 
 function ignoredPath(path: string): boolean {
   const normalized = `/${path.replaceAll("\\", "/")}/`;
-  return ["/node_modules/", "/target/", "/.git/", "/.venv/", "/venv/", "/site-packages/", "/__pycache__/", "/dist/"].some(part => normalized.includes(part));
+  return ["/node_modules/", "/target/", "/build/", "/.gradle/", "/.git/", "/.venv/", "/venv/", "/site-packages/", "/__pycache__/", "/dist/"].some(part => normalized.includes(part));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
