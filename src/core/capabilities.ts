@@ -22,6 +22,7 @@ export interface AgentWorkspaceCapabilities {
       default: string;
     };
     rust: { available: boolean; profile: "rust"; };
+    tauri: { available: boolean; profile: "tauri-linux"; node: "22"; };
   };
   buildSystems: readonly ["maven", "npm", "python", "gradle", "cargo"];
   projectDetection: { supported: readonly ["maven", "npm", "python", "gradle", "cargo"]; };
@@ -52,7 +53,8 @@ export function getCapabilities(): AgentWorkspaceCapabilities {
         supported: [...SUPPORTED_NODE_VERSIONS],
         default: DEFAULT_NODE_VERSION
       },
-      rust: { available: true, profile: "rust" }
+      rust: { available: true, profile: "rust" },
+      tauri: {available:true,profile:"tauri-linux",node:"22"}
     },
     buildSystems: ["maven", "npm", "python", "gradle", "cargo"],
     projectDetection: { supported: ["maven", "npm", "python", "gradle", "cargo"] },
