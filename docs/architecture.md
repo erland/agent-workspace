@@ -318,3 +318,11 @@ Tauri-bilden har **egen** version i `tauri-runtime/version.txt`; initial publice
 **Avgränsning:** En grön Rust- och frontendverifiering innebär inte att Tauri-GUI:t fungerar, att Linux .deb/AppImage installerar eller att någon Windows-/macOS-build fungerar. Komplett `tauri build --no-bundle`, paketering, GUI-test och macOS-/Windows-distribution ligger utanför LANG-003C och kräver separat verifiering. Projekt med `rust-toolchain.toml` stöds fortfarande inte enligt LANG-003B:s verktygskedjepolicy.
 
 Källor för distributionsberoenden: Tauri v2 prerequisites, https://v2.tauri.app/start/prerequisites/ . Senare Tauri CLI-build i Linux kan använda `tauri build --no-bundle` enligt https://v2.tauri.app/distribute/ .
+
+### Releasegrind: CVE-2026-3909 i WebKitGTK (2026-11-08)
+
+Tauri-imagebygge och Cargo/Node/WebKitGTK-smoke passerar, och en versionspinnad npm 11.21.2 eliminerar de 41 HIGH/CRITICAL-fynd som kom från npm:s tidigare beroendeträd. Den ofiltrerade rapporten genereras fortsatt av `Tauri Runtime Image`.
+
+**Publicering blockerad:** Den installerade Ubuntu 24.04-versionen `2.52.6-0ubuntu0.24.04.1` av WebKitGTK ger sex HIGH-fynd för samma verkliga sårbarhet, **CVE-2026-3909**, på sex relaterade WebKitGTK/JavaScriptCore-paket. Tauri v2:s officiella Linux-systemberoenden kräver WebKitGTK 4.1 för inbyggd desktopkompilering. WebKitGTK:s egen advisory WSA-2026-0006 bekräftar att versioner före 2.54.0 påverkas, och Ubuntu listar 24.04 som sårbar: https://webkitgtk.org/security/WSA-2026-0006.html respektive https://ubuntu.com/security/cves?package=webkitgtk .
+
+Detta är **inte ett falsklarm**. Vi gör inget generellt eller tillfälligt undantag i Trivy för det. När Ubuntu erbjuder säkerhetspatchat WebKitGTK (eller en betrodd, versionslåst >=2.54.0-kompatibel uppdatering), bygg om Tauri-imagen och kör alla image-, smoke- och sårbarhetstester tills de är gröna. Mergning av LANG-003C bör invänta ett uttryckligt säkerhetsbeslut. Rust-v1, Playwright och Java/Node-bilderna påverkas inte av denna Tauri-specifika spärr.
