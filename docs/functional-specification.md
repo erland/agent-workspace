@@ -29,6 +29,9 @@ Tjänsten ska i v1 detektera:
 - Maven-projekt via `pom.xml`,
 - npm-projekt via `package.json`.
 
+### FR-015 – Python project discovery (PY-001)
+Tjänsten ska identifiera Python-projekt via `pyproject.toml`, `requirements.txt` och `uv.lock`, inklusive undermappar och blandprojekt. Flera Python-manifest i samma katalog räknas som ett projekt. Identifiering innebär inte att Python-kod kan verifieras eller byggas i detta steg. `get_capabilities` skiljer därför `projectDetection` från körbara `buildSystems`. Python i ett blandprojekt får inte tyst ignoreras med ett sammanlagt PASS.
+
 ### FR-006 – Runtime selection
 V1 ska stödja:
 - Java 17, 21, 25,
@@ -46,9 +49,12 @@ För Maven-projekt ska tjänsten kunna köra test och package. Maven wrapper ska
 ### FR-008 – npm verification
 För npm-projekt ska tjänsten kunna installera dependencies, köra test när test-script finns och köra build när build-script finns. `npm ci` ska föredras när lämplig lockfile finns.
 
+### FR-016 – Python verification (PY-002)
+Python-projekt med eget projektroot ska verifieras i en ephemeral Modal-sandbox med isolerad virtuell miljö. `requirements.txt` och/eller `pyproject.toml` används vid installation. `uv.lock` utan requirements-fil ger BLOCKED tills uv-stöd implementerats. Kör pytest om installerad, annars unittest discovery. Saknade tester eller omöjlig testidentifiering ska ge BLOCKED, aldrig PASS. Pip-installationsfel ger FAILED med begränsade/redigerade loggar. Blandprojekt kräver explicit projectRoot tills PY-003.
+
 ### FR-009 – Structured verification result
 Verifiering ska returnera minst:
-- `PASSED` eller `FAILED`,
+- `PASSED`, `FAILED` eller `BLOCKED`,
 - projekttyp,
 - vald runtime,
 - utförda steg,
@@ -129,7 +135,7 @@ V1 är funktionellt accepterad när en autentiserad testanvändare med anslutet 
 - en användare med flera samtidiga providers,
 - Gradle,
 - pnpm/yarn,
-- Python build workflows,
+- Python wheel/sdist builds and coordinated mixed-project verification (Python test verification is available from PY-002),
 - Git repository integration,
 - CI/CD-plattform,
 - permanent project hosting,

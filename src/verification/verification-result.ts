@@ -1,4 +1,4 @@
-export type VerificationStatus = "PASSED" | "FAILED";
+export type VerificationStatus = "PASSED" | "FAILED" | "BLOCKED";
 export type VerificationStepStatus = "PASSED" | "FAILED";
 
 export interface VerificationStepResult {
@@ -13,7 +13,7 @@ export interface VerificationStepResult {
 
 export interface ProjectVerificationResult {
   status: VerificationStatus;
-  projectType: "NPM" | "MAVEN";
+  projectType: "NPM" | "MAVEN" | "PYTHON";
   durationMs: number;
   steps: VerificationStepResult[];
   failedStep?: string;

@@ -12,6 +12,34 @@ function analyze(entries: Array<{ path: string; content: string }>, runtime: Run
 }
 
 describe("project/runtime detection", () => {
+  it("detects a Python-only pyproject and nested requirements project", () => {
+    const pyproject = analyze([{path:"pyproject.toml",content:'[project]\\nname="demo"'}]);
+    assert.equal(pyproject.projectType, "PYTHON");
+    assert.deepEqual(pyproject.projectRoots, [""]);
+    assert.deepEqual(pyproject.projectManifests, [{root:"",type:"PYTHON"}]);
+    const nested = analyze([{path:"svc/requirements.txt",content:"pytest==8.3.1"}]);
+    assert.equal(nested.projectType, "PYTHON");
+    assert.deepEqual(nested.projectRoots, ["svc"]);
+  });
+
+  it("groups Python manifests in the same root and detects mixed projects", () => {
+    const mixed = analyze([
+      {path:"package.json",content:"{}"},
+      {path:"pyproject.toml",content:'[project]\\nname="demo"'},
+      {path:"requirements.txt",content:"pytest==8.3.1"},
+      {path:"uv.lock",content:"version = 1"}
+    ]);
+    assert.equal(mixed.projectType, "MIXED");
+    assert.deepEqual(mixed.projectManifests, [{root:"",type:"NPM"},{root:"",type:"PYTHON"}]);
+    const multi = analyze([{path:"api/pyproject.toml",content:""},{path:"worker/requirements.txt",content:""}]);
+    assert.ok(multi.warnings.some(w => w.code === "AMBIGUOUS_PROJECT"));
+  });
+
+  it("ignores Python metadata in dependency and generated directories", () => {
+    const result = analyze([{path:".venv/lib/requirements.txt",content:"ignored"},{path:"dist/pyproject.toml",content:"ignored"}]);
+    assert.equal(result.projectType, "UNKNOWN");
+  });
+
   it("detects the project root when the ZIP contains one top-level directory", () => {
     const nestedNpm = analyze([
       { path: "my-project/package.json", content: JSON.stringify({ scripts: { build: "vite build" } }) },

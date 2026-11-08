@@ -25,6 +25,7 @@ import type { ArtifactRecord, PersistedWorkspace } from "../persistence/models.j
 import { ArtifactService } from "../artifact/artifact-service.js";
 import { ProjectBuildService, type RequestedBuildOutput } from "../artifact/project-build-service.js";
 import { NpmVerifier } from "../verification/npm-verifier.js";
+import { PythonVerifier } from "../verification/python-verifier.js";
 import { MavenVerifier } from "../verification/maven-verifier.js";
 import type { ProjectVerificationResult } from "../verification/verification-result.js";
 import { analyzeProjectArchive, type ProjectAnalysis } from "../project/project-detector.js";
@@ -235,7 +236,7 @@ export class WorkspaceService {
 
   public async verifyProject(workspaceId: string, captureFiles: readonly string[] = [], projectRoot?: string): Promise<ProjectVerificationResult & { logArtifact?: ArtifactRecord; artifacts?: ArtifactRecord[]; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
     const workspace = await this.requireReadyProject(workspaceId, "verification");
-    const selected = selectProjectRoot(workspace.project!.analysis, projectRoot);
+    const selected = selectProjectRoot(workspace.project!.analysis, projectRoot, true);
     const kind = selected.type;
     const log: string[] = [];
     const capture = normalizeCaptureFiles(captureFiles, kind);
@@ -246,7 +247,9 @@ export class WorkspaceService {
       try {
         result = kind === "NPM"
           ? await new NpmVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(selected.root), playwrightRuntime: workspace.runtimeProfile === "playwright-chromium-node22" }).verify(handle)
-          : await new MavenVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(selected.root) }).verify(handle);
+          : kind === "PYTHON"
+            ? await new PythonVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(selected.root) }).verify(handle)
+            : await new MavenVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(selected.root) }).verify(handle);
       } catch (error) {
         result = { status: "FAILED", projectType: kind, durationMs: 0, steps: [], failureSummary: String(error) };
         log.push(`Verification error: ${String(error)}`);
@@ -287,6 +290,7 @@ export class WorkspaceService {
     const workspace = await this.requireReadyProject(workspaceId, "build");
     const selected = selectProjectRoot(workspace.project!.analysis, projectRoot);
     const projectType = selected.type;
+    if (projectType === "PYTHON") throw new Error("Python build is not yet supported");
     const log: string[] = [];
     const capture = normalizeCaptureFiles(captureFiles, projectType);
     const lifecycle: Partial<ExecutionDiagnostics> = {};
@@ -645,9 +649,16 @@ function cloneWorkspace(workspace: Workspace): Workspace {
 
 export function selectProjectRoot(
   analysis: NonNullable<Workspace["project"]>["analysis"],
-  requested?: string
-): {root: string; type: "MAVEN" | "NPM"} {
+  requested?: string,
+  allowPython = false
+): {root: string; type: "MAVEN" | "NPM" | "PYTHON"} {
   const manifests = analysis.projectManifests ?? [];
+  // PY-002 can verify a standalone Python root. Mixed projects must not
+  // silently skip required project verification; PY-003 coordinates them.
+  if (requested === undefined && new Set(manifests.map(item => item.type)).size > 1 &&
+      manifests.some(item => item.type === "PYTHON")) {
+    throw new Error("Mixed projects require explicit projectRoot until PY-003 coordinated verification");
+  }
   if (requested !== undefined && (requested.startsWith("/") || requested.includes("\\") ||
       requested.split("/").some(part => part === "." || part === ".." || part === "" && requested !== ""))) {
     throw new Error("Invalid projectRoot: use a relative directory path inside the ZIP");
@@ -666,10 +677,15 @@ export function selectProjectRoot(
     throw new Error(`Multiple project roots: ${[...new Set(manifests.map(x=>x.root || "."))].join(", ")}. Specify projectRoot.`);
   }
   const matches = manifests.filter(item => item.root === selected);
+  if (!allowPython && matches.some(item => item.type === "PYTHON")) {
+    throw new Error("Python build is not supported yet for projectRoot " + JSON.stringify(selected));
+  }
   if (matches.length !== 1) {
     throw new Error(`Mixed Maven/npm manifests at ${selected || "."}; select a dedicated subproject root`);
   }
-  return {root: selected, type: matches[0]!.type};
+  const type = matches[0]!.type;
+  if (type !== "NPM" && type !== "MAVEN" && type !== "PYTHON") throw new Error("Unsupported verifier: " + type);
+  return {root: selected, type};
 }
 
 function resolveWorkspaceProjectRoot(relativeRoot: string): string {
@@ -686,7 +702,7 @@ export function executionTimeoutMs(remainingMs: number): number {
   return Math.floor(Math.min(remainingMs, EPHEMERAL_EXECUTION_TIMEOUT_MS) / 1000) * 1000;
 }
 
-function normalizeCaptureFiles(paths: readonly string[], kind: "NPM" | "MAVEN"): string[] {
+function normalizeCaptureFiles(paths: readonly string[], kind: "NPM" | "MAVEN" | "PYTHON"): string[] {
   if (paths.length > 12) throw new Error("captureFiles exceeds 12 entries");
   const result = new Set<string>(kind === "NPM" ? ["package-lock.json"] : []);
   for (const path of paths) {
