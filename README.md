@@ -347,7 +347,7 @@ Runtime image selection can be overridden for forks or staged rollouts:
 
 ```text
 AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX=ghcr.io/OWNER/agent-workspace-runtime
-AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION=3
+AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION=9
 ```
 
 When the runtime recipe changes, increment `runtime-images/version.txt` and update the application runtime image version in the same change. The runtime-image workflow refuses to publish a tag that already exists in GHCR, so an existing `vN` cannot be repurposed accidentally; publish a new version instead.
@@ -356,3 +356,7 @@ When the runtime recipe changes, increment `runtime-images/version.txt` and upda
 ## Plugin distribution
 
 See [`docs/openai-plugin-distribution.md`](docs/openai-plugin-distribution.md) for the portable ChatGPT/Codex plugin package and release build.
+
+### Python runtime support (v9)
+
+Runtime v9 includes `python`, `python3`, `pip`, `pip3`, and `python3-venv`. The image smoke test creates a virtual environment and checks pip runs as the non-root runtime user. Install project-specific locked Python dependencies (such as `rfc8785`) into a virtual environment during verification; they are not embedded in the shared image. Automatic `project_verify` remains limited to npm and Maven projects; Python-only project discovery/verification is a separate feature.
