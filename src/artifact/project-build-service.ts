@@ -19,7 +19,7 @@ export interface BuildArtifactOutput {
 
 export interface ProjectBuildResult {
   status: "PASSED";
-  projectType: "NPM" | "MAVEN" | "PYTHON" | "GRADLE";
+  projectType: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "CARGO";
   outputs: BuildArtifactOutput[];
 }
 
@@ -39,6 +39,7 @@ export class ProjectBuildService {
     if (projectType === "MAVEN") return this.buildMaven(handle, requested);
     if (projectType === "PYTHON") return this.buildPython(handle, requested);
     if (projectType === "GRADLE") return this.buildGradle(handle, requested);
+    if (projectType === "CARGO") return this.buildCargo(handle, requested);
     throw new Error(`Unsupported build project type: ${projectType}`);
   }
 
@@ -106,6 +107,45 @@ export class ProjectBuildService {
       name: path.split("/").at(-1)?.replace(/\.(jar|war)$/, "") ?? "application",
       kind: path.endsWith(".war") ? "war" : "jar"
     }));
+  }
+
+  private async buildCargo(handle: WorkspaceHandle, requested: readonly RequestedBuildOutput[]): Promise<ProjectBuildResult> {
+    const probe = await this.exec(handle, ["bash", "-lc",
+      "test -f Cargo.toml && test ! -f rust-toolchain && test ! -f rust-toolchain.toml"]);
+    if (probe.exitCode !== 0) throw new Error("Cargo.toml is required; project-defined rust-toolchain files are not yet supported");
+    // Removing release outputs guards against publishing stale binaries from the ZIP.
+    await this.mustExec(handle, ["cargo", "clean", "--release"]);
+    await this.mustExec(handle, ["cargo", "build", "--release", "--workspace"]);
+    const outputs = requested.length ? [...requested] : await this.detectCargoOutputs(handle);
+    if (!outputs.length) throw new Error("Cargo build succeeded but no binary targets were found; supply explicit outputs for library-only projects");
+    if (outputs.length > 12) throw new Error("Build produced more than 12 publishable outputs");
+    return {status:"PASSED", projectType:"CARGO", outputs: await this.collectOutputs(handle, outputs)};
+  }
+
+  private async detectCargoOutputs(handle: WorkspaceHandle): Promise<RequestedBuildOutput[]> {
+    const result = await this.exec(handle, ["cargo", "metadata", "--no-deps", "--format-version", "1"]);
+    if (result.exitCode !== 0) throw new Error(result.stderr || "Could not inspect Cargo workspace metadata");
+    let raw: unknown;
+    try { raw = JSON.parse(result.stdout); } catch { throw new Error("Invalid Cargo metadata JSON"); }
+    if (!raw || typeof raw !== "object") throw new Error("Invalid Cargo metadata");
+    const metadata = raw as {workspace_members?: unknown; packages?: unknown};
+    if (!Array.isArray(metadata.workspace_members) || !Array.isArray(metadata.packages)) throw new Error("Invalid Cargo workspace packages");
+    const members = new Set(metadata.workspace_members.filter((x):x is string=>typeof x==="string"));
+    const names = new Set<string>();
+    for (const rawPackage of metadata.packages) {
+      if (!rawPackage || typeof rawPackage !== "object") continue;
+      const pkg = rawPackage as {id?:unknown;targets?:unknown};
+      if (typeof pkg.id !== "string" || !members.has(pkg.id) || !Array.isArray(pkg.targets)) continue;
+      for (const rawTarget of pkg.targets) {
+        if (!rawTarget || typeof rawTarget !== "object") continue;
+        const target = rawTarget as {name?:unknown;kind?:unknown};
+        if (typeof target.name === "string" && Array.isArray(target.kind) && target.kind.includes("bin")) {
+          if (!/^[A-Za-z0-9_-]+$/.test(target.name)) throw new Error("Unsupported Cargo binary name");
+          names.add(target.name);
+        }
+      }
+    }
+    return [...names].sort().map(name=>({path:`target/release/${name}`,name,kind:"linux-binary"}));
   }
 
   private async buildPython(handle: WorkspaceHandle, requested: readonly RequestedBuildOutput[]): Promise<ProjectBuildResult> {

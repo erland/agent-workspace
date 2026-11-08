@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { selectProjectRoot, selectVerificationTargets, aggregateVerification } from "../src/workspace/workspace-service.js";
+import { selectProjectRoot, selectVerificationTargets, aggregateVerification, assertRuntimeCompatibility } from "../src/workspace/workspace-service.js";
 import type { ProjectAnalysis } from "../src/project/project-detector.js";
 
 function analysis(projectManifests: ProjectAnalysis["projectManifests"]): ProjectAnalysis {
@@ -85,4 +85,19 @@ test("Gradle root is selected and is included in mixed verification", () => {
   const mix=analysis([{root:"web",type:"NPM"},{root:"backend",type:"GRADLE"}]);
   assert.deepEqual(selectVerificationTargets(mix),[{root:"web",type:"NPM"},{root:"backend",type:"GRADLE"}]);
   assert.deepEqual(selectVerificationTargets(mix,"backend"),[{root:"backend",type:"GRADLE"}]);
+});
+
+test("Cargo workspace selects parent and rejects mixed-runtime verification",()=>{
+ const a=analysis([{root:"",type:"CARGO"},{root:"crates/core",type:"CARGO"}]);
+ assert.deepEqual(selectProjectRoot(a),{root:"",type:"CARGO"});
+ assert.deepEqual(selectVerificationTargets(a),[{root:"",type:"CARGO"}]);
+ assert.doesNotThrow(()=>assertRuntimeCompatibility("rust",["CARGO"]));
+ assert.throws(()=>assertRuntimeCompatibility("java21-node22",["CARGO"]),/rust:true/);
+ assert.throws(()=>assertRuntimeCompatibility("rust",["MAVEN"]),/Cargo projects only/);
+ assert.throws(()=>assertRuntimeCompatibility("rust",["CARGO","NPM"]),/separate workspaces/);
+});
+test("Cargo and Java in separate directories may be selected with an explicit root",()=>{
+ const a=analysis([{root:"backend",type:"MAVEN"},{root:"native",type:"CARGO"}]);
+ assert.deepEqual(selectVerificationTargets(a,"native"),[{root:"native",type:"CARGO"}]);
+ assert.deepEqual(selectProjectRoot(a,"backend"),{root:"backend",type:"MAVEN"});
 });

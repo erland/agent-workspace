@@ -1,4 +1,5 @@
 import type { SandboxProvider, WorkspaceHandle } from "../core/sandbox-provider.js";
+import { CargoVerifier } from "./cargo-verifier.js";
 import { MavenVerifier } from "./maven-verifier.js";
 import { GradleVerifier } from "./gradle-verifier.js";
 import { NpmVerifier } from "./npm-verifier.js";
@@ -6,7 +7,7 @@ import { PythonVerifier } from "./python-verifier.js";
 import type { ProjectVerificationResult } from "./verification-result.js";
 
 /** Verifiable project kinds. Kept separate from aggregate/detection-only types. */
-export type VerifierKind = "MAVEN" | "NPM" | "PYTHON" | "GRADLE";
+export type VerifierKind = "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO";
 
 /** Implemented by each engine; the sandbox lifecycle remains owned by WorkspaceService. */
 export interface ProjectVerifier {
@@ -61,6 +62,8 @@ export class VerifierRegistry {
 }
 
 export const defaultVerifierRegistry = new VerifierRegistry([
+  { kind: "CARGO", manifests: ["Cargo.toml"],
+    create: ({provider,projectRoot}) => new CargoVerifier(provider,{projectRoot}) },
   { kind: "GRADLE", manifests: ["build.gradle", "build.gradle.kts"],
     create: ({provider,projectRoot}) => new GradleVerifier(provider,{projectRoot}) },
   {
