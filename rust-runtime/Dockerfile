@@ -8,8 +8,8 @@ ENV CARGO_HOME=/home/agent-workspace/.cargo
 ENV RUSTUP_HOME=/home/agent-workspace/.rustup
 ENV PATH=/home/agent-workspace/.cargo/bin:$PATH
 
+## Bootstrap CA trust via signed Ubuntu apt indexes before forcing HTTPS.
 RUN set -eux; \
-    # Minimal Ubuntu base has no CA bundle yet; Ubuntu apt indices are GPG-signed. \
     apt-get update; \
     apt-get install -y --no-install-recommends ca-certificates; \
     find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -i 's|http://|https://|g' {} +; \
