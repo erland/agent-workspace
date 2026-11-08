@@ -288,3 +288,11 @@ Bas: `ubuntu:24.04` med Rust 1.99.1 installerat via Rustup som icke-root under i
 **Gränser:** Denna PR levererar endast runtimefamiljen, explicit val och build/publish-pipeline för imagen. Den deklarerar INTE Rust i `buildSystems` eller `projectDetection` förrän Cargo-verifiering och projektidentifiering genomförs i LANG-003B. På samma sätt finns inget stöd för Tauri eller Windows/macOS-artifakter än. En workspace som skapas med `rust:true` och sedan får ett befintligt npm/Maven-projekt ska inte användas för att verifiera det projektet; exekveringsmotorn förväntar sig rätt verktyg i vald image. Nästa steg kommer att ha explicit matchning mellan Cargo-projekt och runtime.
 
 För LANG-003C ska en separat Tauri-image byggas från samma versionspinnade Rust-grund och lägga till Node.js och WebKitGTK, utan att skapa kombinationer med Java-versioner.
+
+### Säkerhetsgranskning av Rust-basimagen (2026-11-08)
+
+Rust-imagen byggs på Ubuntu 24.04 och uppdaterar installerade paket före distribution. Vid första skanningen identifierade Trivy 385 HIGH/CRITICAL-fynd, **alla tilldelade paketet `linux-libc-dev`**. Det paketet innehåller Linux-kärnans utvecklingsheaders, inte den körande kärnan i Modal-sandboxen. Trivy tilldelar sårbarheter från Linux-källpaketet även till headers som inte nödvändigtvis är exponerade av den specifika CVE:n. Detta är en riskbedömning, inte ett påstående att varje fynd är felaktigt.
+
+Det separata Rust-workflowet gör därför två skanningar: (1) sparar ett **ofiltrerat** JSON-resultat i GitHub Actions-artefakten `rust-trivy-unfiltered-report`; (2) använder `rust-runtime/trivy-kernel-headers.rego` för att enbart undanta sårbarhetsfynd mot `linux-libc-dev` från den blockerande skanningen. Andra OS-/biblioteksfynd och hemlighetsfynd fortsätter att stoppa publicering. Undantaget **upphör 2026-12-08**, då workflowet automatiskt blockerar publicering tills det har omprövats eller tagits bort. Se även Trivys diskussion om kernel headers (aquasecurity/trivy#6562).
+
+Vid en framtida Rust-/Tauri-imageuppdatering ska en ny granskning av både CVE-rapport och headerbehov göras. Policyn ska inte återanvändas okritiskt i andra images.
