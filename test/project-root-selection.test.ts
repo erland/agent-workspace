@@ -32,3 +32,15 @@ test("invalid or unknown roots are rejected before execution", () => {
     assert.throws(()=>selectProjectRoot(a,p));
   }
 });
+
+test("Python-only project root is selectable for verification but not build", () => {
+  const a = analysis([{root:"backend",type:"PYTHON"}]);
+  assert.deepEqual(selectProjectRoot(a, undefined, true), {root:"backend",type:"PYTHON"});
+  assert.throws(() => selectProjectRoot(a), /Python build is not supported/);
+});
+
+test("mixed Python/Node root is not silently verified", () => {
+  const a = analysis([{root:"",type:"NPM"},{root:"",type:"PYTHON"}]);
+  assert.throws(() => selectProjectRoot(a, undefined, true), /Mixed projects require explicit projectRoot/);
+  assert.throws(() => selectProjectRoot(a, "", true), /Mixed Maven\/npm manifests/);
+});
