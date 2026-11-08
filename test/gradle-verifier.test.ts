@@ -8,6 +8,7 @@ class GradleProvider implements SandboxProvider {
   commands: Command[] = [];
   wrapper = true;
   testExit = 0;
+  testCount = 2;
   async createWorkspace(_o:CreateWorkspaceOptions):Promise<WorkspaceHandle>{return handle;}
   async uploadArchive():Promise<void>{}
   async terminate():Promise<void>{}
@@ -15,6 +16,7 @@ class GradleProvider implements SandboxProvider {
   async exec(_h:WorkspaceHandle,c:Command):Promise<ExecutionResult>{
     this.commands.push(c);
     if(c.argv[0]==="bash" && c.argv[1]==="-lc")return {exitCode:this.wrapper?0:1,stdout:"",stderr:""};
+    if(c.argv[0]==="python3" && c.argv[1]==="-c")return {exitCode:0,stdout:JSON.stringify({tests:this.testCount}),stderr:""};
     return {exitCode:this.testExit,stdout:this.testExit?"":"BUILD SUCCESSFUL",stderr:this.testExit?"FAILURE: test failed":""};
   }
 }
@@ -24,7 +26,7 @@ test("runs wrapper test in selected project root",async()=>{
   assert.equal(r.status,"PASSED");
   assert.equal(r.projectType,"GRADLE");
   assert.equal(r.steps[0]?.name,"test");
-  assert.deepEqual(p.commands[1]?.argv,["bash","./gradlew","--no-daemon","--console=plain","test"]);
+  assert.deepEqual(p.commands[1]?.argv,["bash","./gradlew","--no-daemon","--console=plain","clean","test"]);
   assert.ok(p.commands.every(c=>c.workdir==="/workspace/project/backend"));
 });
 test("wrapper is required and missing wrapper is BLOCKED",async()=>{
@@ -41,4 +43,11 @@ test("failed Gradle tests return FAILED and preserve diagnostic steps",async()=>
   assert.equal(r.failedStep,"test");
   assert.equal(r.exitCode,1);
   assert.match(r.failureSummary??"",/FAILURE|test failed/);
+});
+
+test("Gradle NO-SOURCE must be BLOCKED, never PASSED",async()=>{
+  const p=new GradleProvider();p.testCount=0;
+  const r=await new GradleVerifier(p).verify(handle);
+  assert.equal(r.status,"BLOCKED");
+  assert.match(r.failureSummary??"",/no executed tests/);
 });
