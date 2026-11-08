@@ -8,12 +8,13 @@ import { makeStoredZip } from "./zip-fixture.js";
 
 test("workspace_create accepts explicit Rust profile without Java/Node fields", () => {
   const payload = WorkspaceCreateInputSchema.parse({rust:true,lifetimeMinutes:10});
-  assert.equal(resolveRuntimeProfile(payload).id,"rust");
+  assert.equal(resolveRuntimeProfile({rust:payload.rust===true}).id,"rust");
   assert.equal(resolveRuntimeProfile({rust:false}).id,"java21-node22");
 });
 test("Rust profile rejects mixed runtime requests, leaving Java/Node default unchanged", () => {
   for(const args of [{rust:true,java:"21" as const},{rust:true,node:"22" as const},{rust:true,playwright:true}]){
-    assert.throws(()=>resolveRuntimeProfile(WorkspaceCreateInputSchema.parse(args)),/cannot be combined/);
+    WorkspaceCreateInputSchema.parse(args);
+    assert.throws(()=>resolveRuntimeProfile(args),/cannot be combined/);
   }
   assert.equal(resolveRuntimeProfile({java:"25"}).id,"java25-node22");
 });
