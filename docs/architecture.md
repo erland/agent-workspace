@@ -264,3 +264,15 @@ Agent Workspace identity (Google issuer + subject)
 ```
 
 Google credentials are never accepted directly by `/mcp`. This keeps resource/audience/scope enforcement under Agent Workspace control while retaining Google as the single human identity source.
+
+## LANG-001: Gemensamt verifieringsgränssnitt
+
+`src/verification/verifier-registry.ts` innehåller `ProjectVerifier` med metoden `verify(handle)`, ett typat `VerifierContext` samt en serverstyrd registrering av verifieringsmotorer. Existerande Maven-, npm- och Python-verifierare implementerar gränssnittet och registreras genom fabriksfunktioner. `WorkspaceService.verifyProject` väljer motor via registret, inte genom språkberoende villkor.
+
+- **Projektidentifiering** fortsätter i `project-detector.ts` och den befintliga logiken för val av projektrot och samordnad verifiering av blandprojekt kvarstår.
+- **Sandboxlivscykel, loggar och artefakter** ägs fortsatt av `WorkspaceService`. En verifierare får bara sandboxprovidern, en säker projektrot och stödjande körmiljöinformation.
+- **Säkerhet**: registreringar definieras av serverkoden. ZIP-projekt får aldrig registrera godtyckliga exekveringsmotorer.
+- **Utökning**: en ny motor implementerar `ProjectVerifier`, registreras med manifest och fabrik, och kompletteras separat med identifiering, runtimebild, byggartefakter och tester. Registret innebär inte automatiskt att projektidentifiering eller `project_build` kan hantera en ny typ.
+
+LANG-001 ändrar inte det publika MCP-kontraktet eller den befintliga logiken för Maven, npm och Python. Gradle följer i ett separat steg.
+
