@@ -276,3 +276,15 @@ Google credentials are never accepted directly by `/mcp`. This keeps resource/au
 
 LANG-001 ändrar inte det publika MCP-kontraktet eller den befintliga logiken för Maven, npm och Python. Gradle följer i ett separat steg.
 
+
+## LANG-003A: Separat Rust-runtime som framtida Tauri-bas
+
+Agent Workspace har en ny frivillig runtimeprofil `rust`, vald genom `workspace_create({rust:true})`. Den återanvänder `RuntimeProfile`, sandboxisolering och profilbaserad `imageRef` från Playwright utan att ha Java eller Node installerat. `rust:true` går inte att kombinera med Java-/Node-versioner eller Playwright. Standardprofilen `java21-node22` ändras inte.
+
+Den publicerade containern är `ghcr.io/erland/agent-workspace-runtime:rust-v1`. Versionen kommer från `rust-runtime/version.txt` och är **oberoende** av Java/Node-bildernas `runtime-images/version.txt` (i nuläget v9). Byggning, Cargo-smoketester som icke-root och Trivy-skanning görs i det egna arbetsflödet `.github/workflows/rust-runtime.yml`. På main publiceras imagen efter validering, och befintliga taggar får inte skrivas över. Ändra Rust-version och öka Rust-imageversion vid nästa uppdatering.
+
+Bas: `rust:1.99.1-bookworm` med Rustup, Cargo, Clippy, rustfmt, GCC, OpenSSL-utvecklingsbibliotek, Python, git och vanliga verktyg. `/workspace` ägs av den obehöriga användaren `agent-workspace`. Rustup/Cargo-hemkatalogerna kan användas i sandboxen, men projektbaserat verktygskedjeval får separat policystyrning i LANG-003B.
+
+**Gränser:** Denna PR levererar endast runtimefamiljen, explicit val och build/publish-pipeline för imagen. Den deklarerar INTE Rust i `buildSystems` eller `projectDetection` förrän Cargo-verifiering och projektidentifiering genomförs i LANG-003B. På samma sätt finns inget stöd för Tauri eller Windows/macOS-artifakter än. En workspace som skapas med `rust:true` och sedan får ett befintligt npm/Maven-projekt ska inte användas för att verifiera det projektet; exekveringsmotorn förväntar sig rätt verktyg i vald image. Nästa steg kommer att ha explicit matchning mellan Cargo-projekt och runtime.
+
+För LANG-003C ska en separat Tauri-image byggas från samma versionspinnade Rust-grund och lägga till Node.js och WebKitGTK, utan att skapa kombinationer med Java-versioner.
