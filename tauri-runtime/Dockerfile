@@ -28,7 +28,7 @@ RUN set -eux; \
     pkg-config --modversion webkit2gtk-4.1; \
     pkg-config --modversion ayatana-appindicator3-0.1; \
     pkg-config --modversion librsvg-2.0; \
-    pkg-config --modversion xdo
+    test -f /usr/include/xdo.h
 
 USER agent-workspace
 WORKDIR /workspace
