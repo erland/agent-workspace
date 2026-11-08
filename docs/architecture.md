@@ -296,3 +296,13 @@ Rust-imagen byggs på Ubuntu 24.04 och uppdaterar installerade paket före distr
 Det separata Rust-workflowet gör därför två skanningar: (1) sparar ett **ofiltrerat** JSON-resultat i GitHub Actions-artefakten `rust-trivy-unfiltered-report`; (2) använder `rust-runtime/trivy-kernel-headers.rego` för att enbart undanta sårbarhetsfynd mot `linux-libc-dev` från den blockerande skanningen. Andra OS-/biblioteksfynd och hemlighetsfynd fortsätter att stoppa publicering. Undantaget **upphör 2026-12-08**, då workflowet automatiskt blockerar publicering tills det har omprövats eller tagits bort. Se även Trivys diskussion om kernel headers (aquasecurity/trivy#6562).
 
 Vid en framtida Rust-/Tauri-imageuppdatering ska en ny granskning av både CVE-rapport och headerbehov göras. Policyn ska inte återanvändas okritiskt i andra images.
+
+## LANG-003B: Cargo verifiering och byggning
+
+`Cargo.toml` identifierar Rust/Cargo-projekt. Cargo-workspaces identifieras med manifest för roten och medlemmar; verifiering av en överordnad workspace kör `--workspace`, så samma medlemmar inte verifieras separat en gång till. Det finns ingen Java-/Node-koppling till Cargo och runtimeprofilen `rust` måste väljas uttryckligen i `workspace_create({rust:true})`.
+
+`project_verify` kör `cargo fmt --all -- --check`, `cargo check --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings` och `cargo test --workspace --all-targets`. Testkommandot måste faktiskt rapportera minst ett exekverat test för PASS. Fel på något steg blir FAILED; inga testfall blir BLOCKED. Rust-kompilatorn är versionslåst i runtime-imagen och projektets `rust-toolchain`/`rust-toolchain.toml` blockeras i detta steg för att undvika okontrollerade automatiska nedladdningar. Policy för projektstyrd Rust-version tas separat när behöriga toolchains definierats.
+
+`project_build` rensar tidigare releaseutdata med `cargo clean --release`, kör `cargo build --release --workspace`, och använder `cargo metadata --no-deps --format-version 1` för att samla verkliga `bin`-targets från workspace-medlemmar. Utdata `target/release/<binary>` publiceras som `linux-binary` med befintliga artefaktgränser och signerade nedladdningslänkar. Projekt som enbart bygger bibliotek behöver ange explicita utdata; inga fiktiva binärer publiceras.
+
+Ett logiskt workspace kan för närvarande enbart ha **en** runtimeimage. Blandprojekt med Cargo och Maven/npm/Python/Gradle avvisas därför vid samordnad verifiering med ett tydligt fel, och användaren väljer separata projektrotsval och workspaces. Detta undviker ett falskt PASS och kommer att ersättas av samordning av flera sandboxar i ett senare steg. Kompletta Tauri-projekt kräver en separat Tauri-runtime (LANG-003C).
