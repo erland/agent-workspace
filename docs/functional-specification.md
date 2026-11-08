@@ -49,9 +49,12 @@ För Maven-projekt ska tjänsten kunna köra test och package. Maven wrapper ska
 ### FR-008 – npm verification
 För npm-projekt ska tjänsten kunna installera dependencies, köra test när test-script finns och köra build när build-script finns. `npm ci` ska föredras när lämplig lockfile finns.
 
+### FR-016 – Python verification (PY-002)
+Python-projekt med eget projektroot ska verifieras i en ephemeral Modal-sandbox med isolerad virtuell miljö. `requirements.txt` och/eller `pyproject.toml` används vid installation. `uv.lock` utan requirements-fil ger BLOCKED tills uv-stöd implementerats. Kör pytest om installerad, annars unittest discovery. Saknade tester eller omöjlig testidentifiering ska ge BLOCKED, aldrig PASS. Pip-installationsfel ger FAILED med begränsade/redigerade loggar. Blandprojekt kräver explicit projectRoot tills PY-003.
+
 ### FR-009 – Structured verification result
 Verifiering ska returnera minst:
-- `PASSED` eller `FAILED`,
+- `PASSED`, `FAILED` eller `BLOCKED`,
 - projekttyp,
 - vald runtime,
 - utförda steg,
@@ -132,7 +135,7 @@ V1 är funktionellt accepterad när en autentiserad testanvändare med anslutet 
 - en användare med flera samtidiga providers,
 - Gradle,
 - pnpm/yarn,
-- Python verification/build workflows (projektidentifiering ingår från PY-001),
+- Python wheel/sdist builds and coordinated mixed-project verification (Python test verification is available from PY-002),
 - Git repository integration,
 - CI/CD-plattform,
 - permanent project hosting,
