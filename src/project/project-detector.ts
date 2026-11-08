@@ -10,7 +10,7 @@ import {
 import { readZipTextEntries } from "../archive/zip-entry-reader.js";
 import type { ArchiveValidationResult } from "../archive/archive-validator.js";
 
-export type ProjectType = "MAVEN" | "NPM" | "MAVEN_NPM" | "UNKNOWN";
+export type ProjectType = "MAVEN" | "NPM" | "PYTHON" | "MAVEN_NPM" | "MIXED" | "UNKNOWN";
 
 export interface RuntimeDetection<T extends string> {
   version: T;
@@ -32,7 +32,7 @@ export interface ProjectWarning {
 export interface ProjectAnalysis {
   projectType: ProjectType;
   projectRoots: readonly string[];
-  projectManifests: readonly { root: string; type: "MAVEN" | "NPM" }[];
+  projectManifests: readonly { root: string; type: "MAVEN" | "NPM" | "PYTHON" }[];
   java?: RuntimeDetection<string>;
   node?: RuntimeDetection<string>;
   recommendedRuntime: {
@@ -57,21 +57,19 @@ export function analyzeProjectArchive(
 
   const pomPaths = candidates.pomPaths;
   const packagePaths = candidates.packagePaths;
-  const projectType: ProjectType =
-    pomPaths.length > 0 && packagePaths.length > 0
-      ? "MAVEN_NPM"
-      : pomPaths.length > 0
-        ? "MAVEN"
-        : packagePaths.length > 0
-          ? "NPM"
-          : "UNKNOWN";
+  const pythonPaths = candidates.pythonPaths;
+  const kinds = [pomPaths.length > 0 ? "MAVEN" : undefined, packagePaths.length > 0 ? "NPM" : undefined, pythonPaths.length > 0 ? "PYTHON" : undefined].filter(Boolean);
+  const projectType: ProjectType = kinds.length === 0 ? "UNKNOWN"
+    : kinds.length === 1 ? kinds[0] as ProjectType
+    : kinds.length === 2 && !kinds.includes("PYTHON") ? "MAVEN_NPM" : "MIXED";
 
-  const manifests = [...pomPaths.map(path => ({ root: parentPath(path), type: "MAVEN" as const })), ...packagePaths.map(path => ({ root: parentPath(path), type: "NPM" as const }))];
+  const manifests = [...pomPaths.map(path => ({ root: parentPath(path), type: "MAVEN" as const })), ...packagePaths.map(path => ({ root: parentPath(path), type: "NPM" as const })),
+    ...pythonPaths.map(path => ({ root: parentPath(path), type: "PYTHON" as const }))];
   const roots = [...new Set(manifests.map(item => item.root))].sort();
-  if (pomPaths.length > 1 || packagePaths.length > 1) {
+  if (pomPaths.length > 1 || packagePaths.length > 1 || new Set(pythonPaths.map(parentPath)).size > 1) {
     warnings.push({
       code: "AMBIGUOUS_PROJECT",
-      message: `Multiple project manifests detected (${pomPaths.length} pom.xml, ${packagePaths.length} package.json)`
+      message: `Multiple project manifests detected (${pomPaths.length} pom.xml, ${packagePaths.length} package.json, ${pythonPaths.length} Python manifests)`
     });
   }
 
@@ -124,13 +122,19 @@ export function analyzeProjectArchive(
 function discoverMetadataPaths(validation: ArchiveValidationResult): {
   pomPaths: string[];
   packagePaths: string[];
+  pythonPaths: string[];
   nodeVersionPaths: string[];
   metadataPaths: string[];
 } {
   const paths = validation.entries.filter((entry) => !entry.directory).map((entry) => entry.path);
   const pomPaths = paths.filter((path) => basename(path) === "pom.xml" && !ignoredPath(path)).sort();
   const packagePaths = paths.filter((path) => basename(path) === "package.json" && !ignoredPath(path)).sort();
-  const roots = [...new Set([...pomPaths, ...packagePaths].map(parentPath))];
+  const pythonPaths = paths.filter(path =>
+    ["pyproject.toml", "requirements.txt", "uv.lock"].includes(basename(path)) && !ignoredPath(path)
+  ).sort();
+  // Multiple Python metadata files in one directory represent a single project.
+  const selectedPythonPaths = [...new Map(pythonPaths.map(path => [parentPath(path), path])).values()];
+  const roots = [...new Set([...pomPaths, ...packagePaths, ...selectedPythonPaths].map(parentPath))];
   const nodeVersionPaths = paths.filter((path) => {
     const base = basename(path);
     if (base !== ".nvmrc" && base !== ".node-version") return false;
@@ -140,6 +144,7 @@ function discoverMetadataPaths(validation: ArchiveValidationResult): {
   return {
     pomPaths,
     packagePaths,
+    pythonPaths: selectedPythonPaths,
     nodeVersionPaths,
     metadataPaths: [...new Set([...pomPaths, ...packagePaths, ...nodeVersionPaths])]
   };
@@ -273,7 +278,7 @@ function parentPath(path: string): string {
 
 function ignoredPath(path: string): boolean {
   const normalized = `/${path.replaceAll("\\", "/")}/`;
-  return normalized.includes("/node_modules/") || normalized.includes("/target/") || normalized.includes("/.git/");
+  return ["/node_modules/", "/target/", "/.git/", "/.venv/", "/venv/", "/site-packages/", "/__pycache__/", "/dist/"].some(part => normalized.includes(part));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
