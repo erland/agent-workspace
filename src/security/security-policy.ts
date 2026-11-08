@@ -19,6 +19,8 @@ export const DEFAULT_DEPENDENCY_DOMAINS = [
   "security.ubuntu.com",
   "deb.nodesource.com",
   "registry.npmjs.org",
+  "pypi.org",
+  "files.pythonhosted.org",
   "repo.maven.apache.org",
   "repo1.maven.org",
   "github.com",
