@@ -3,9 +3,18 @@ set -euo pipefail
 
 # Runs as the runtime image's unprivileged user.
 test "$(id -u)" -ne 0
-for executable in java javac mvn node npm pnpm git python3 jq zip unzip tar gzip; do
+for executable in java javac mvn node npm pnpm git python python3 pip pip3 jq zip unzip tar gzip; do
   command -v "$executable" >/dev/null
 done
+python --version
+python3 -m pip --version
+# Verify Python packaging works offline, under the same unprivileged user as Modal.
+python_probe_root="$(mktemp -d)"
+trap 'rm -rf "$python_probe_root"' EXIT
+python3 -m venv "$python_probe_root/venv"
+"$python_probe_root/venv/bin/python" -m pip --version
+"$python_probe_root/venv/bin/python" -c "import sys; assert sys.prefix != sys.base_prefix"
+
 node -e 'const x=require("node:assert/strict");x.equal(2+2,4)'
 printf '{"pass":true}\n' | jq -e '.pass == true' >/dev/null
 
