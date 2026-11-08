@@ -67,13 +67,12 @@ export function resolveRuntimeProfile(request: RuntimeRequest = {}): RuntimeProf
     return RUNTIME_PROFILES["tauri-linux"];
   }
   if (request.rust === true) {
-    if (request.java !== undefined || request.node !== undefined || request.playwright === true || request.tauri === true) {
+    if (request.java !== undefined || request.node !== undefined || request.playwright === true ) {
       throw new Error("Rust runtime cannot be combined with Java, Node or Playwright runtime options");
     }
     return RUNTIME_PROFILES.rust;
   }
   if (request.playwright) {
-    if (request.tauri === true) throw new Error("Playwright cannot be combined with Tauri");
     if ((request.java !== undefined && request.java !== "21") || (request.node !== undefined && request.node !== "22")) {
       throw new Error("Playwright runtime requires Java 21 and Node 22");
     }
