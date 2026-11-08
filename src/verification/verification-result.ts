@@ -13,7 +13,7 @@ export interface VerificationStepResult {
 
 export interface ProjectVerificationResult {
   status: VerificationStatus;
-  projectType: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "MIXED";
+  projectType: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "CARGO" | "MIXED";
   /** Results for every required verifier in a coordinated mixed-project run. */
   subResults?: readonly { projectRoot: string; result: ProjectVerificationResult }[];
   durationMs: number;
