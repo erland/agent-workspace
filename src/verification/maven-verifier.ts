@@ -1,3 +1,4 @@
+import type { ProjectVerifier } from "./verifier-registry.js";
 import type {
   Command,
   SandboxProvider,
@@ -20,7 +21,7 @@ export interface MavenVerifierOptions {
 const DEFAULT_PROJECT_ROOT = "/workspace/project";
 const DEFAULT_COMMAND_TIMEOUT_MS = 5 * 60_000;
 
-export class MavenVerifier {
+export class MavenVerifier implements ProjectVerifier {
   private readonly projectRoot: string;
   private readonly commandTimeoutMs: number;
   private readonly maxStepLogChars: number | undefined;
