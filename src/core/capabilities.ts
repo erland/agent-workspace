@@ -23,8 +23,8 @@ export interface AgentWorkspaceCapabilities {
     };
     rust: { available: boolean; profile: "rust"; };
   };
-  buildSystems: readonly ["maven", "npm", "python", "gradle"];
-  projectDetection: { supported: readonly ["maven", "npm", "python", "gradle"]; };
+  buildSystems: readonly ["maven", "npm", "python", "gradle", "cargo"];
+  projectDetection: { supported: readonly ["maven", "npm", "python", "gradle", "cargo"]; };
   workspace: {
     defaultLifetimeMinutes: number;
     maxLifetimeMinutes: number;
