@@ -24,6 +24,8 @@ COPY --from=node-toolchain /usr/local/lib/node_modules /usr/local/lib/node_modul
 RUN set -eux; \
     ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm; \
     ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx; \
+    # Upgrade bundled npm to a pinned patched CLI release, reducing vulnerable transitive packages. \
+    npm install --global npm@11.21.2 --no-audit --no-fund; \
     node --version; npm --version; \
     pkg-config --modversion webkit2gtk-4.1; \
     pkg-config --modversion ayatana-appindicator3-0.1; \
