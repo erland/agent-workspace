@@ -662,8 +662,8 @@ export function assertRuntimeCompatibility(runtime: RuntimeProfileId, kinds: rea
   if (hasCargo && hasOther) {
     throw new Error("Mixed Cargo and non-Cargo projects require separate workspaces and runtime images; select a projectRoot and use the matching runtime");
   }
-  if (hasCargo && runtime !== "rust") {
-    throw new Error("Cargo projects require workspace_create({rust:true}); current workspace uses " + runtime);
+  if (hasCargo && runtime !== "rust" && runtime !== "tauri-linux") {
+    throw new Error("Cargo projects require workspace_create({rust:true}) or workspace_create({tauri:true}); current workspace uses " + runtime);
   }
   if (!hasCargo && runtime === "rust") {
     throw new Error("Rust runtime supports Cargo projects only; choose a Java/Node runtime for this project");
