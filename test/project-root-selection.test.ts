@@ -101,3 +101,14 @@ test("Cargo and Java in separate directories may be selected with an explicit ro
  assert.deepEqual(selectVerificationTargets(a,"native"),[{root:"native",type:"CARGO"}]);
  assert.deepEqual(selectProjectRoot(a,"backend"),{root:"backend",type:"MAVEN"});
 });
+
+test("Tauri runtime coordinates frontend npm and Cargo without allowing Java/Python", () => {
+ const a=analysis([{root:"",type:"NPM"},{root:"src-tauri",type:"CARGO"}]);
+ assert.deepEqual(selectVerificationTargets(a),[{root:"",type:"NPM"},{root:"src-tauri",type:"CARGO"}]);
+ assert.doesNotThrow(()=>assertRuntimeCompatibility("tauri-linux",["NPM","CARGO"]));
+ assert.doesNotThrow(()=>assertRuntimeCompatibility("tauri-linux",["CARGO"]));
+ assert.doesNotThrow(()=>assertRuntimeCompatibility("tauri-linux",["NPM"]));
+ assert.throws(()=>assertRuntimeCompatibility("rust",["NPM","CARGO"]),/separate workspaces/);
+ assert.throws(()=>assertRuntimeCompatibility("tauri-linux",["CARGO","MAVEN"]),/separate workspaces/);
+ assert.throws(()=>assertRuntimeCompatibility("tauri-linux",["CARGO","PYTHON"]),/separate workspaces/);
+});
