@@ -12,6 +12,23 @@ function analyze(entries: Array<{ path: string; content: string }>, runtime: Run
 }
 
 describe("project/runtime detection", () => {
+  it("detects Cargo manifest at root and nested roots and ignores target output", () => {
+    const root = analyze([{path:"Cargo.toml",content:'[package]\nname="demo"'}],"rust");
+    assert.equal(root.projectType,"CARGO");
+    assert.deepEqual(root.projectManifests,[{root:"",type:"CARGO"}]);
+    const nested = analyze([{path:"src-tauri/Cargo.toml",content:"[package]"},{path:"target/cache/Cargo.toml",content:"ignored"}],"rust");
+    assert.equal(nested.projectType,"CARGO");
+    assert.deepEqual(nested.projectManifests,[{root:"src-tauri",type:"CARGO"}]);
+  });
+  it("detects Cargo workspaces and mixed Java/Cargo metadata without hiding types", () => {
+    const workspace = analyze([{path:"Cargo.toml",content:"[workspace]"},{path:"crates/core/Cargo.toml",content:"[package]"}],"rust");
+    assert.equal(workspace.projectType,"CARGO");
+    assert.deepEqual(workspace.projectManifests,[{root:"",type:"CARGO"},{root:"crates/core",type:"CARGO"}]);
+    const mixed = analyze([{path:"service/pom.xml",content:"<project/>"},{path:"native/Cargo.toml",content:"[package]"}]);
+    assert.equal(mixed.projectType,"MIXED");
+    assert.deepEqual(mixed.projectManifests,[{root:"service",type:"MAVEN"},{root:"native",type:"CARGO"}]);
+  });
+
   it("recognizes Gradle Groovy and Kotlin builds and groups duplicate DSL manifests", () => {
     const groovy = analyze([{path:"backend/build.gradle",content:"plugins { id 'java' }"}]);
     assert.equal(groovy.projectType,"GRADLE");
