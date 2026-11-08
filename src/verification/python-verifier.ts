@@ -1,3 +1,4 @@
+import type { ProjectVerifier } from "./verifier-registry.js";
 import type { Command, SandboxProvider, WorkspaceHandle } from "../core/sandbox-provider.js";
 import { boundLog, failureExcerpt, failureSummary } from "./log-bounds.js";
 import type { ProjectVerificationResult, VerificationStepResult } from "./verification-result.js";
@@ -29,7 +30,7 @@ interface Inspection {
   pytest: boolean;
 }
 
-export class PythonVerifier {
+export class PythonVerifier implements ProjectVerifier {
   private readonly root: string;
   private readonly nowMs: () => number;
   private readonly installTimeoutMs: number;
