@@ -6,10 +6,11 @@ npm --version
 rustc --version | grep -F '1.99.1'
 cargo fmt --version
 cargo clippy --version
-for lib in webkit2gtk-4.1 ayatana-appindicator3-0.1 librsvg-2.0 xdo; do
+for lib in webkit2gtk-4.1 ayatana-appindicator3-0.1 librsvg-2.0; do
   pkg-config --exists "$lib"
   pkg-config --modversion "$lib"
 done
+test -f /usr/include/xdo.h
 root="$(mktemp -d)"
 trap 'rm -rf "$root"' EXIT
 cd "$root"
