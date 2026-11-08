@@ -269,3 +269,65 @@ describe("WorkspaceService ZIP upload", () => {
     assert.equal(provider.uploads, 0);
   });
 });
+
+
+describe("PY-003 mixed project verification", () => {
+  class MixedProvider extends FakeProvider {
+    constructor(private readonly failPython = false) { super(); }
+    override async exec(_handle: WorkspaceHandle, command: Command): Promise<ExecutionResult> {
+      this.commands.push(command);
+      const argv = command.argv;
+      if (argv[0] === "node" && argv[1] === "-e") {
+        return {exitCode:0,stdout:JSON.stringify({hasPackageLock:false,scripts:{test:"node --test"}}),stderr:""};
+      }
+      if ((argv[0] === "python3" || argv[0] === ".agent-workspace-venv/bin/python") && argv[1] === "-c") {
+        if (argv[2]?.includes("from pathlib import Path")) {
+          return {exitCode:0,stdout:JSON.stringify({requirements:true,pyproject:false,uvlock:false,tests:true,pytest:false}),stderr:""};
+        }
+        return {exitCode:0,stdout:"tests\n",stderr:""};
+      }
+      if (argv.includes("unittest")) {
+        return this.failPython
+          ? {exitCode:1,stdout:"",stderr:"AssertionError: expected equal"}
+          : {exitCode:0,stdout:"",stderr:"Ran 1 test\nOK"};
+      }
+      return {exitCode:0,stdout:"ok",stderr:""};
+    }
+  }
+
+  async function verify(failPython: boolean) {
+    const provider = new MixedProvider(failPython);
+    const service = new WorkspaceService(provider, {
+      idFactory: () => "ws_mixed_py003", schedule: () => ({})
+    });
+    await service.create();
+    const archive = makeStoredZip([
+      {path:"package.json",content:JSON.stringify({scripts:{test:"node --test"}})},
+      {path:"backend/requirements.txt",content:""},
+      {path:"backend/tests/test_example.py",content:"import unittest"}
+    ]);
+    await service.uploadZip("ws_mixed_py003", archive);
+    return {provider, result: await service.verifyProject("ws_mixed_py003")};
+  }
+
+  it("runs npm and Python in one sandbox with independent steps", async () => {
+    const {provider,result} = await verify(false);
+    assert.equal(result.projectType,"MIXED");
+    assert.equal(result.status,"PASSED");
+    assert.deepEqual(result.subResults?.map(x=>[x.projectRoot,x.result.status]),[["","PASSED"],["backend","PASSED"]]);
+    assert.equal(provider.creates.length,1);
+    assert.equal(provider.terminated.length,1);
+    assert.ok(provider.commands.some(c=>c.argv[0]==="npm"));
+    assert.ok(provider.commands.some(c=>c.argv.includes("unittest")));
+    assert.ok(provider.commands.filter(c=>c.argv.includes("unittest")).every(c=>c.workdir==="/workspace/project/backend"));
+  });
+
+  it("returns FAILED when Python fails even when npm passes", async () => {
+    const {result,provider} = await verify(true);
+    assert.equal(result.status,"FAILED");
+    assert.equal(result.projectType,"MIXED");
+    assert.deepEqual(result.subResults?.map(x=>x.result.status),["PASSED","FAILED"]);
+    assert.equal(result.failedStep,"python:backend:test");
+    assert.equal(provider.terminated.length,1);
+  });
+});
