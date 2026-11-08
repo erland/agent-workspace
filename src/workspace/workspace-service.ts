@@ -290,6 +290,7 @@ export class WorkspaceService {
     const workspace = await this.requireReadyProject(workspaceId, "build");
     const selected = selectProjectRoot(workspace.project!.analysis, projectRoot);
     const projectType = selected.type;
+    if (projectType === "PYTHON") throw new Error("Python build is not yet supported");
     const log: string[] = [];
     const capture = normalizeCaptureFiles(captureFiles, projectType);
     const lifecycle: Partial<ExecutionDiagnostics> = {};
