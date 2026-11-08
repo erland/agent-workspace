@@ -21,6 +21,7 @@ mod tests {
     #[test] fn it_adds() { assert_eq!(super::sum(2, 3), 5); }
 }
 RS
+cargo fmt
 cargo fmt --check
 cargo check --offline
 cargo test --offline
