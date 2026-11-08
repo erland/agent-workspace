@@ -24,10 +24,8 @@ import type { ArtifactRepository, WorkspaceRepository } from "../persistence/rep
 import type { ArtifactRecord, PersistedWorkspace } from "../persistence/models.js";
 import { ArtifactService } from "../artifact/artifact-service.js";
 import { ProjectBuildService, type RequestedBuildOutput } from "../artifact/project-build-service.js";
-import { NpmVerifier } from "../verification/npm-verifier.js";
-import { PythonVerifier } from "../verification/python-verifier.js";
-import { MavenVerifier } from "../verification/maven-verifier.js";
 import type { ProjectVerificationResult } from "../verification/verification-result.js";
+import { defaultVerifierRegistry } from "../verification/verifier-registry.js";
 import { analyzeProjectArchive, type ProjectAnalysis } from "../project/project-detector.js";
 import {
   resolveRuntimeProfile,
@@ -251,11 +249,11 @@ export class WorkspaceService {
       for (const target of targets) {
         let result: ProjectVerificationResult;
         try {
-          result = target.type === "NPM"
-            ? await new NpmVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(target.root), playwrightRuntime: workspace.runtimeProfile === "playwright-chromium-node22" }).verify(handle)
-            : target.type === "PYTHON"
-              ? await new PythonVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(target.root) }).verify(handle)
-              : await new MavenVerifier(recorder, { projectRoot: resolveWorkspaceProjectRoot(target.root) }).verify(handle);
+          result = await defaultVerifierRegistry.create(target.type, {
+            provider: recorder,
+            projectRoot: resolveWorkspaceProjectRoot(target.root),
+            playwrightRuntime: workspace.runtimeProfile === "playwright-chromium-node22"
+          }).verify(handle);
         } catch (error) {
           result = { status: "FAILED", projectType: target.type, durationMs: 0, steps: [], failureSummary: String(error) };
           log.push(`Verification error [${target.type}:${target.root || "."}]: ${String(error)}`);
