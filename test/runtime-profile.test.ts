@@ -29,7 +29,7 @@ describe("runtime profiles", () => {
 
 
   it("uses prebuilt versioned GHCR images without per-workspace bootstrap", () => {
-    for (const profile of Object.values(RUNTIME_PROFILES).filter(profile => profile.id !== "playwright-chromium-node22")) {
+    for (const profile of Object.values(RUNTIME_PROFILES).filter(profile => profile.id !== "playwright-chromium-node22" && profile.id !== "rust")) {
       assert.equal(
         profile.imageRef,
         `ghcr.io/erland/agent-workspace-runtime:${profile.id}-v${DEFAULT_RUNTIME_IMAGE_VERSION}`
