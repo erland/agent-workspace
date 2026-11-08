@@ -23,6 +23,7 @@ export interface AgentWorkspaceCapabilities {
     };
   };
   buildSystems: readonly ["maven", "npm"];
+  projectDetection: { supported: readonly ["maven", "npm", "python"]; };
   workspace: {
     defaultLifetimeMinutes: number;
     maxLifetimeMinutes: number;
@@ -52,6 +53,7 @@ export function getCapabilities(): AgentWorkspaceCapabilities {
       }
     },
     buildSystems: ["maven", "npm"],
+    projectDetection: { supported: ["maven", "npm", "python"] },
     workspace: {
       defaultLifetimeMinutes: 60,
       maxLifetimeMinutes: 60,
