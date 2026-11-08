@@ -22,7 +22,8 @@ describe("runtime profiles", () => {
       "java21-node22",
       "java25-node20",
       "java25-node22",
-      "playwright-chromium-node22"
+      "playwright-chromium-node22",
+      "rust"
     ]);
   });
 
@@ -42,6 +43,19 @@ describe("runtime profiles", () => {
     assert.equal(profile.imageRef, `ghcr.io/erland/agent-workspace-runtime:playwright-chromium-node22-v${DEFAULT_RUNTIME_IMAGE_VERSION}`);
     assert.throws(() => resolveRuntimeProfile({ playwright: true, java: "25" }), /requires Java 21 and Node 22/);
   });
+  it("selects a dedicated Rust image without Java and Node, independently versioned", () => {
+    const p = resolveRuntimeProfile({rust:true});
+    assert.equal(p.id,"rust");
+    assert.equal(p.java,undefined);
+    assert.equal(p.node,undefined);
+    assert.equal(p.imageRef,"ghcr.io/erland/agent-workspace-runtime:rust-v1");
+    assert.deepEqual(p.bootstrapCommands,[]);
+    for (const input of [{rust:true,java:"21" as const},{rust:true,node:"22" as const},{rust:true,playwright:true}]) {
+      assert.throws(()=>resolveRuntimeProfile(input),/cannot be combined/);
+    }
+    assert.equal(resolveRuntimeProfile().id,"java21-node22");
+  });
+
   it("resolves an explicitly requested Java 25 / Node 20 runtime", () => {
     const profile = resolveRuntimeProfile({ java: "25", node: "20" });
     assert.equal(profile.id, "java25-node20");
