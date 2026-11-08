@@ -44,9 +44,10 @@ function validPath(path: string) {
 
 function extractArchiveFile(data: Uint8Array, filename: string, path: string): Uint8Array {
   validPath(path);
-  if (filename.endsWith(".zip")) return zipEntry(data, path);
+  // Python wheels are ZIP archives; preserve the same validated ZIP entry path.
+  if (filename.endsWith(".zip") || filename.endsWith(".whl")) return zipEntry(data, path);
   if (filename.endsWith(".tar.gz") || filename.endsWith(".tgz")) return tarEntry(data, path);
-  throw new Error("Requested artifact is not ZIP or tar.gz");
+  throw new Error("Requested artifact is not ZIP, wheel or tar.gz");
 }
 
 function zipEntry(data: Uint8Array, path: string): Uint8Array {

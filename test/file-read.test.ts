@@ -76,3 +76,25 @@ it("reads a binary ZIP entry in Base64 without UTF-8 decoding", () => {
   assert.equal(Buffer.from(result.content, "base64").toString("utf8"), "PN");
   assert.equal(result.nextOffset, 2);
 });
+
+
+it("reads Python wheel members with the same validated ZIP handling", () => {
+  const wheel = makeStoredZip([
+    {path: "awsmoke/__init__.py", content: "def answer():\n    return 'WHEEL_OK'\n"},
+    {path: "awsmoke-0.2.0.dist-info/METADATA", content: "Metadata-Version: 2.1\nName: awsmoke\nVersion: 0.2.0\n"}
+  ]);
+  assert.equal(readTextFile(wheel, "awsmoke-0.2.0-py3-none-any.whl", "awsmoke/__init__.py").text,
+    "def answer():\n    return 'WHEEL_OK'\n");
+  const binary = readBinaryFile(wheel, "awsmoke-0.2.0-py3-none-any.whl", "awsmoke-0.2.0.dist-info/METADATA", 0, 8);
+  assert.equal(Buffer.from(binary.content, "base64").toString("utf8"), "Metadata");
+  assert.equal(binary.nextOffset, 8);
+  assert.throws(() => readTextFile(wheel, "awsmoke-0.2.0-py3-none-any.whl", "../secret"), /Invalid archive path/);
+  assert.throws(() => readTextFile(wheel, "awsmoke-0.2.0-py3-none-any.whl", "missing.py"), /File not found in ZIP/);
+});
+
+it("reads wheel artifacts as raw binary without requiring an archive-entry path", () => {
+  const wheel = makeStoredZip([{path:"awsmoke/__init__.py",content:"pass\n"}]);
+  const page = readBinaryFile(wheel,"awsmoke-0.2.0-py3-none-any.whl",undefined,0,4);
+  assert.deepEqual(Buffer.from(page.content,"base64"),wheel.subarray(0,4));
+  assert.equal(page.sizeBytes,wheel.byteLength);
+});
