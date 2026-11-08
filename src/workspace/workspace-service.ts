@@ -293,7 +293,7 @@ export class WorkspaceService {
     outputs: readonly RequestedBuildOutput[] = [],
     captureFiles: readonly string[] = [],
     projectRoot?: string
-  ): Promise<{ status: "PASSED" | "FAILED"; projectType: "NPM" | "MAVEN" | "PYTHON"; artifacts: ArtifactRecord[]; logArtifact: ArtifactRecord; failureSummary?: string; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
+  ): Promise<{ status: "PASSED" | "FAILED"; projectType: "NPM" | "MAVEN" | "PYTHON" | "GRADLE"; artifacts: ArtifactRecord[]; logArtifact: ArtifactRecord; failureSummary?: string; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
     const workspace = await this.requireReadyProject(workspaceId, "build");
     const selected = selectProjectRoot(workspace.project!.analysis, projectRoot, true);
     const projectType = selected.type;
@@ -653,7 +653,7 @@ function cloneWorkspace(workspace: Workspace): Workspace {
   };
 }
 
-export type VerificationTarget = { root: string; type: "MAVEN" | "NPM" | "PYTHON" };
+export type VerificationTarget = { root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" };
 
 /** One required verifier per detected build system and project root. */
 export function selectVerificationTargets(
@@ -669,9 +669,9 @@ export function selectVerificationTargets(
   if (candidates.length === 0) {
     throw new Error(`No project manifest for projectRoot ${JSON.stringify(requested)}. Available: ${manifests.map(x => x.root || ".").join(", ")}`);
   }
-  const hasPythonMix = new Set(candidates.map(x => x.type)).size > 1 && candidates.some(x => x.type === "PYTHON");
+  const hasPythonMix = new Set(candidates.map(x => x.type)).size > 1 && candidates.some(x => x.type === "PYTHON" || x.type === "GRADLE");
   if (!hasPythonMix) return [selectProjectRoot(analysis, requested, true)];
-  // A parent's Maven reactor/npm workspace is responsible for children of
+  // Parent Maven/Gradle reactors and npm workspaces are responsible for children of
   // the same build system. Python remains independently required.
   const selected = candidates.filter(item => !candidates.some(parent =>
     parent !== item && parent.type === item.type && parent.root !== item.root &&
@@ -711,7 +711,7 @@ export function selectProjectRoot(
   analysis: NonNullable<Workspace["project"]>["analysis"],
   requested?: string,
   allowPython = false
-): {root: string; type: "MAVEN" | "NPM" | "PYTHON"} {
+): {root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE"} {
   const manifests = analysis.projectManifests ?? [];
   // PY-002 can verify a standalone Python root. Mixed projects must not
   // silently skip required project verification; PY-003 coordinates them.
@@ -744,7 +744,7 @@ export function selectProjectRoot(
     throw new Error(`Mixed Maven/npm manifests at ${selected || "."}; select a dedicated subproject root`);
   }
   const type = matches[0]!.type;
-  if (type !== "NPM" && type !== "MAVEN" && type !== "PYTHON") throw new Error("Unsupported verifier: " + type);
+  if (type !== "NPM" && type !== "MAVEN" && type !== "PYTHON" && type !== "GRADLE") throw new Error("Unsupported verifier: " + type);
   return {root: selected, type};
 }
 
@@ -762,7 +762,7 @@ export function executionTimeoutMs(remainingMs: number): number {
   return Math.floor(Math.min(remainingMs, EPHEMERAL_EXECUTION_TIMEOUT_MS) / 1000) * 1000;
 }
 
-function normalizeCaptureFiles(paths: readonly string[], kind: "NPM" | "MAVEN" | "PYTHON" | "MIXED"): string[] {
+function normalizeCaptureFiles(paths: readonly string[], kind: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "MIXED"): string[] {
   if (paths.length > 12) throw new Error("captureFiles exceeds 12 entries");
   const result = new Set<string>(kind === "NPM" ? ["package-lock.json"] : []);
   for (const path of paths) {

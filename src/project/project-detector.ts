@@ -10,7 +10,7 @@ import {
 import { readZipTextEntries } from "../archive/zip-entry-reader.js";
 import type { ArchiveValidationResult } from "../archive/archive-validator.js";
 
-export type ProjectType = "MAVEN" | "NPM" | "PYTHON" | "MAVEN_NPM" | "MIXED" | "UNKNOWN";
+export type ProjectType = "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "MAVEN_NPM" | "MIXED" | "UNKNOWN";
 
 export interface RuntimeDetection<T extends string> {
   version: T;
@@ -32,7 +32,7 @@ export interface ProjectWarning {
 export interface ProjectAnalysis {
   projectType: ProjectType;
   projectRoots: readonly string[];
-  projectManifests: readonly { root: string; type: "MAVEN" | "NPM" | "PYTHON" }[];
+  projectManifests: readonly { root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" }[];
   java?: RuntimeDetection<string>;
   node?: RuntimeDetection<string>;
   recommendedRuntime: {
@@ -58,22 +58,24 @@ export function analyzeProjectArchive(
   const pomPaths = candidates.pomPaths;
   const packagePaths = candidates.packagePaths;
   const pythonPaths = candidates.pythonPaths;
-  const kinds = [pomPaths.length > 0 ? "MAVEN" : undefined, packagePaths.length > 0 ? "NPM" : undefined, pythonPaths.length > 0 ? "PYTHON" : undefined].filter(Boolean);
+  const gradlePaths = candidates.gradlePaths;
+  const kinds = [pomPaths.length > 0 ? "MAVEN" : undefined, packagePaths.length > 0 ? "NPM" : undefined, pythonPaths.length > 0 ? "PYTHON" : undefined, gradlePaths.length > 0 ? "GRADLE" : undefined].filter(Boolean);
   const projectType: ProjectType = kinds.length === 0 ? "UNKNOWN"
     : kinds.length === 1 ? kinds[0] as ProjectType
-    : kinds.length === 2 && !kinds.includes("PYTHON") ? "MAVEN_NPM" : "MIXED";
+    : kinds.length === 2 && kinds.includes("MAVEN") && kinds.includes("NPM") ? "MAVEN_NPM" : "MIXED";
 
   const manifests = [...pomPaths.map(path => ({ root: parentPath(path), type: "MAVEN" as const })), ...packagePaths.map(path => ({ root: parentPath(path), type: "NPM" as const })),
-    ...pythonPaths.map(path => ({ root: parentPath(path), type: "PYTHON" as const }))];
+    ...pythonPaths.map(path => ({ root: parentPath(path), type: "PYTHON" as const })),
+    ...gradlePaths.map(path => ({ root: parentPath(path), type: "GRADLE" as const }))];
   const roots = [...new Set(manifests.map(item => item.root))].sort();
-  if (pomPaths.length > 1 || packagePaths.length > 1 || new Set(pythonPaths.map(parentPath)).size > 1) {
+  if (pomPaths.length > 1 || packagePaths.length > 1 || new Set(pythonPaths.map(parentPath)).size > 1 || gradlePaths.length > 1) {
     warnings.push({
       code: "AMBIGUOUS_PROJECT",
-      message: `Multiple project manifests detected (${pomPaths.length} pom.xml, ${packagePaths.length} package.json, ${pythonPaths.length} Python manifests)`
+      message: `Multiple project manifests detected (${pomPaths.length} pom.xml, ${packagePaths.length} package.json, ${pythonPaths.length} Python manifests, ${gradlePaths.length} Gradle roots)`
     });
   }
 
-  const java = detectJava(pomPaths, contents);
+  const java = detectJava(pomPaths, contents) ?? detectGradleJava(gradlePaths, contents);
   const node = detectNode(packagePaths, contents, candidates.nodeVersionPaths, warnings);
 
   if (java !== undefined && !java.supported) {
@@ -123,6 +125,7 @@ function discoverMetadataPaths(validation: ArchiveValidationResult): {
   pomPaths: string[];
   packagePaths: string[];
   pythonPaths: string[];
+  gradlePaths: string[];
   nodeVersionPaths: string[];
   metadataPaths: string[];
 } {
@@ -132,9 +135,11 @@ function discoverMetadataPaths(validation: ArchiveValidationResult): {
   const pythonPaths = paths.filter(path =>
     ["pyproject.toml", "requirements.txt", "uv.lock"].includes(basename(path)) && !ignoredPath(path)
   ).sort();
+  const allGradlePaths = paths.filter(path => ["build.gradle", "build.gradle.kts"].includes(basename(path)) && !ignoredPath(path)).sort();
+  const gradlePaths = [...new Map(allGradlePaths.map(path => [parentPath(path), path])).values()];
   // Multiple Python metadata files in one directory represent a single project.
   const selectedPythonPaths = [...new Map(pythonPaths.map(path => [parentPath(path), path])).values()];
-  const roots = [...new Set([...pomPaths, ...packagePaths, ...selectedPythonPaths].map(parentPath))];
+  const roots = [...new Set([...pomPaths, ...packagePaths, ...selectedPythonPaths, ...gradlePaths].map(parentPath))];
   const nodeVersionPaths = paths.filter((path) => {
     const base = basename(path);
     if (base !== ".nvmrc" && base !== ".node-version") return false;
@@ -145,9 +150,22 @@ function discoverMetadataPaths(validation: ArchiveValidationResult): {
     pomPaths,
     packagePaths,
     pythonPaths: selectedPythonPaths,
+    gradlePaths,
     nodeVersionPaths,
-    metadataPaths: [...new Set([...pomPaths, ...packagePaths, ...nodeVersionPaths])]
+    metadataPaths: [...new Set([...pomPaths, ...packagePaths, ...gradlePaths, ...nodeVersionPaths])]
   };
+}
+
+/** A conservative Java toolchain hint; Gradle Kotlin and Groovy project scripts are untrusted text. */
+function detectGradleJava(paths: readonly string[], contents: ReadonlyMap<string, string>): RuntimeDetection<string> | undefined {
+  for (const path of paths) {
+    const script = contents.get(path);
+    if (!script) continue;
+    const match = /JavaLanguageVersion\.of\(\s*(\d{1,3})\s*\)/.exec(script);
+    if (match?.[1]) return {version: match[1], source: path + ":toolchain",
+      supported: supportedJava(match[1]) !== undefined};
+  }
+  return undefined;
 }
 
 function detectJava(
@@ -278,7 +296,7 @@ function parentPath(path: string): string {
 
 function ignoredPath(path: string): boolean {
   const normalized = `/${path.replaceAll("\\", "/")}/`;
-  return ["/node_modules/", "/target/", "/.git/", "/.venv/", "/venv/", "/site-packages/", "/__pycache__/", "/dist/"].some(part => normalized.includes(part));
+  return ["/node_modules/", "/target/", "/build/", "/.gradle/", "/.git/", "/.venv/", "/venv/", "/site-packages/", "/__pycache__/", "/dist/"].some(part => normalized.includes(part));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

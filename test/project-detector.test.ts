@@ -12,6 +12,29 @@ function analyze(entries: Array<{ path: string; content: string }>, runtime: Run
 }
 
 describe("project/runtime detection", () => {
+  it("recognizes Gradle Groovy and Kotlin builds and groups duplicate DSL manifests", () => {
+    const groovy = analyze([{path:"backend/build.gradle",content:"plugins { id 'java' }"}]);
+    assert.equal(groovy.projectType,"GRADLE");
+    assert.deepEqual(groovy.projectManifests,[{root:"backend",type:"GRADLE"}]);
+    const kotlin = analyze([
+      {path:"build.gradle.kts",content:"java { toolchain { languageVersion.set(JavaLanguageVersion.of(25)) } }"},
+      {path:"build.gradle",content:"plugins { id 'java' }"}
+    ]);
+    assert.equal(kotlin.projectType,"GRADLE");
+    assert.equal(kotlin.projectManifests.length,1);
+    const onlyKotlin = analyze([{path:"build.gradle.kts",content:"java { toolchain { languageVersion.set(JavaLanguageVersion.of(25)) } }"}]);
+    assert.equal(onlyKotlin.java?.version,"25");
+    assert.ok(onlyKotlin.warnings.some(x=>x.code==="JAVA_RUNTIME_MISMATCH"));
+  });
+
+  it("recognizes mixed Gradle/npm and ignores generated Gradle builds", () => {
+    const mix=analyze([{path:"service/build.gradle.kts",content:""},{path:"web/package.json",content:"{}"}]);
+    assert.equal(mix.projectType,"MIXED");
+    assert.deepEqual(mix.projectManifests,[{root:"web",type:"NPM"},{root:"service",type:"GRADLE"}]);
+    const ignored=analyze([{path:"build/build.gradle",content:"ignored"},{path:".gradle/build.gradle",content:"ignored"}]);
+    assert.equal(ignored.projectType,"UNKNOWN");
+  });
+
   it("detects a Python-only pyproject and nested requirements project", () => {
     const pyproject = analyze([{path:"pyproject.toml",content:'[project]\\nname="demo"'}]);
     assert.equal(pyproject.projectType, "PYTHON");

@@ -19,7 +19,7 @@ export interface BuildArtifactOutput {
 
 export interface ProjectBuildResult {
   status: "PASSED";
-  projectType: "NPM" | "MAVEN" | "PYTHON";
+  projectType: "NPM" | "MAVEN" | "PYTHON" | "GRADLE";
   outputs: BuildArtifactOutput[];
 }
 
@@ -38,6 +38,7 @@ export class ProjectBuildService {
     if (projectType === "NPM") return this.buildNpm(handle, requested);
     if (projectType === "MAVEN") return this.buildMaven(handle, requested);
     if (projectType === "PYTHON") return this.buildPython(handle, requested);
+    if (projectType === "GRADLE") return this.buildGradle(handle, requested);
     throw new Error(`Unsupported build project type: ${projectType}`);
   }
 
@@ -80,6 +81,31 @@ export class ProjectBuildService {
       projectType: "MAVEN",
       outputs: await this.collectOutputs(handle, outputs)
     };
+  }
+
+  private async buildGradle(handle: WorkspaceHandle, requested: readonly RequestedBuildOutput[]): Promise<ProjectBuildResult> {
+    const probe = await this.exec(handle, ["bash", "-lc",
+      "test -f ./gradlew && test -f ./gradle/wrapper/gradle-wrapper.jar && test -f ./gradle/wrapper/gradle-wrapper.properties"]);
+    if (probe.exitCode !== 0) {
+      throw new Error("Gradle Wrapper files (gradlew, gradle-wrapper.jar, gradle-wrapper.properties) are required");
+    }
+    // Use the project's wrapper, never install an unpinned globally shared Gradle.
+    await this.mustExec(handle, ["bash", "./gradlew", "--no-daemon", "--console=plain", "assemble"]);
+    const outputs = requested.length > 0 ? [...requested] : await this.detectGradleOutputs(handle);
+    if (outputs.length === 0) throw new Error("Gradle build completed but no JAR/WAR output was detected");
+    if (outputs.length > 12) throw new Error("Build produced more than 12 publishable outputs");
+    return {status: "PASSED", projectType: "GRADLE", outputs: await this.collectOutputs(handle, outputs)};
+  }
+
+  private async detectGradleOutputs(handle: WorkspaceHandle): Promise<RequestedBuildOutput[]> {
+    const result = await this.exec(handle, ["bash", "-lc",
+      "find . -type f \\( -path '*/build/libs/*.jar' -o -path '*/build/libs/*.war' \\) ! -name '*-plain.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name '*-tests.jar' ! -path '*/.gradle/*' -printf '%p\\n' | sort"]);
+    if (result.exitCode !== 0) throw new Error(result.stderr || "Could not discover Gradle build outputs");
+    return result.stdout.split("\n").map(x => x.trim().replace(/^\.\//, "")).filter(Boolean).map(path => ({
+      path,
+      name: path.split("/").at(-1)?.replace(/\.(jar|war)$/, "") ?? "application",
+      kind: path.endsWith(".war") ? "war" : "jar"
+    }));
   }
 
   private async buildPython(handle: WorkspaceHandle, requested: readonly RequestedBuildOutput[]): Promise<ProjectBuildResult> {

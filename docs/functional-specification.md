@@ -55,6 +55,9 @@ Python-projekt med eget projektroot ska verifieras i en ephemeral Modal-sandbox 
 ### FR-017 – Coordinated mixed-project verification (PY-003)
 För ZIP-projekt som kombinerar Python med npm och/eller Maven ska `project_verify` automatiskt verifiera samtliga identifierade byggsystem i en och samma tillfälliga sandbox. Delresultat ska innehålla projektrot, byggsystem, steg, status och felinformation. Sammanlagt PASS får endast rapporteras när alla obligatoriska delverifieringar är PASS. Om någon del är FAILED blir helheten FAILED; annars blir den BLOCKED om någon del är BLOCKED. Kända Maven-reaktormoduler ska inte dubbelverifieras när en överordnad Maven-rot redan täcker dem. Vid explicit `projectRoot` begränsas verifieringen till den valda katalogens manifest. Denna funktion omfattar inte Python-byggartefakter.
 
+### FR-019 – Gradle-project discovery, verification and builds (LANG-002)
+Tjänsten identifierar Gradle-projekt via `build.gradle` och `build.gradle.kts` (en projektrot även när båda finns), i undermappar och blandprojekt. Java-toolchain-version kan härledas ur explicit `JavaLanguageVersion.of(...)`. För verifiering krävs en komplett Gradle Wrapper (`gradlew`, `gradle/wrapper/gradle-wrapper.jar`, `gradle/wrapper/gradle-wrapper.properties`); `project_verify` kör `bash ./gradlew --no-daemon --console=plain clean test`, kontrollerar att minst ett test finns i genererade XML-rapporter och ger BLOCKED om wrappern eller verifierade testresultat saknas samt FAILED om tester fallerar. `project_build` kör `assemble`, hittar JAR/WAR i underprojektens `build/libs` och publicerar dem via samma artefakthantering som Maven; saknat wrapper eller utebliven JAR/WAR är byggfel. Gradle laddas ned av projektets wrapper till isolerad sandbox; ingen global Gradle-installation eller ny runtimebild behövs. Android-byggen som kräver Android SDK, samt Gradle-projekt utan wrapper, ingår inte.
+
 ### FR-009 – Structured verification result
 Verifiering ska returnera minst:
 - `PASSED`, `FAILED` eller `BLOCKED`,
@@ -139,7 +142,7 @@ V1 är funktionellt accepterad när en autentiserad testanvändare med anslutet 
 
 - fler execution providers än Modal,
 - en användare med flera samtidiga providers,
-- Gradle,
+- Android SDK-baserade Gradle-byggen och Gradle-projekt utan fullständig wrapper,
 - pnpm/yarn,
 - Conda-, Poetry- och uv-specifika Python build workflows (wheel/sdist via PEP 517 ingår från PY-004),
 - Git repository integration,

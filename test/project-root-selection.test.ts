@@ -79,3 +79,10 @@ test("mixed aggregation includes every required sub-result and never hides failu
   assert.equal(failResult.failedStep,"python:backend:test");
   assert.equal(failResult.exitCode,2);
 });
+
+test("Gradle root is selected and is included in mixed verification", () => {
+  assert.deepEqual(selectProjectRoot(analysis([{root:"backend",type:"GRADLE"}])),{root:"backend",type:"GRADLE"});
+  const mix=analysis([{root:"web",type:"NPM"},{root:"backend",type:"GRADLE"}]);
+  assert.deepEqual(selectVerificationTargets(mix),[{root:"web",type:"NPM"},{root:"backend",type:"GRADLE"}]);
+  assert.deepEqual(selectVerificationTargets(mix,"backend"),[{root:"backend",type:"GRADLE"}]);
+});

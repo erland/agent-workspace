@@ -22,8 +22,8 @@ export interface AgentWorkspaceCapabilities {
       default: string;
     };
   };
-  buildSystems: readonly ["maven", "npm", "python"];
-  projectDetection: { supported: readonly ["maven", "npm", "python"]; };
+  buildSystems: readonly ["maven", "npm", "python", "gradle"];
+  projectDetection: { supported: readonly ["maven", "npm", "python", "gradle"]; };
   workspace: {
     defaultLifetimeMinutes: number;
     maxLifetimeMinutes: number;
@@ -52,8 +52,8 @@ export function getCapabilities(): AgentWorkspaceCapabilities {
         default: DEFAULT_NODE_VERSION
       }
     },
-    buildSystems: ["maven", "npm", "python"],
-    projectDetection: { supported: ["maven", "npm", "python"] },
+    buildSystems: ["maven", "npm", "python", "gradle"],
+    projectDetection: { supported: ["maven", "npm", "python", "gradle"] },
     workspace: {
       defaultLifetimeMinutes: 60,
       maxLifetimeMinutes: 60,
