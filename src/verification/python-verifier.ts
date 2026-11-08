@@ -79,7 +79,13 @@ export class PythonVerifier {
     }
     const test = await this.run(handle, "test", argv, this.commandTimeoutMs);
     steps.push(test);
-    if (test.status === "FAILED") return this.failure(start, steps, test);
+    if (test.status === "FAILED") {
+      if (installed.pytest && test.exitCode === 5) return this.blocked(start, steps, "pytest did not collect any tests");
+      return this.failure(start, steps, test);
+    }
+    if (!installed.pytest && /Ran 0 tests?\b/.test(test.stdout + "\n" + test.stderr)) {
+      return this.blocked(start, steps, "unittest discovered zero tests");
+    }
     return { status: "PASSED", projectType: "PYTHON", durationMs: Math.max(0, this.nowMs() - start), steps };
   }
 
