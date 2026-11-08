@@ -22,8 +22,8 @@ export interface AgentWorkspaceCapabilities {
       default: string;
     };
   };
-  buildSystems: readonly ["maven", "npm", "python"];
-  projectDetection: { supported: readonly ["maven", "npm", "python"]; };
+  buildSystems: readonly ["maven", "npm", "python", "gradle"];
+  projectDetection: { supported: readonly ["maven", "npm", "python", "gradle"]; };
   workspace: {
     defaultLifetimeMinutes: number;
     maxLifetimeMinutes: number;
