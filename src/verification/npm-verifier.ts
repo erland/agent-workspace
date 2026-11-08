@@ -1,3 +1,4 @@
+import type { ProjectVerifier } from "./verifier-registry.js";
 import { NODE_PROJECT_INSPECTION, selectNodePackageManager } from "../project/node-package-manager.js";
 import type {
   Command,
@@ -61,7 +62,7 @@ const INSTALL_PROJECT_CHROMIUM = [
   "diagnose().finally(()=>{process.exitCode=result.status===null?1:result.status;});"
 ].join("\n");
 
-export class NpmVerifier {
+export class NpmVerifier implements ProjectVerifier {
   private readonly projectRoot: string;
   private readonly installTimeoutMs: number;
   private readonly commandTimeoutMs: number;
