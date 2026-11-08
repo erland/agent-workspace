@@ -9,6 +9,7 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends \
       ca-certificates curl git build-essential pkg-config libssl-dev \
       python3 python3-pip python3-venv jq zip unzip tar gzip; \
+    rustup component add rustfmt clippy; \
     rustc --version; cargo --version; rustup --version; \
     cargo fmt --version; cargo clippy --version; \
     rm -rf /var/lib/apt/lists/*; \
