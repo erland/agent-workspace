@@ -41,6 +41,29 @@ jobs:
           cache-to: type=gha,mode=max,scope=rust-runtime
       - name: Verify Cargo, tests, lint and non-root execution
         run: docker run --rm --mount type=bind,source="${{ github.workspace }}/rust-runtime/smoke.sh",target=/tmp/smoke.sh,readonly agent-workspace-runtime:rust-smoke bash /tmp/smoke.sh
+      - name: Export complete unfiltered findings for security review
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: agent-workspace-runtime:rust-smoke
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          format: json
+          output: rust-trivy-raw.json
+          exit-code: "0"
+      - name: Archive complete vulnerability report
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-trivy-unfiltered-report
+          path: rust-trivy-raw.json
+          retention-days: 30
+      - name: Enforce kernel-headers risk-acceptance review deadline
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$(date -u +%F)" > "2026-12-08" ]]; then
+            echo "::error::linux-libc-dev CVE triage expired 2026-12-08; review and renew or remove the narrowly-scoped policy."
+            exit 1
+          fi
       - name: Scan image for high and critical vulnerabilities
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -48,7 +71,9 @@ jobs:
           scanners: vuln,secret
           severity: HIGH,CRITICAL
           exit-code: "1"
+          ignore-policy: rust-runtime/trivy-kernel-headers.rego
           trivyignores: security/trivy-runtime-ignore.yaml
+          skip-setup-trivy: true
       - name: Log in to GHCR
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
