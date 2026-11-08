@@ -11,7 +11,7 @@ RUN set -eux; \
     find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -i 's|http://|https://|g' {} +; \
     apt-get update; \
     apt-get upgrade -y; \
-    apt-get install -y --no-install-recommends ca-certificates curl gnupg maven unzip git python3 jq zip tar gzip; \
+    apt-get install -y --no-install-recommends ca-certificates curl gnupg maven unzip git python3 python3-pip python3-venv python-is-python3 jq zip tar gzip; \
     curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -; \
     apt-get install -y --no-install-recommends nodejs; \
     npm install -g "npm@${NPM_VERSION}" "pnpm@${PNPM_VERSION}"; \
@@ -60,6 +60,8 @@ RUN set -eux; \
     pnpm --version; \
     git --version; \
     python3 --version; \
+    python --version; \
+    python3 -m pip --version; \
     jq --version; \
     rm -rf /var/lib/apt/lists/* /root/.npm/_cacache; \
     groupadd --system agent-workspace; \
