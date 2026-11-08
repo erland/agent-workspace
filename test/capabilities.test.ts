@@ -26,5 +26,6 @@ describe("getCapabilities", () => {
   it("reports npm and Maven without advertising unimplemented build systems", () => {
     const capabilities = getCapabilities();
     assert.deepEqual(capabilities.buildSystems, ["maven", "npm"]);
+    assert.deepEqual(capabilities.projectDetection.supported, ["maven", "npm", "python"]);
   });
 });
