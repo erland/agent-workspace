@@ -49,6 +49,19 @@ jobs:
           cache-to: type=gha,mode=max,scope=tauri-runtime
       - name: Verify Node, Rust, GTK, WebKitGTK and non-root compilation
         run: docker run --rm --mount type=bind,source="${{ github.workspace }}/tauri-runtime/smoke.sh",target=/tmp/smoke.sh,readonly agent-workspace-runtime:tauri-smoke bash /tmp/smoke.sh
+      - name: Inventory exact Debian packages and manually installed tools
+        run: |
+          docker run --rm agent-workspace-runtime:tauri-smoke bash -lc 'dpkg-query -W -f="${Package}\t${Version}\n"' > tauri-packages.tsv
+          docker run --rm agent-workspace-runtime:tauri-smoke bash -lc 'apt-mark showmanual' > tauri-manual-packages.txt
+          echo "Installed package count: $(wc -l < tauri-packages.tsv)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive installed-package inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-image-package-inventory
+          path: |
+            tauri-packages.tsv
+            tauri-manual-packages.txt
+          retention-days: 30
       - name: Save unfiltered Trivy report
         uses: aquasecurity/trivy-action@v0.36.0
         with:
