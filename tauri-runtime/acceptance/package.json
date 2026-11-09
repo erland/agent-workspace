@@ -1,0 +1,11 @@
+{
+  "name": "agent-workspace-tauri-acceptance",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.9.5"
+  }
+}
