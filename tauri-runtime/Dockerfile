@@ -21,9 +21,9 @@ RUN set -eux; \
     apt-get upgrade -y; \
     apt-get install -y --no-install-recommends \
       curl git build-essential pkg-config libssl-dev \
-      python3 python3-pip python3-venv jq zip unzip tar gzip \
+      python3 jq zip unzip tar gzip \
       libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
-      librsvg2-dev libxdo-dev libgtk-3-dev patchelf file wget; \
+      librsvg2-dev libxdo-dev libgtk-3-dev patchelf file; \
     rm -rf /var/lib/apt/lists/*; \
     groupadd --system agent-workspace; \
     useradd --system --gid agent-workspace --create-home --home-dir /home/agent-workspace agent-workspace; \
