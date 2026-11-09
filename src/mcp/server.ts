@@ -12,7 +12,6 @@ import {
   JsonObjectOutputSchema,
   ProjectBuildInputSchema,
   WorkspaceCreateInputSchema,
-  WorkspaceCreateRustInputSchema,
   WorkspaceIdInputSchema,
   WorkspaceUploadZipFromUrlInputSchema,
   WorkspaceUploadZipInputSchema
@@ -72,18 +71,6 @@ export function createAgentWorkspaceMcpServer(tools: AgentWorkspaceTools): McpSe
     if (input.lifetimeMinutes !== undefined) normalizedInput.lifetimeMinutes = input.lifetimeMinutes;
     return tools.createWorkspace(normalizedInput);
   });
-
-  // Compatibility path for MCP clients retaining an older cached
-  // workspace_create schema without rust/tauri. No Java/Node profile can be
-  // accidentally selected: this always forwards rust:true.
-  registerJsonTool(
-    server,
-    "workspace_create_rust",
-    "Create a temporary Rust/Cargo workspace with the dedicated rust-v1 runtime. No sandbox is allocated until project_verify or project_build.",
-    WorkspaceCreateRustInputSchema,
-    async (input: z.infer<typeof WorkspaceCreateRustInputSchema>) =>
-      tools.createWorkspace({ rust: true, ...(input.lifetimeMinutes !== undefined ? { lifetimeMinutes: input.lifetimeMinutes } : {}) })
-  );
 
   server.registerTool(
     "workspace_upload_zip",
