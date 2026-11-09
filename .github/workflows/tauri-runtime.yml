@@ -26,6 +26,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify vulnerability triage logic
         run: python3 tauri-runtime/test-trivy-summary.py
+      - name: Verify CVE waiver has exact scope and expiry
+        run: python3 tauri-runtime/test-waiver-scope.py
       - name: Read Tauri image version
         id: version
         run: echo "value=$(tr -d '[:space:]' < tauri-runtime/version.txt)" >> "$GITHUB_OUTPUT"
