@@ -5,6 +5,7 @@ import {
   DEFAULT_RUNTIME_PROFILE_ID,
   DEFAULT_RUNTIME_IMAGE_VERSION,
   RUNTIME_PROFILES,
+  assertTauriBuildOnlyRiskWindow,
   resolveRuntimeProfile
 } from "../src/core/runtime-profile.js";
 
@@ -69,6 +70,13 @@ describe("runtime profiles", () => {
       assert.throws(()=>resolveRuntimeProfile(input),/Tauri runtime requires/);
     }
     assert.equal(resolveRuntimeProfile().id,"java21-node22");
+  });
+
+  it("enforces Tauri risk acceptance expiry independently of image publication", () => {
+    assert.doesNotThrow(() => assertTauriBuildOnlyRiskWindow(Date.parse("2026-12-09T23:59:59Z")));
+    assert.throws(() => assertTauriBuildOnlyRiskWindow(Date.parse("2026-12-10T00:00:00Z")), /expired/);
+    assert.throws(() => assertTauriBuildOnlyRiskWindow(Date.parse("2027-01-01T00:00:00Z")), /expired/);
+    assert.throws(() => assertTauriBuildOnlyRiskWindow(NaN), /expired/);
   });
 
   it("resolves an explicitly requested Java 25 / Node 20 runtime", () => {
