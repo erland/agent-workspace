@@ -309,7 +309,7 @@ Ett logiskt workspace kan för närvarande enbart ha **en** runtimeimage. Blandp
 
 ## LANG-003C: Separat Linux-runtime för Tauri v2
 
-Tauri har en separat runtimeprofil `tauri-linux` (MCP: `workspace_create({tauri:true})`) med Rust 1.99.1, Node 22.21.1/npm, `libwebkit2gtk-4.1-dev`, Ayatana AppIndicator, `librsvg2-dev`, `libxdo-dev` och nödvändiga Linux-byggbibliotek. **Ingen Java-installation** behövs. Profilen återanvänder verktygskedjan genom `FROM ghcr.io/erland/agent-workspace-runtime:rust-v1` och kompletteras med Node från en fast version av officiell Node-image; CLI- och Tauri-versioner följer projektets beroenden/låsfiler och är inte globalt installerade.
+Tauri har en separat runtimeprofil `tauri-linux` (MCP: `workspace_create({tauri:true})`) med Rust 1.99.1, Node 22.21.1/npm, `libwebkit2gtk-4.1-dev`, Ayatana AppIndicator, `librsvg2-dev`, `libxdo-dev` och nödvändiga Linux-byggbibliotek. **Ingen Java-installation** behövs. Profilen använder `debian:trixie-slim` som Linux-bas och **kopierar endast den versionslåsta Rust-verktygskedjan** från `ghcr.io/erland/agent-workspace-runtime:rust-v1`, utan att kopiera Ubuntu-systembibliotek. Den kompletteras med Node från en fast version av officiell Node-image; CLI- och Tauri-versioner följer projektets beroenden/låsfiler och är inte globalt installerade.
 
 Tauri-bilden har **egen** version i `tauri-runtime/version.txt`; initial publicerad tagg är `ghcr.io/erland/agent-workspace-runtime:tauri-linux-v1`. Eget GitHub Actions-flöde (`.github/workflows/tauri-runtime.yml`) verifierar att Rust, Node, Cargo, WebKitGTK och systembibliotek fungerar under en icke-root-användare, skriver en ofiltrerad Trivyrapport och blockerar publicering vid nya HIGH/CRITICAL-fynd utöver det existerande, tidsbegränsade `linux-libc-dev`-undantaget. Paketets och kernelheaders-undantagets bedömning måste omprövas före 2026-12-08.
 
@@ -319,10 +319,19 @@ Tauri-bilden har **egen** version i `tauri-runtime/version.txt`; initial publice
 
 Källor för distributionsberoenden: Tauri v2 prerequisites, https://v2.tauri.app/start/prerequisites/ . Senare Tauri CLI-build i Linux kan använda `tauri build --no-bundle` enligt https://v2.tauri.app/distribute/ .
 
-### Releasegrind: CVE-2026-3909 i WebKitGTK (2026-11-08)
+### Releasegrind: CVE-2026-3909 i WebKitGTK (2026-11-08) och migration till Debian 13
 
 Tauri-imagebygge och Cargo/Node/WebKitGTK-smoke passerar, och en versionspinnad npm 11.21.2 eliminerar de 41 HIGH/CRITICAL-fynd som kom från npm:s tidigare beroendeträd. Den ofiltrerade rapporten genereras fortsatt av `Tauri Runtime Image`.
 
 **Publicering blockerad:** Den installerade Ubuntu 24.04-versionen `2.52.6-0ubuntu0.24.04.1` av WebKitGTK ger sex HIGH-fynd för samma verkliga sårbarhet, **CVE-2026-3909**, på sex relaterade WebKitGTK/JavaScriptCore-paket. Tauri v2:s officiella Linux-systemberoenden kräver WebKitGTK 4.1 för inbyggd desktopkompilering. WebKitGTK:s egen advisory WSA-2026-0006 bekräftar att versioner före 2.54.0 påverkas, och Ubuntu listar 24.04 som sårbar: https://webkitgtk.org/security/WSA-2026-0006.html respektive https://ubuntu.com/security/cves?package=webkitgtk .
 
 Detta är **inte ett falsklarm**. Vi gör inget generellt eller tillfälligt undantag i Trivy för det. När Ubuntu erbjuder säkerhetspatchat WebKitGTK (eller en betrodd, versionslåst >=2.54.0-kompatibel uppdatering), bygg om Tauri-imagen och kör alla image-, smoke- och sårbarhetstester tills de är gröna. Mergning av LANG-003C bör invänta ett uttryckligt säkerhetsbeslut. Rust-v1, Playwright och Java/Node-bilderna påverkas inte av denna Tauri-specifika spärr.
+
+
+### LANG-003C säkerhetsåtgärd – Debian 13 (2026-11-09)
+
+För att åtgärda blockeraren i Ubuntu 24.04 har PR:n ändrats till att använda `debian:trixie-slim` (Debian 13) som operativsystemsbas. Rust 1.99.1, Clippy, rustfmt och Cargo kopieras från den publicerade, versionslåsta Rust-imagen (`rust-v1`) utan att ärva dess Ubuntu-runtimepaket. Node 22.21.1 kopieras från den fasta Node-bilden; npm uppgraderas till 11.21.2. Tauri-beroenden installeras från Debians signerade arkiv och imagebygget kontrollerar WebKitGTK, Ayatana, librsvg och libxdo.
+
+`tauri-runtime/smoke.sh` verifierar uttryckligen Debian 13 och `pkg-config --modversion webkit2gtk-4.1` **minst 2.54**, utöver Cargo, Node, Clippy, kompilering och icke-root-körning. Uppfyllda versionskrav är inte i sig ett frikännande: den blockerande Trivy-skanningen måste också passera utan generella undantag för WebKitGTK. CI publicerar ingen Tauri-image om detta inte är uppfyllt.
+
+Den historiska beskrivningen av Ubuntu/WebKitGTK ovan redovisar varför bytet behövdes, inte det aktuella OS-innehållet i den nya imagen.
