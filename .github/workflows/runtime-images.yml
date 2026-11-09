@@ -7,12 +7,9 @@ on:
       - "runtime-images/**"
       - ".github/workflows/runtime-images.yml"
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
-      - "runtime-images/**"
-      - ".github/workflows/runtime-images.yml"
-
+      - "runtime-images/version.txt"
 permissions:
   contents: read
   packages: write
