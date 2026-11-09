@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import type { SandboxProvider, WorkspaceHandle, CreateWorkspaceOptions, Command, ExecutionResult } from "../src/core/sandbox-provider.js";
 import { StaticProfileProvider } from "../src/mcp/profile.js";
+import { WorkspaceCreateInputSchema, WorkspaceCreateRustInputSchema } from "../src/mcp/schemas.js";
 import { AgentWorkspaceToolService } from "../src/mcp/tool-service.js";
 import { WorkspaceService } from "../src/workspace/workspace-service.js";
 import { makeStoredZip } from "./zip-fixture.js";
@@ -40,6 +41,29 @@ describe("DEV-010 MCP tool service contract", () => {
     const destroyed = await tools.destroyWorkspace({ workspaceId: "ws_1" });
     assert.equal(destroyed.ok, true);
     assert.equal(provider.terminated, false);
+  });
+
+  it("keeps rust and tauri visible in the primary workspace_create schema", () => {
+    assert.equal(WorkspaceCreateInputSchema.safeParse({ rust: true, lifetimeMinutes: 5 }).success, true);
+    assert.equal(WorkspaceCreateInputSchema.safeParse({ tauri: true, lifetimeMinutes: 5 }).success, true);
+    assert.equal(WorkspaceCreateInputSchema.safeParse({ rust: "true" }).success, false);
+    assert.equal(WorkspaceCreateRustInputSchema.safeParse({ lifetimeMinutes: 5 }).success, true);
+    assert.equal(WorkspaceCreateRustInputSchema.safeParse({ rust: true }).success, false);
+    assert.equal(WorkspaceCreateRustInputSchema.safeParse({ lifetimeMinutes: 61 }).success, false);
+  });
+
+  it("creates a real Rust-profile logical workspace without allocating a sandbox", async () => {
+    const provider = new FakeProvider();
+    const workspace = new WorkspaceService(provider, { idFactory: () => "ws_rust", schedule: () => ({}) });
+    const tools = new AgentWorkspaceToolService(workspace, new StaticProfileProvider({ user: { id: "u1" }, execution: { provider: "modal", connected: true } }));
+    const created = await tools.createWorkspace({ rust: true, lifetimeMinutes: 5 });
+    assert.equal(created.ok, true);
+    if (created.ok) {
+      assert.equal((created.result as { runtimeProfile: string }).runtimeProfile, "rust");
+    }
+    assert.equal(provider.terminated, false);
+    const destroyed = await tools.destroyWorkspace({ workspaceId: "ws_rust" });
+    assert.equal(destroyed.ok, true);
   });
 
   it("uploads base64 ZIP and project_verify selects npm", async () => {
