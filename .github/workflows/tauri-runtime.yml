@@ -30,6 +30,9 @@ jobs:
         run: python3 tauri-runtime/test-trivy-summary.py
       - name: Verify CVE waiver has exact scope and expiry
         run: python3 tauri-runtime/test-waiver-scope.py
+      - name: Explain manual and scheduled verification mode
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        run: echo 'Validation-only run. Published GHCR tags are immutable; publishing requires a new image version merged to main.' >> "$GITHUB_STEP_SUMMARY"
       - name: Read Tauri image version
         id: version
         run: echo "value=$(tr -d '[:space:]' < tauri-runtime/version.txt)" >> "$GITHUB_OUTPUT"
@@ -135,7 +138,7 @@ jobs:
           trivyignores: security/trivy-runtime-ignore.yaml
           skip-setup-trivy: true
       - name: Refuse overwrite of published Tauri image tag
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           IMAGE_TAG: tauri-linux-v${{ steps.version.outputs.value }}
@@ -154,10 +157,10 @@ jobs:
             exit 1
           fi
       - name: Publish validated Tauri image
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'push'
         run: |
           docker tag agent-workspace-runtime:tauri-smoke ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:tauri-linux-v${{ steps.version.outputs.value }}
           docker push ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:tauri-linux-v${{ steps.version.outputs.value }}
       - name: Summary
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'push'
         run: echo 'Published `ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:tauri-linux-v${{ steps.version.outputs.value }}`' >> "$GITHUB_STEP_SUMMARY"
