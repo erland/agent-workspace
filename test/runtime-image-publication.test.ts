@@ -15,6 +15,15 @@ describe("immutable runtime image publication", () => {
       const yaml = readFileSync(resolve(process.cwd(), path), "utf8");
       const rows = yaml.split(/\r?\n/);
       assert.match(yaml, /workflow_dispatch:/);
+      const versionPath = path.includes("rust-runtime") ? "rust-runtime/version.txt"
+        : path.includes("tauri-runtime") ? "tauri-runtime/version.txt"
+        : "runtime-images/version.txt";
+      const pushBlock = yaml.split(/^  push:\s*$/m)[1]?.split(/^permissions:\s*$/m)[0] ?? "";
+      assert.match(pushBlock, /branches:\s*\[main\]/);
+      assert.ok(pushBlock.includes(`- "${versionPath}"`),
+        `${path} must publish only when its version.txt changes`);
+      assert.doesNotMatch(pushBlock, /Dockerfile|\.github\/workflows|\/\*\*/);
+
       assert.match(yaml, /name: Explain manual and scheduled verification mode/);
       assert.doesNotMatch(yaml, /if: github\.event_name != 'pull_request'/);
       assert.doesNotMatch(yaml, /if: github\.event_name == 'push' \|\| github\.event_name == 'workflow_dispatch'/);
