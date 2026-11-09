@@ -12,14 +12,13 @@ permissions:
 
 jobs:
   libsoup-evaluation:
-    name: Debian 13 source-only libsoup3 3.8.0-3 feasibility
+    name: Debian 13 source-only libsoup feasibility
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - name: Evaluate signed upstream source against Debian 13
         id: evaluate
-        continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
@@ -35,7 +34,7 @@ jobs:
         shell: bash
         run: |
           {
-            echo "## Source-only libsoup3 3.8.0-3 evaluation"
+            echo "## Source-only Debian unstable libsoup evaluation"
             echo "Outcome: ${RESULT}"
             echo ""
             echo "Uses signed Debian sid **source only** and stable/backports binary dependencies."
