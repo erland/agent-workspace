@@ -14,12 +14,6 @@ export const WorkspaceCreateInputSchema = z.object({
   lifetimeMinutes: z.number().positive().max(60).optional()
 }).strict();
 
-// Dedicated creation tool for MCP hosts which cache an older workspace_create
-// schema without the Rust option. Same lifetime limits as workspace_create.
-export const WorkspaceCreateRustInputSchema = z.object({
-  lifetimeMinutes: z.number().positive().max(60).optional()
-}).strict();
-
 export const OpenAIFileParameterSchema = z.object({
   download_url: z.string().url(),
   file_id: z.string().min(1),
