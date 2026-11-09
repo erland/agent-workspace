@@ -56,12 +56,12 @@ export class AuthenticatedAgentWorkspaceToolService {
     } catch (error) { return this.failure(error); }
   }
 
-  async createWorkspace(input: { java?: "17"|"21"|"25"; node?: "20"|"22"; playwright?: boolean; lifetimeMinutes?: number }): Promise<ToolResult<unknown>> {
+  async createWorkspace(input: { java?: "17"|"21"|"25"; node?: "20"|"22"; playwright?: boolean; rust?: boolean; tauri?: boolean; lifetimeMinutes?: number }): Promise<ToolResult<unknown>> {
     return this.withWorkspaceService("workspace_create", undefined, (service) => {
-      const runtime = input.java !== undefined || input.node !== undefined || input.playwright === true
-        ? { ...(input.java ? { java: input.java } : {}), ...(input.node ? { node: input.node } : {}), ...(input.playwright ? { playwright: true } : {}) }
+      const runtime = input.java !== undefined || input.node !== undefined || input.playwright === true || input.rust === true || input.tauri === true
+        ? { ...(input.java ? { java: input.java } : {}), ...(input.node ? { node: input.node } : {}), ...(input.playwright ? { playwright: true } : {}), ...(input.rust ? { rust: true } : {}), ...(input.tauri ? { tauri: true } : {}) }
         : undefined;
-      return service.create({ ...(runtime ? { runtime } : {}), ...(input.lifetimeMinutes ? { lifetimeMinutes: input.lifetimeMinutes } : {}) });
+      return service.create({ ...(runtime ? { runtime } : {}), ...(input.lifetimeMinutes !== undefined ? { lifetimeMinutes: input.lifetimeMinutes } : {}) });
     });
   }
 
