@@ -62,6 +62,18 @@ jobs:
           name: tauri-trivy-unfiltered-report
           path: tauri-trivy-raw.json
           retention-days: 30
+      - name: Summarize vulnerabilities without suppressing findings
+        run: |
+          python3 tauri-runtime/trivy-summary.py tauri-trivy-raw.json --json tauri-trivy-triage.json --markdown tauri-trivy-triage.md
+          cat tauri-trivy-triage.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload vulnerability triage summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-trivy-triage
+          path: |
+            tauri-trivy-triage.json
+            tauri-trivy-triage.md
+          retention-days: 30
       - name: Enforce inherited kernel-headers review deadline
         shell: bash
         run: |
