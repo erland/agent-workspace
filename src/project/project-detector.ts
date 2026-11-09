@@ -98,13 +98,13 @@ export function analyzeProjectArchive(
 
   if (options.workspaceRuntimeProfile !== undefined) {
     const locked = parseRuntimeProfile(options.workspaceRuntimeProfile);
-    if (locked && java?.supported === true && java.version !== locked.java) {
+    if (locked?.java !== undefined && java?.supported === true && java.version !== locked.java) {
       warnings.push({
         code: "JAVA_RUNTIME_MISMATCH",
         message: `Project requests Java ${java.version}, but workspace is locked to Java ${locked.java}`
       });
     }
-    if (locked && node?.supported === true && node.version !== locked.node) {
+    if (locked?.node !== undefined && node?.supported === true && node.version !== locked.node) {
       warnings.push({
         code: "NODE_RUNTIME_MISMATCH",
         message: `Project requests Node ${node.version}, but workspace is locked to Node ${locked.node}`
@@ -281,8 +281,9 @@ function supportedNode(version: string | undefined): NodeVersion | undefined {
   return SUPPORTED_NODE_VERSIONS.find((candidate) => candidate === version);
 }
 
-function parseRuntimeProfile(id: RuntimeProfileId): { java: JavaVersion; node: NodeVersion } | undefined {
+function parseRuntimeProfile(id: RuntimeProfileId): { java?: JavaVersion; node?: NodeVersion } | undefined {
   if (id === "rust") return undefined;
+  if (id === "tauri-linux") return {node:"22"};
   if (id === "playwright-chromium-node22") return { java: "21", node: "22" };
   const match = /^java(17|21|25)-node(20|22)$/.exec(id);
   if (match === null) throw new Error(`Invalid runtime profile id: ${id}`);

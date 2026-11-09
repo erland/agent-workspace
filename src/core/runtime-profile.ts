@@ -3,7 +3,7 @@ export const SUPPORTED_NODE_VERSIONS = ["20", "22"] as const;
 
 export type JavaVersion = (typeof SUPPORTED_JAVA_VERSIONS)[number];
 export type NodeVersion = (typeof SUPPORTED_NODE_VERSIONS)[number];
-export type RuntimeProfileId = `java${JavaVersion}-node${NodeVersion}` | "playwright-chromium-node22" | "rust";
+export type RuntimeProfileId = `java${JavaVersion}-node${NodeVersion}` | "playwright-chromium-node22" | "rust" | "tauri-linux";
 
 export interface RuntimeProfile {
   id: RuntimeProfileId;
@@ -18,6 +18,7 @@ export interface RuntimeRequest {
   node?: NodeVersion;
   playwright?: boolean;
   rust?: boolean;
+  tauri?: boolean;
 }
 
 export const DEFAULT_JAVA_VERSION: JavaVersion = "21";
@@ -49,12 +50,33 @@ export const RUNTIME_PROFILES: Readonly<Record<RuntimeProfileId, RuntimeProfile>
   "java25-node20": createProfile("25", "20"),
   "java25-node22": createProfile("25", "22"),
   "playwright-chromium-node22": { ...createProfile("21", "22"), id: "playwright-chromium-node22", imageRef: `${process.env.AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX ?? DEFAULT_RUNTIME_IMAGE_PREFIX}:playwright-chromium-node22-v${process.env.AGENT_WORKSPACE_RUNTIME_IMAGE_VERSION ?? DEFAULT_RUNTIME_IMAGE_VERSION}` },
+  "tauri-linux": {
+    id: "tauri-linux", node: "22",
+    imageRef: `${process.env.AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX ?? DEFAULT_RUNTIME_IMAGE_PREFIX}:tauri-linux-v${process.env.AGENT_WORKSPACE_TAURI_RUNTIME_IMAGE_VERSION ?? "1"}`,
+    bootstrapCommands: []
+  },
   rust: { id: "rust", imageRef: `${process.env.AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX ?? DEFAULT_RUNTIME_IMAGE_PREFIX}:rust-v${process.env.AGENT_WORKSPACE_RUST_RUNTIME_IMAGE_VERSION ?? "1"}`, bootstrapCommands: [] }
 };
 
+/** Enforce risk-acceptance expiry at workspace creation, even after image publication. */
+export function assertTauriBuildOnlyRiskWindow(nowMs: number = Date.now()): void {
+  const expiryUtc = Date.parse("2026-12-10T00:00:00Z");
+  if (!Number.isFinite(nowMs) || nowMs >= expiryUtc) {
+    throw new Error("Tauri Ubuntu WebKitGTK risk acceptance expired after 2026-12-09; a patched runtime is required");
+  }
+}
+
 export function resolveRuntimeProfile(request: RuntimeRequest = {}): RuntimeProfile {
+  if (request.tauri === true) {
+    if (request.java !== undefined || request.rust === true || request.playwright === true ||
+        (request.node !== undefined && request.node !== "22")) {
+      throw new Error("Tauri runtime requires Node 22 and cannot be combined with Java, Rust or Playwright options");
+    }
+    assertTauriBuildOnlyRiskWindow();
+    return RUNTIME_PROFILES["tauri-linux"];
+  }
   if (request.rust === true) {
-    if (request.java !== undefined || request.node !== undefined || request.playwright === true) {
+    if (request.java !== undefined || request.node !== undefined || request.playwright === true ) {
       throw new Error("Rust runtime cannot be combined with Java, Node or Playwright runtime options");
     }
     return RUNTIME_PROFILES.rust;

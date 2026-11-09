@@ -1,0 +1,163 @@
+name: Tauri Runtime Image
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'
+  pull_request:
+    paths:
+      - "tauri-runtime/**"
+      - ".github/workflows/tauri-runtime.yml"
+      - "tauri-runtime/trivy-temporary-policy.rego"
+  push:
+    branches: [main]
+    paths:
+      - "tauri-runtime/**"
+      - ".github/workflows/tauri-runtime.yml"
+      - "tauri-runtime/trivy-temporary-policy.rego"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  tauri:
+    name: tauri-linux-amd64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify vulnerability triage logic
+        run: python3 tauri-runtime/test-trivy-summary.py
+      - name: Verify CVE waiver has exact scope and expiry
+        run: python3 tauri-runtime/test-waiver-scope.py
+      - name: Read Tauri image version
+        id: version
+        run: echo "value=$(tr -d '[:space:]' < tauri-runtime/version.txt)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR to read Rust base
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Tauri runtime from published Rust base
+        uses: docker/build-push-action@v6
+        with:
+          context: tauri-runtime
+          file: tauri-runtime/Dockerfile
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: agent-workspace-runtime:tauri-smoke
+          cache-from: type=gha,scope=tauri-runtime
+          cache-to: type=gha,mode=max,scope=tauri-runtime
+      - name: Verify Node, Rust, GTK, WebKitGTK and non-root compilation
+        run: docker run --rm --mount type=bind,source="${{ github.workspace }}/tauri-runtime/smoke.sh",target=/tmp/smoke.sh,readonly agent-workspace-runtime:tauri-smoke bash /tmp/smoke.sh
+      - name: Inventory exact Ubuntu packages and manually installed tools
+        run: |
+          docker run --rm agent-workspace-runtime:tauri-smoke bash -lc 'dpkg-query -W -f="${Package}\t${Version}\n"' > tauri-packages.tsv
+          docker run --rm agent-workspace-runtime:tauri-smoke bash -lc 'apt-mark showmanual' > tauri-manual-packages.txt
+          echo "Installed package count: $(wc -l < tauri-packages.tsv)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive installed-package inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-image-package-inventory
+          path: |
+            tauri-packages.tsv
+            tauri-manual-packages.txt
+          retention-days: 30
+      - name: Save unfiltered Trivy report
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: agent-workspace-runtime:tauri-smoke
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          format: json
+          output: tauri-trivy-raw.json
+          exit-code: "0"
+      - name: Report WebKitGTK security patch status
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os
+          with open("tauri-trivy-raw.json", encoding="utf-8") as source:
+              data = json.load(source)
+          packages = sorted({v.get("PkgName", "unknown")
+              for result in data.get("Results", [])
+              for v in result.get("Vulnerabilities", []) or []
+              if v.get("VulnerabilityID") == "CVE-2026-3909"})
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              if packages:
+                  summary.write("WebKitGTK CVE-2026-3909 still reported for: " + ", ".join(packages) + "\\n")
+              else:
+                  summary.write("**CVE-2026-3909 no longer detected. Remove the temporary waiver and publish a new image version.**\\n")
+                  print("::notice::CVE-2026-3909 no longer detected; remove the temporary waiver")
+          PY
+      - name: Upload raw security findings
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-trivy-unfiltered-report
+          path: tauri-trivy-raw.json
+          retention-days: 30
+      - name: Summarize vulnerabilities without suppressing findings
+        run: |
+          python3 tauri-runtime/trivy-summary.py tauri-trivy-raw.json --json tauri-trivy-triage.json --markdown tauri-trivy-triage.md
+          cat tauri-trivy-triage.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload vulnerability triage summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-trivy-triage
+          path: |
+            tauri-trivy-triage.json
+            tauri-trivy-triage.md
+          retention-days: 30
+      - name: Enforce both scoped risk-acceptance deadlines
+        shell: bash
+        run: |
+          set -euo pipefail
+          today="$(date -u +%F)"
+          if [[ "$today" > "2026-12-08" ]]; then
+            echo "::error::Inherited linux-libc-dev review expired 2026-12-08; re-evaluate Rust and Tauri policies."
+            exit 1
+          fi
+          if [[ "$today" > "2026-12-09" ]]; then
+            echo "::error::CVE-2026-3909 build-only waiver expired 2026-12-09; remove waiver and use patched WebKitGTK."
+            exit 1
+          fi
+      - name: Block all other high and critical vulnerability and secret findings
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: agent-workspace-runtime:tauri-smoke
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-policy: tauri-runtime/trivy-temporary-policy.rego
+          trivyignores: security/trivy-runtime-ignore.yaml
+          skip-setup-trivy: true
+      - name: Refuse overwrite of published Tauri image tag
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_TAG: tauri-linux-v${{ steps.version.outputs.value }}
+          OWNER: ${{ github.repository_owner }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp)"
+          if gh api --paginate "/users/${OWNER}/packages/container/agent-workspace-runtime/versions?per_page=100" > "${tmp}" 2>gh-api-error.txt; then
+            if jq -e --arg tag "${IMAGE_TAG}" '.[] | select(any(.metadata.container.tags[]?; . == $tag))' "${tmp}" >/dev/null; then
+              echo "::error::Tauri image ${IMAGE_TAG} already exists; increment tauri-runtime/version.txt."
+              exit 1
+            fi
+          elif ! grep -q "HTTP 404" gh-api-error.txt; then
+            cat gh-api-error.txt >&2
+            exit 1
+          fi
+      - name: Publish validated Tauri image
+        if: github.event_name != 'pull_request'
+        run: |
+          docker tag agent-workspace-runtime:tauri-smoke ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:tauri-linux-v${{ steps.version.outputs.value }}
+          docker push ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:tauri-linux-v${{ steps.version.outputs.value }}
+      - name: Summary
+        if: github.event_name != 'pull_request'
+        run: echo 'Published `ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:tauri-linux-v${{ steps.version.outputs.value }}`' >> "$GITHUB_STEP_SUMMARY"

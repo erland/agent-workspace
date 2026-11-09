@@ -24,3 +24,10 @@ test("project metadata inspection does not invent Java/Node mismatch for Rust pr
   assert.equal(analysis.projectType,"MAVEN");
   assert.equal(analysis.warnings.some(w=>w.code==="JAVA_RUNTIME_MISMATCH" || w.code==="NODE_RUNTIME_MISMATCH"),false);
 });
+
+test("workspace_create accepts explicit Tauri and rejects Java/Rust conflicts", () => {
+  const payload=WorkspaceCreateInputSchema.parse({tauri:true,lifetimeMinutes:15});
+  assert.equal(resolveRuntimeProfile({tauri:payload.tauri===true}).id,"tauri-linux");
+  WorkspaceCreateInputSchema.parse({tauri:true,rust:true});
+  assert.throws(()=>resolveRuntimeProfile({tauri:true,rust:true}),/Tauri runtime requires/);
+});

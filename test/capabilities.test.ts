@@ -12,6 +12,7 @@ describe("getCapabilities", () => {
     assert.deepEqual(capabilities.runtimes.node.supported, ["20", "22"]);
     assert.equal(capabilities.runtimes.node.default, "22");
     assert.deepEqual(capabilities.runtimes.rust,{available:true,profile:"rust"});
+    assert.deepEqual(capabilities.runtimes.tauri,{available:true,profile:"tauri-linux",node:"22"});
     assert.deepEqual(capabilities.provider.runtimeProfiles, [
       "java17-node20",
       "java17-node22",
@@ -20,7 +21,8 @@ describe("getCapabilities", () => {
       "java25-node20",
       "java25-node22",
       "playwright-chromium-node22",
-      "rust"
+      "rust",
+      "tauri-linux"
     ]);
   });
 

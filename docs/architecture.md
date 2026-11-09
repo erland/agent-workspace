@@ -306,3 +306,109 @@ Vid en framtida Rust-/Tauri-imageuppdatering ska en ny granskning av både CVE-r
 `project_build` rensar tidigare releaseutdata med `cargo clean --release`, kör `cargo build --release --workspace`, och använder `cargo metadata --no-deps --format-version 1` för att samla verkliga `bin`-targets från workspace-medlemmar. Utdata `target/release/<binary>` publiceras som `linux-binary` med befintliga artefaktgränser och signerade nedladdningslänkar. Projekt som enbart bygger bibliotek behöver ange explicita utdata; inga fiktiva binärer publiceras.
 
 Ett logiskt workspace kan för närvarande enbart ha **en** runtimeimage. Blandprojekt med Cargo och Maven/npm/Python/Gradle avvisas därför vid samordnad verifiering med ett tydligt fel, och användaren väljer separata projektrotsval och workspaces. Detta undviker ett falskt PASS och kommer att ersättas av samordning av flera sandboxar i ett senare steg. Kompletta Tauri-projekt kräver en separat Tauri-runtime (LANG-003C).
+
+## LANG-003C: Separat Linux-runtime för Tauri v2
+
+Tauri har en separat runtimeprofil `tauri-linux` (MCP: `workspace_create({tauri:true})`) med Rust 1.99.1, Node 22.21.1/npm, `libwebkit2gtk-4.1-dev`, Ayatana AppIndicator, `librsvg2-dev`, `libxdo-dev` och nödvändiga Linux-byggbibliotek. **Ingen Java-installation** behövs. Profilen använder `debian:trixie-slim` som Linux-bas och **kopierar endast den versionslåsta Rust-verktygskedjan** från `ghcr.io/erland/agent-workspace-runtime:rust-v1`, utan att kopiera Ubuntu-systembibliotek. Den kompletteras med Node från en fast version av officiell Node-image; CLI- och Tauri-versioner följer projektets beroenden/låsfiler och är inte globalt installerade.
+
+Tauri-bilden har **egen** version i `tauri-runtime/version.txt`; initial publicerad tagg är `ghcr.io/erland/agent-workspace-runtime:tauri-linux-v1`. Eget GitHub Actions-flöde (`.github/workflows/tauri-runtime.yml`) verifierar att Rust, Node, Cargo, WebKitGTK och systembibliotek fungerar under en icke-root-användare, skriver en ofiltrerad Trivyrapport och blockerar publicering vid nya HIGH/CRITICAL-fynd utöver det existerande, tidsbegränsade `linux-libc-dev`-undantaget. Paketets och kernelheaders-undantagets bedömning måste omprövas före 2026-12-08.
+
+**Verifiering:** Samma isolerade Tauri-image får köra Cargo och npm-verifiering tillsammans om ett arkiv innehåller frontend och `src-tauri/Cargo.toml`. `project_verify` sammanställer separata testresultat och rapporterar inte PASS om någon verifierare misslyckas eller saknar tester. Försök att samverifiera Cargo med Java/Gradle/Python avvisas; andra projekt använder sina existerande profiler. `project_build` stöder fortfarande val av en specifik byggrot, och Rust-binärer publiceras som Linux-artefakter; det innebär **inte** att en komplett Tauri desktop-bundle skapas automatiskt.
+
+**Avgränsning:** En grön Rust- och frontendverifiering innebär inte att Tauri-GUI:t fungerar, att Linux .deb/AppImage installerar eller att någon Windows-/macOS-build fungerar. Komplett `tauri build --no-bundle`, paketering, GUI-test och macOS-/Windows-distribution ligger utanför LANG-003C och kräver separat verifiering. Projekt med `rust-toolchain.toml` stöds fortfarande inte enligt LANG-003B:s verktygskedjepolicy.
+
+Källor för distributionsberoenden: Tauri v2 prerequisites, https://v2.tauri.app/start/prerequisites/ . Senare Tauri CLI-build i Linux kan använda `tauri build --no-bundle` enligt https://v2.tauri.app/distribute/ .
+
+### Releasegrind: CVE-2026-3909 i WebKitGTK (2026-11-08) och migration till Debian 13
+
+Tauri-imagebygge och Cargo/Node/WebKitGTK-smoke passerar, och en versionspinnad npm 11.21.2 eliminerar de 41 HIGH/CRITICAL-fynd som kom från npm:s tidigare beroendeträd. Den ofiltrerade rapporten genereras fortsatt av `Tauri Runtime Image`.
+
+**Publicering blockerad:** Den installerade Ubuntu 24.04-versionen `2.52.6-0ubuntu0.24.04.1` av WebKitGTK ger sex HIGH-fynd för samma verkliga sårbarhet, **CVE-2026-3909**, på sex relaterade WebKitGTK/JavaScriptCore-paket. Tauri v2:s officiella Linux-systemberoenden kräver WebKitGTK 4.1 för inbyggd desktopkompilering. WebKitGTK:s egen advisory WSA-2026-0006 bekräftar att versioner före 2.54.0 påverkas, och Ubuntu listar 24.04 som sårbar: https://webkitgtk.org/security/WSA-2026-0006.html respektive https://ubuntu.com/security/cves?package=webkitgtk .
+
+Detta är **inte ett falsklarm**. Vi gör inget generellt eller tillfälligt undantag i Trivy för det. När Ubuntu erbjuder säkerhetspatchat WebKitGTK (eller en betrodd, versionslåst >=2.54.0-kompatibel uppdatering), bygg om Tauri-imagen och kör alla image-, smoke- och sårbarhetstester tills de är gröna. Mergning av LANG-003C bör invänta ett uttryckligt säkerhetsbeslut. Rust-v1, Playwright och Java/Node-bilderna påverkas inte av denna Tauri-specifika spärr.
+
+
+### LANG-003C säkerhetsåtgärd – Debian 13 (2026-11-09)
+
+För att åtgärda blockeraren i Ubuntu 24.04 har PR:n ändrats till att använda `debian:trixie-slim` (Debian 13) som operativsystemsbas. Rust 1.99.1, Clippy, rustfmt och Cargo kopieras från den publicerade, versionslåsta Rust-imagen (`rust-v1`) utan att ärva dess Ubuntu-runtimepaket. Node 22.21.1 kopieras från den fasta Node-bilden; npm uppgraderas till 11.21.2. Tauri-beroenden installeras från Debians signerade arkiv och imagebygget kontrollerar WebKitGTK, Ayatana, librsvg och libxdo.
+
+`tauri-runtime/smoke.sh` verifierar uttryckligen Debian 13 och `pkg-config --modversion webkit2gtk-4.1` **minst 2.54**, utöver Cargo, Node, Clippy, kompilering och icke-root-körning. Uppfyllda versionskrav är inte i sig ett frikännande: den blockerande Trivy-skanningen måste också passera utan generella undantag för WebKitGTK. CI publicerar ingen Tauri-image om detta inte är uppfyllt.
+
+Den historiska beskrivningen av Ubuntu/WebKitGTK ovan redovisar varför bytet behövdes, inte det aktuella OS-innehållet i den nya imagen.
+
+
+### Verifiering av Debian 13-varianten – 9 november 2026
+
+GitHub Actions [Tauri Runtime Image #42562591711](https://github.com/erland/agent-workspace/actions/runs/42562591711) byggde den nya Debian 13-imagen och slutförde icke-root-smoketestet. Imagen hämtade WebKitGTK **2.54.0-1~deb13u3** från Debian Security, och `smoke.sh`:s gräns minst 2.54 passerade. Den ursprungliga Ubuntu/WebKitGTK-versionen 2.52.6 finns inte längre i basimagen.
+
+**Den blockerande säkerhetsskanningen fallerade ändå:** Trivy rapporterade **225 HIGH/CRITICAL-fynd (215 HIGH, 10 CRITICAL)** mot andra Debian 13-systempaket, exempelvis `libsoup-3.0`, `util-linux`, `curl` och andra bibliotek. Den rapporten behöver CVE-för-CVE-granskning, kontroll mot Debians advisory/backport-status och eventuellt ytterligare uppdateringar eller borttagning av onödiga paket. Det finns i nuläget **ingen verifierad säkerhetsgodkänd Tauri-image**. Vi har inte utökat Trivy-undantagen; kritiska libsoup-fynd kan vara relevanta för en webview-baserad applikation och får inte rutinmässigt ignoreras.
+
+I PR #68 är **kod-CI och ordinarie Security Scan gröna**, men **Tauri Runtime Image har FAIL**. PR:n ligger kvar som Draft och ska inte mergas eller publiceras innan återstående blockerande sårbarheter är omhändertagna eller ett separat, uttryckligt riskbeslut är dokumenterat. Versionskravet för WebKitGTK är nödvändigt men inte ett fullständigt säkerhetsgodkännande.
+
+### LANG-003C säkerhetsinventering och reducerad byggimage (9 november 2026)
+
+Fortsatt säkerhetsarbete görs **utan att lägga till undantag** för `libsoup`, WebKitGTK eller övriga Debian-paket. I senaste verifierade Debian 13-image fanns **225 HIGH/CRITICAL-rapporterade fynd**, men en och samma CVE kan förekomma flera gånger därför att bibliotek och tillhörande `-dev`, GObject introspection och `-common` paket får var sin rapportpost. Dubblering är inte ett säkerhetsfrikännande. Prioritera särskilt kritiska heap buffer overflow/HTTP/WebSocket-fynd i libsoup och dokumentera om respektive CVE påverkar faktisk Tauri-process eller bara ett ej exponerat byggverktyg. Debian-backport, åtgärdsstatus och reell exponering behöver kontrolleras per CVE.
+
+Som ett första, reversibelt minimeringssteg har `python3-pip`, `python3-venv` och `wget` tagits bort från den explicit installerade Tauri-beroendelistan. Dessa behövs inte för den planerade Cargo/npm-verifieringen. `python3` och build-verktyg behålls för befintliga sandbox-/artefaktfunktioner. Att ett paket inte längre installeras explicit garanterar inte att det försvinner: transitive dependencies avgör och **verifieras i genererad paketlista**.
+
+CI genererar nu `tauri-image-package-inventory` med faktisk `dpkg-query`-inventering och `apt-mark showmanual`, samt `tauri-trivy-triage` (JSON + Markdown). Sammanställningen grupperar råa Trivyposter per CVE, paket, allvarlighetsgrad, status och eventuellt rapporterad `FixedVersion`. Den råa Trivyrapporten sparas oförändrad. **Ingen gruppning eller reducering av dubbleringar påverkar den blockerande Trivy-skanningen**, som måste ge PASS innan publicering. Komponenterna testas med syntetiska fixturedata i image-workflowet innan tidskrävande Dockerbygge.
+
+Rekommenderad fortsatt prioritering: (1) använd rapporten för att lokalisera CVE:er med kända fixversioner; (2) pröva patchade Debian security/backports där de finns utan att kringgå APT-signaturer; (3) minimera återstående icke-nödvändiga paket; (4) utför fördelad hotanalys för libsoup, WebKitGTK, TLS och nätverksbibliotek; (5) kräv säkerhetsgodkänt image-jobb innan PR lämnar Draft.
+
+### Kontroll mot Debians säkerhetstracker (9 november 2026)
+
+Den offentliga säkerhetstrackern bekräftar att **libsoup3 i Debian trixie är listad som sårbar** för flera av de viktigaste CVE:erna, inklusive `CVE-2026-102560`, och i nuläget inte har en DSA-baserad fix i den stabila utgåvan. Se https://security-tracker.debian.org/tracker/source-package/libsoup3 . Red Hats analys av `CVE-2026-102560` anger förutsättningarna: WebSocket `permessage-deflate` måste förhandlas och ett mycket stort utgående meddelande komprimeras; begränsning av storlek eller avaktivering av komprimering kan reducera exponering i applikationen, men får **inte** betraktas som en patchad byggimage eller kringgå säkerhetsgrinden. Se https://access.redhat.com/security/cve/cve-2026-102560 .
+
+Debians tracker visar även flera öppna `util-linux`-CVE:er för trixie, t.ex. `CVE-2026-76642` (`no-dsa`; åtgärdad i Debian unstable men inte i trixie). Se https://security-tracker.debian.org/tracker/source-package/util-linux och https://security-tracker.debian.org/tracker/CVE-2026-76642 . Att en CVE är markerad `no-dsa` betyder **inte** att paketet är åtgärdat eller att fyndet generellt kan ignoreras. Vi ska inte blanda in unstable-paket i en stabil sandboximage utan fullständig kompatibilitets- och säkerhetsgranskning.
+
+Konsekvens: enbart `apt-get upgrade` kan i dag inte förväntas eliminera alla Tauri-relaterade CVE:er. Säkerhetsgrinden står kvar; nästa beslut bör utgå från faktisk exponeringsyta och/eller en uppströms patchad libsoup/GTK-stack, med en dokumenterad säkerhetsbedömning. Inga säkerhetsundantag har skapats i detta steg.
+
+### LANG-003C: Isolerad utvärdering av säkerhetsuppdaterad libsoup-källa (9 november 2026)
+
+En versionsuppdatering av `libsoup` bedöms vara den mest konkreta vägen att angripa flera kritiska WebSocket-/HTTP-fynd. Debian 13 stable (trixie) har källpaketet `libsoup3` 3.6.5-3 och flera öppna CVE:er. Debian unstable har däremot bytt **källpaketets namn** till `libsoup` och tillhandahåller bland annat 3.8.1-1; dess tidigare 3.8.0-utgåva omfattar patchar för ett flertal berörda CVE:er. Att byta hela Debian-basen till unstable eller installera unstable-binärer i releaseimagen vore ett betydligt större drift- och säkerhetsmässigt risktagande. Därför görs i stället en **separat, endast utforskande källkodsbyggning**.
+
+`.github/workflows/tauri-libsoup-backport-evaluation.yml` kör `tauri-runtime/evaluate-libsoup-backport.sh` i en separat Debian 13-container. Skriptet:
+- hämtar enbart **källkod** från Debians signerade unstable-arkiv, kräver minst 3.8.0 och sparar den faktiskt hämtade versionens SHA256;
+- installerar byggverktyg och beroenden bara från Debian 13 stable och signerat trixie-backports (bland annat debhelper 14), **aldrig binärpaket från sid**;
+- försöker bygga Debianpaket och sparar logg och eventuell byggartefaktlista i GitHub Actions, med tydligt PASS eller FAIL.
+
+Den historiska källan `libsoup3=3.8.0-3` var inte längre tillgänglig från aktuellt sid-källindex. Utvärderingen justerades till källpaketet `libsoup`, och en körning verifierade att den signerade källversionen **3.8.1-1** gick att hämta och att dess byggberoenden gick att installera. Första paketeringsförsöket stoppades av `dh_gnome_clean` innan kompilering och har därför fått en ny `dpkg-buildpackage -nc`-variant som undviker det steget. **Hämtad källa eller framgångsrik kompilering är inte ett bevis för säkerhet eller kompatibilitet med WebKitGTK.**
+
+Denna utvärdering muterar inte `tauri-runtime/Dockerfile`, ändrar **inga** befintliga Trivy-undantag och publicerar **inte** experimentella paket. Ett eventuellt fungerande backport behöver därefter en separat, verifierbar kandidatimage med ABI-test, verklig Tauri-kompilering, paketinventering, SBOM och full blockerande säkerhetsskanning. Övriga kritiska Debianfynd kvarstår även om libsoup åtgärdas.
+
+Källreferenser: https://packages.debian.org/source/sid/libsoup , https://sources.debian.org/src/libsoup3/3.8.0-3/ , https://security-tracker.debian.org/tracker/source-package/libsoup3 .
+
+### Utfall av libsoup-backportens byggbarhet (9 november 2026)
+
+**PASS – källkodsbygge, inte säkerhetsgodkännande.** GitHub Actions [Tauri libsoup backport feasibility #42568137595](https://github.com/erland/agent-workspace/actions/runs/42568137595) hämtade Debian unstable-källpaketet `libsoup` **3.8.1-1**, med sparad faktisk källversion och SHA256-värden. Byggberoendena kom från trixie och trixie-backports; inga Debian sid-binärer installerades. Efter att det felande `dh_gnome_clean`-steget kringgåtts med `dpkg-buildpackage -nc` byggdes bland annat `libsoup-3.0-0`, `libsoup-3.0-common`, `libsoup-3.0-dev`, `gir1.2-soup-3.0` och tests-/debugpaket med version 3.8.1-1.
+
+GitHub Actions-artefakten `tauri-libsoup-backport-feasibility` innehåller bygglogg, källversionsfil, källchecksummer och paketförteckning, **inte färdiga paket för distribution**. Denna källkodsbyggning har **inte** validerat ABI- och runtidskompatibilitet med Debian 13:s WebKitGTK, verkliga Tauri-byggen eller frånvaro av CVE:er enligt Trivy. PR #68 är därför fortsatt Draft; den befintliga imagebygg- och säkerhetsgrinden ändras inte.
+
+Nästa säkra steg är att skapa en **separat kandidatimage för test**, installera de byggda Debianpaketen där med kontrollerad beroendelösning och testa (1) dynamiska bibliotek/ABI, (2) WebKitGTK 4.1 och faktiskt Tauri-projekt, (3) nytt komplett Trivyresultat med jämförbar CVE-lista mot Debian 13-baslinjen. Kandidaten får inte publiceras som `tauri-linux-v1` innan övriga blockerande sårbarheter har lösts eller formellt riskbedömts.
+
+## LANG-003C beslut: Ubuntu 24.04 och tidsbegränsat build-only-undantag (9 november 2026)
+
+**Detta beslut ersätter Debian 13-experimentet och tidigare rekommendation att hålla Tauri-releasen blockerad enbart på grund av CVE-2026-3909.** Den dedikerade Tauri-imagen bygger återigen direkt på det publicerade Ubuntu 24.04-baserade `rust-v1`, kompletterat med Node 22.21.1, npm 11.21.2 och Tauri v2:s bibliotek från Ubuntus signerade paketarkiv. Rust-, Java/Node- och Playwright-profilerna påverkas inte. Experimenten med Debian 13 och `libsoup` finns kvar som spårbar historik och ett **manuellt** utvärderingsflöde, men inga ombyggda paket installeras eller publiceras.
+
+### Avgränsning av den accepterade risken
+
+- Endast **CVE-2026-3909** för de sex exakta paketen `gir1.2-javascriptcoregtk-4.1`, `gir1.2-webkit2-4.1`, `libjavascriptcoregtk-4.1-0`, `libjavascriptcoregtk-4.1-dev`, `libwebkit2gtk-4.1-0` och `libwebkit2gtk-4.1-dev` omfattas. Detta är en känd HIGH-sårbarhet enligt WebKitGTK:s WSA-2026-0006. Den anses **inte åtgärdad** av vår kontroll eller isolering.
+- Undantaget finns **bara** i `tauri-runtime/trivy-temporary-policy.rego`; det lägger till denna enda CVE till det äldre, separata `linux-libc-dev`-undantaget. Ingen annan CVE, inget annat paket och inga secret-fynd får undantas. Den fullständiga, ofiltrerade JSON-rapporten lagras även när blockerande skanning passerar.
+- WebKitGTK-undantaget löper ut efter **9 december 2026** och det tidigare `linux-libc-dev`-undantaget efter **8 december 2026**. Båda kontrolleras av ett oberoende steg i GitHub Actions; efter deadline stoppas publicering även om Trivy-reglerna finns kvar. Förlängning kräver ny explicit säkerhetsbedömning och uppdaterad PR.
+- Om Ubuntu publicerar en säkerhetskorrigerad WebKitGTK-version, bygg om från uppdaterade arkiv, granska Trivy-resultatet och ta bort undantaget utan att invänta deadline. Källor: https://webkitgtk.org/security/WSA-2026-0006.html och https://ubuntu.com/security/CVE-2026-3909 .
+
+### Driftbegränsningar
+
+Denna profil är en **isolerad, icke-root, temporär Linux-byggsandbox**, inte en säker eller godkänd grafik-/webbläsarruntime. `tauri-runtime/Dockerfile` sätter `DISPLAY` och `WAYLAND_DISPLAY` till tomma strängar samt `GDK_BACKEND=none`. Standard-smoken verifierar detta och gör endast Cargo-, Node- och systembibliotekskontroller; inga GUI-, WebView-, Xvfb-, webbläsar- eller externa webbsidestester ingår. En projektskript-/testprocess kan teoretiskt ändra miljövariabler eller försöka starta en GUI-process. Miljövariabler är därför **inte en hård säkerhetsgräns**. Sandboxes får inte exponerar någon grafisk display/server och ska fortsätta ha kort livslängd, icke-root-användare, process-/resursgränser och nätverksrestriktioner. Projektkod är fortfarande opålitlig.
+
+Denna riskacceptans gäller **enbart build/check/test utan avsiktlig WebKitGTK- eller GUI-körning**. Om sådana testfall krävs, eller om säkerhetsskanningen rapporterar andra blockerande fynd, ska denna profil inte användas för dem och publicering ska stoppas eller ett separat dokumenterat riskbeslut tas.
+
+### Återgång och releasegrind
+
+GitHub Actions ska visa PASS för (1) kod-CI, (2) vanlig Security Scan, (3) fullständig Tauri-imagebuild och smoke, och (4) blockerande Trivy-scanning med den **enda** tidsbegränsade WebKitGTK-regeln och existerande kernelheaders-regeln. Då får en ny, immutable `tauri-linux-v1`-tagg publiceras från main, efter kontroll att den inte redan existerar. Ofiltrerad säkerhetsrapport och paketinventering sparas. Detta beslut är inte ett löfte om att en senare Ubuntu-patch kommer före ett visst datum.
+
+### Oberoende runtime-spärr och regelbunden uppdateringskontroll
+
+Utöver imagebyggens kontroller vägrar `resolveRuntimeProfile({tauri:true})` **skapa nya Tauri-workspaces från och med 2026-12-10 00:00 UTC**, även om `tauri-linux-v1` redan skulle vara publicerad. `assertTauriBuildOnlyRiskWindow` har tester för gränsögonblicket. Det stoppar inte automatiskt redan aktiva sandboxes, som därför måste följa normala korta livslängdsgränser. Denna kontroll är en ytterligare säkerhetsspärr, inte en ersättning för skanning.
+
+`Tauri Runtime Image`-workflowet körs dessutom **varje måndag kl. 06 UTC** via GitHub Actions schedule och bygger/skannar senaste Ubuntu-paketstatus. Schemalagda körningar **publicerar aldrig** en image. Om CVE-2026-3909 försvinner ur den ofiltrerade Trivy-rapporten skriver workflowet ett tydligt meddelande om att undantaget ska tas bort och en ny versionsmärkt image publiceras. Det ger upptäckt vid veckovis kontroll, men uppdaterar inte redan publicerade images automatiskt. Kod- och bildgranskningshistoriken finns kvar.

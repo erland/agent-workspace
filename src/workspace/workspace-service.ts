@@ -659,11 +659,11 @@ function cloneWorkspace(workspace: Workspace): Workspace {
 export function assertRuntimeCompatibility(runtime: RuntimeProfileId, kinds: readonly string[]): void {
   const hasCargo = kinds.includes("CARGO");
   const hasOther = kinds.some(x => x !== "CARGO");
-  if (hasCargo && hasOther) {
-    throw new Error("Mixed Cargo and non-Cargo projects require separate workspaces and runtime images; select a projectRoot and use the matching runtime");
+  if (hasCargo && hasOther && !(runtime === "tauri-linux" && kinds.every(x => x === "CARGO" || x === "NPM"))) {
+    throw new Error("Mixed Cargo projects require separate workspaces unless using the Tauri runtime with Cargo/npm only");
   }
-  if (hasCargo && runtime !== "rust") {
-    throw new Error("Cargo projects require workspace_create({rust:true}); current workspace uses " + runtime);
+  if (hasCargo && runtime !== "rust" && runtime !== "tauri-linux") {
+    throw new Error("Cargo projects require workspace_create({rust:true}) or workspace_create({tauri:true}); current workspace uses " + runtime);
   }
   if (!hasCargo && runtime === "rust") {
     throw new Error("Rust runtime supports Cargo projects only; choose a Java/Node runtime for this project");
