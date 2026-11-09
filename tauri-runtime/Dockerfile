@@ -31,7 +31,7 @@ RUN set -eux; \
 # Defense in depth. This image has no Xvfb, display server, or desktop session.
 # Prevent accidental GUI startup in stock tool workflows. Untrusted arbitrary
 # build scripts may still attempt to launch GUI tools; sandbox isolation remains required.
-ENV DISPLAY="" WAYLAND_DISPLAY="" GDK_BACKEND="broadway"
+ENV DISPLAY="" WAYLAND_DISPLAY="" GDK_BACKEND="none"
 USER agent-workspace
 WORKDIR /workspace
 CMD ["sleep", "3600"]
