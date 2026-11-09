@@ -59,7 +59,7 @@ sha256sum /src/libsoup_* | tee "$OUT/source-sha256.txt"
 # Source control metadata is from sid but binary build-dependencies are drawn
 # only from stable + signed trixie-backports, never from sid.
 apt-get build-dep -y --no-install-recommends .
-dpkg-buildpackage -us -uc -b -j2
+dpkg-buildpackage -us -uc -b -nc -j2
 find /src -maxdepth 1 -type f -name '*.deb' -printf '%f\n' | tee "$OUT/built-debs.txt"
 test -s "$OUT/built-debs.txt"
 echo 'FEASIBILITY=PASS (compile only, NOT security-approved or deployed)'
