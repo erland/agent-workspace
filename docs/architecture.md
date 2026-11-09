@@ -406,3 +406,9 @@ Denna riskacceptans gäller **enbart build/check/test utan avsiktlig WebKitGTK- 
 ### Återgång och releasegrind
 
 GitHub Actions ska visa PASS för (1) kod-CI, (2) vanlig Security Scan, (3) fullständig Tauri-imagebuild och smoke, och (4) blockerande Trivy-scanning med den **enda** tidsbegränsade WebKitGTK-regeln och existerande kernelheaders-regeln. Då får en ny, immutable `tauri-linux-v1`-tagg publiceras från main, efter kontroll att den inte redan existerar. Ofiltrerad säkerhetsrapport och paketinventering sparas. Detta beslut är inte ett löfte om att en senare Ubuntu-patch kommer före ett visst datum.
+
+### Oberoende runtime-spärr och regelbunden uppdateringskontroll
+
+Utöver imagebyggens kontroller vägrar `resolveRuntimeProfile({tauri:true})` **skapa nya Tauri-workspaces från och med 2026-12-10 00:00 UTC**, även om `tauri-linux-v1` redan skulle vara publicerad. `assertTauriBuildOnlyRiskWindow` har tester för gränsögonblicket. Det stoppar inte automatiskt redan aktiva sandboxes, som därför måste följa normala korta livslängdsgränser. Denna kontroll är en ytterligare säkerhetsspärr, inte en ersättning för skanning.
+
+`Tauri Runtime Image`-workflowet körs dessutom **varje måndag kl. 06 UTC** via GitHub Actions schedule och bygger/skannar senaste Ubuntu-paketstatus. Schemalagda körningar **publicerar aldrig** en image. Om CVE-2026-3909 försvinner ur den ofiltrerade Trivy-rapporten skriver workflowet ett tydligt meddelande om att undantaget ska tas bort och en ny versionsmärkt image publiceras. Det ger upptäckt vid veckovis kontroll, men uppdaterar inte redan publicerade images automatiskt. Kod- och bildgranskningshistoriken finns kvar.
