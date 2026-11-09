@@ -2,6 +2,8 @@ name: Tauri Runtime Image
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'
   pull_request:
     paths:
       - "tauri-runtime/**"
@@ -73,6 +75,24 @@ jobs:
           format: json
           output: tauri-trivy-raw.json
           exit-code: "0"
+      - name: Report WebKitGTK security patch status
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os
+          with open("tauri-trivy-raw.json", encoding="utf-8") as source:
+              data = json.load(source)
+          packages = sorted({v.get("PkgName", "unknown")
+              for result in data.get("Results", [])
+              for v in result.get("Vulnerabilities", []) or []
+              if v.get("VulnerabilityID") == "CVE-2026-3909"})
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              if packages:
+                  summary.write("WebKitGTK CVE-2026-3909 still reported for: " + ", ".join(packages) + "\\n")
+              else:
+                  summary.write("**CVE-2026-3909 no longer detected. Remove the temporary waiver and publish a new image version.**\\n")
+                  print("::notice::CVE-2026-3909 no longer detected; remove the temporary waiver")
+          PY
       - name: Upload raw security findings
         uses: actions/upload-artifact@v4
         with:
@@ -115,7 +135,7 @@ jobs:
           trivyignores: security/trivy-runtime-ignore.yaml
           skip-setup-trivy: true
       - name: Refuse overwrite of published Tauri image tag
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           IMAGE_TAG: tauri-linux-v${{ steps.version.outputs.value }}
