@@ -335,3 +335,12 @@ För att åtgärda blockeraren i Ubuntu 24.04 har PR:n ändrats till att använd
 `tauri-runtime/smoke.sh` verifierar uttryckligen Debian 13 och `pkg-config --modversion webkit2gtk-4.1` **minst 2.54**, utöver Cargo, Node, Clippy, kompilering och icke-root-körning. Uppfyllda versionskrav är inte i sig ett frikännande: den blockerande Trivy-skanningen måste också passera utan generella undantag för WebKitGTK. CI publicerar ingen Tauri-image om detta inte är uppfyllt.
 
 Den historiska beskrivningen av Ubuntu/WebKitGTK ovan redovisar varför bytet behövdes, inte det aktuella OS-innehållet i den nya imagen.
+
+
+### Verifiering av Debian 13-varianten – 9 november 2026
+
+GitHub Actions [Tauri Runtime Image #42562591711](https://github.com/erland/agent-workspace/actions/runs/42562591711) byggde den nya Debian 13-imagen och slutförde icke-root-smoketestet. Imagen hämtade WebKitGTK **2.54.0-1~deb13u3** från Debian Security, och `smoke.sh`:s gräns minst 2.54 passerade. Den ursprungliga Ubuntu/WebKitGTK-versionen 2.52.6 finns inte längre i basimagen.
+
+**Den blockerande säkerhetsskanningen fallerade ändå:** Trivy rapporterade **225 HIGH/CRITICAL-fynd (215 HIGH, 10 CRITICAL)** mot andra Debian 13-systempaket, exempelvis `libsoup-3.0`, `util-linux`, `curl` och andra bibliotek. Den rapporten behöver CVE-för-CVE-granskning, kontroll mot Debians advisory/backport-status och eventuellt ytterligare uppdateringar eller borttagning av onödiga paket. Det finns i nuläget **ingen verifierad säkerhetsgodkänd Tauri-image**. Vi har inte utökat Trivy-undantagen; kritiska libsoup-fynd kan vara relevanta för en webview-baserad applikation och får inte rutinmässigt ignoreras.
+
+I PR #68 är **kod-CI och ordinarie Security Scan gröna**, men **Tauri Runtime Image har FAIL**. PR:n ligger kvar som Draft och ska inte mergas eller publiceras innan återstående blockerande sårbarheter är omhändertagna eller ett separat, uttryckligt riskbeslut är dokumenterat. Versionskravet för WebKitGTK är nödvändigt men inte ett fullständigt säkerhetsgodkännande.
