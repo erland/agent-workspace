@@ -24,6 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Verify vulnerability triage logic
+        run: python3 tauri-runtime/test-trivy-summary.py
       - name: Read Tauri image version
         id: version
         run: echo "value=$(tr -d '[:space:]' < tauri-runtime/version.txt)" >> "$GITHUB_OUTPUT"
