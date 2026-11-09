@@ -362,3 +362,18 @@ Den offentliga säkerhetstrackern bekräftar att **libsoup3 i Debian trixie är 
 Debians tracker visar även flera öppna `util-linux`-CVE:er för trixie, t.ex. `CVE-2026-76642` (`no-dsa`; åtgärdad i Debian unstable men inte i trixie). Se https://security-tracker.debian.org/tracker/source-package/util-linux och https://security-tracker.debian.org/tracker/CVE-2026-76642 . Att en CVE är markerad `no-dsa` betyder **inte** att paketet är åtgärdat eller att fyndet generellt kan ignoreras. Vi ska inte blanda in unstable-paket i en stabil sandboximage utan fullständig kompatibilitets- och säkerhetsgranskning.
 
 Konsekvens: enbart `apt-get upgrade` kan i dag inte förväntas eliminera alla Tauri-relaterade CVE:er. Säkerhetsgrinden står kvar; nästa beslut bör utgå från faktisk exponeringsyta och/eller en uppströms patchad libsoup/GTK-stack, med en dokumenterad säkerhetsbedömning. Inga säkerhetsundantag har skapats i detta steg.
+
+### LANG-003C: Isolerad utvärdering av säkerhetsuppdaterad libsoup-källa (9 november 2026)
+
+En versionsuppdatering av `libsoup` bedöms vara den mest konkreta vägen att angripa flera kritiska WebSocket-/HTTP-fynd. Debian 13 stable (trixie) har källpaketet `libsoup3` 3.6.5-3 och flera öppna CVE:er. Debian unstable har däremot bytt **källpaketets namn** till `libsoup` och tillhandahåller bland annat 3.8.1-1; dess tidigare 3.8.0-utgåva omfattar patchar för ett flertal berörda CVE:er. Att byta hela Debian-basen till unstable eller installera unstable-binärer i releaseimagen vore ett betydligt större drift- och säkerhetsmässigt risktagande. Därför görs i stället en **separat, endast utforskande källkodsbyggning**.
+
+`.github/workflows/tauri-libsoup-backport-evaluation.yml` kör `tauri-runtime/evaluate-libsoup-backport.sh` i en separat Debian 13-container. Skriptet:
+- hämtar enbart **källkod** från Debians signerade unstable-arkiv, kräver minst 3.8.0 och sparar den faktiskt hämtade versionens SHA256;
+- installerar byggverktyg och beroenden bara från Debian 13 stable och signerat trixie-backports (bland annat debhelper 14), **aldrig binärpaket från sid**;
+- försöker bygga Debianpaket och sparar logg och eventuell byggartefaktlista i GitHub Actions, med tydligt PASS eller FAIL.
+
+Den historiska källan `libsoup3=3.8.0-3` var inte längre tillgänglig från aktuellt sid-källindex. Utvärderingen justerades till källpaketet `libsoup`, och en körning verifierade att den signerade källversionen **3.8.1-1** gick att hämta och att dess byggberoenden gick att installera. Första paketeringsförsöket stoppades av `dh_gnome_clean` innan kompilering och har därför fått en ny `dpkg-buildpackage -nc`-variant som undviker det steget. **Hämtad källa eller framgångsrik kompilering är inte ett bevis för säkerhet eller kompatibilitet med WebKitGTK.**
+
+Denna utvärdering muterar inte `tauri-runtime/Dockerfile`, ändrar **inga** befintliga Trivy-undantag och publicerar **inte** experimentella paket. Ett eventuellt fungerande backport behöver därefter en separat, verifierbar kandidatimage med ABI-test, verklig Tauri-kompilering, paketinventering, SBOM och full blockerande säkerhetsskanning. Övriga kritiska Debianfynd kvarstår även om libsoup åtgärdas.
+
+Källreferenser: https://packages.debian.org/source/sid/libsoup , https://sources.debian.org/src/libsoup3/3.8.0-3/ , https://security-tracker.debian.org/tracker/source-package/libsoup3 .
