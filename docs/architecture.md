@@ -385,3 +385,24 @@ Källreferenser: https://packages.debian.org/source/sid/libsoup , https://source
 GitHub Actions-artefakten `tauri-libsoup-backport-feasibility` innehåller bygglogg, källversionsfil, källchecksummer och paketförteckning, **inte färdiga paket för distribution**. Denna källkodsbyggning har **inte** validerat ABI- och runtidskompatibilitet med Debian 13:s WebKitGTK, verkliga Tauri-byggen eller frånvaro av CVE:er enligt Trivy. PR #68 är därför fortsatt Draft; den befintliga imagebygg- och säkerhetsgrinden ändras inte.
 
 Nästa säkra steg är att skapa en **separat kandidatimage för test**, installera de byggda Debianpaketen där med kontrollerad beroendelösning och testa (1) dynamiska bibliotek/ABI, (2) WebKitGTK 4.1 och faktiskt Tauri-projekt, (3) nytt komplett Trivyresultat med jämförbar CVE-lista mot Debian 13-baslinjen. Kandidaten får inte publiceras som `tauri-linux-v1` innan övriga blockerande sårbarheter har lösts eller formellt riskbedömts.
+
+## LANG-003C beslut: Ubuntu 24.04 och tidsbegränsat build-only-undantag (9 november 2026)
+
+**Detta beslut ersätter Debian 13-experimentet och tidigare rekommendation att hålla Tauri-releasen blockerad enbart på grund av CVE-2026-3909.** Den dedikerade Tauri-imagen bygger återigen direkt på det publicerade Ubuntu 24.04-baserade `rust-v1`, kompletterat med Node 22.21.1, npm 11.21.2 och Tauri v2:s bibliotek från Ubuntus signerade paketarkiv. Rust-, Java/Node- och Playwright-profilerna påverkas inte. Experimenten med Debian 13 och `libsoup` finns kvar som spårbar historik och ett **manuellt** utvärderingsflöde, men inga ombyggda paket installeras eller publiceras.
+
+### Avgränsning av den accepterade risken
+
+- Endast **CVE-2026-3909** för de sex exakta paketen `gir1.2-javascriptcoregtk-4.1`, `gir1.2-webkit2-4.1`, `libjavascriptcoregtk-4.1-0`, `libjavascriptcoregtk-4.1-dev`, `libwebkit2gtk-4.1-0` och `libwebkit2gtk-4.1-dev` omfattas. Detta är en känd HIGH-sårbarhet enligt WebKitGTK:s WSA-2026-0006. Den anses **inte åtgärdad** av vår kontroll eller isolering.
+- Undantaget finns **bara** i `tauri-runtime/trivy-temporary-policy.rego`; det lägger till denna enda CVE till det äldre, separata `linux-libc-dev`-undantaget. Ingen annan CVE, inget annat paket och inga secret-fynd får undantas. Den fullständiga, ofiltrerade JSON-rapporten lagras även när blockerande skanning passerar.
+- WebKitGTK-undantaget löper ut efter **9 december 2026** och det tidigare `linux-libc-dev`-undantaget efter **8 december 2026**. Båda kontrolleras av ett oberoende steg i GitHub Actions; efter deadline stoppas publicering även om Trivy-reglerna finns kvar. Förlängning kräver ny explicit säkerhetsbedömning och uppdaterad PR.
+- Om Ubuntu publicerar en säkerhetskorrigerad WebKitGTK-version, bygg om från uppdaterade arkiv, granska Trivy-resultatet och ta bort undantaget utan att invänta deadline. Källor: https://webkitgtk.org/security/WSA-2026-0006.html och https://ubuntu.com/security/CVE-2026-3909 .
+
+### Driftbegränsningar
+
+Denna profil är en **isolerad, icke-root, temporär Linux-byggsandbox**, inte en säker eller godkänd grafik-/webbläsarruntime. `tauri-runtime/Dockerfile` sätter `DISPLAY` och `WAYLAND_DISPLAY` till tomma strängar samt `GDK_BACKEND=none`. Standard-smoken verifierar detta och gör endast Cargo-, Node- och systembibliotekskontroller; inga GUI-, WebView-, Xvfb-, webbläsar- eller externa webbsidestester ingår. En projektskript-/testprocess kan teoretiskt ändra miljövariabler eller försöka starta en GUI-process. Miljövariabler är därför **inte en hård säkerhetsgräns**. Sandboxes får inte exponerar någon grafisk display/server och ska fortsätta ha kort livslängd, icke-root-användare, process-/resursgränser och nätverksrestriktioner. Projektkod är fortfarande opålitlig.
+
+Denna riskacceptans gäller **enbart build/check/test utan avsiktlig WebKitGTK- eller GUI-körning**. Om sådana testfall krävs, eller om säkerhetsskanningen rapporterar andra blockerande fynd, ska denna profil inte användas för dem och publicering ska stoppas eller ett separat dokumenterat riskbeslut tas.
+
+### Återgång och releasegrind
+
+GitHub Actions ska visa PASS för (1) kod-CI, (2) vanlig Security Scan, (3) fullständig Tauri-imagebuild och smoke, och (4) blockerande Trivy-scanning med den **enda** tidsbegränsade WebKitGTK-regeln och existerande kernelheaders-regeln. Då får en ny, immutable `tauri-linux-v1`-tagg publiceras från main, efter kontroll att den inte redan existerar. Ofiltrerad säkerhetsrapport och paketinventering sparas. Detta beslut är inte ett löfte om att en senare Ubuntu-patch kommer före ett visst datum.
