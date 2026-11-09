@@ -25,3 +25,13 @@ The existing version check is deliberately strict. A repeated manual verificatio
 A **GitHub Release of Agent Workspace** is distinct from publishing a runtime container image. A code release should not require updating every runtime image version. Rebuilding a changed Tauri or Rust image requires a version increment only for that image and, if needed, updating the corresponding production override.
 
 The current Tauri profile is still **build-only/headless** while the documented WebKitGTK CVE-2026-3909 risk acceptance is active. The existing expiry checks and raw Trivy evidence are unchanged by this workflow fix.
+
+## MCP schema refresh after adding Rust/Tauri profiles
+
+The deployed Agent Workspace server already declares `workspace_create({ rust: true })` and `workspace_create({ tauri: true })` in `WorkspaceCreateInputSchema`. However, ChatGPT or another MCP client may retain an **older tools/list schema** containing only `java`, `node`, `playwright` and `lifetimeMinutes`. This is a client-side cached tool definition; `get_capabilities` can advertise Cargo and Rust even when the cached `workspace_create` schema prevents sending `rust:true`.
+
+For compatibility, the server now additionally exposes `workspace_create_rust({ lifetimeMinutes?: number })`. This creates precisely a Rust-profile workspace by forwarding `rust: true` internally. The original `workspace_create` remains unchanged and supports Rust and Tauri as optional parameters. The MCP smoke checks that **the advertised tools/list input schema itself** includes both options.
+
+**Required after deployment:** In ChatGPT, refresh/reload the Agent Workspace connection's tools (or reconnect the plugin if its tool schema is not refreshed). Then verify that either `workspace_create` accepts `rust:true` or the newly introduced `workspace_create_rust` tool is listed. If neither is visible, the ChatGPT connection is still using a cached schema or older deployed endpoint; redeployment alone cannot mutate an already-cached client tool definition.
+
+For live acceptance, create a temporary Rust workspace using one of the two routes, upload a ZIP with `Cargo.toml` and a real unit test, run `project_verify`, confirm Cargo fmt/check/Clippy/tests all pass, and destroy the workspace. No runtime image bump is required for this server-side MCP tool change.
