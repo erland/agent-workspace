@@ -12,10 +12,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "tauri-runtime/**"
-      - ".github/workflows/tauri-runtime.yml"
-      - "tauri-runtime/trivy-temporary-policy.rego"
-
+      - "tauri-runtime/version.txt"
 permissions:
   contents: read
   packages: write
