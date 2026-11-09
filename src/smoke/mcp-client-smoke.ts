@@ -5,7 +5,6 @@ const expectedTools = [
   "get_capabilities",
   "get_profile",
   "workspace_create",
-  "workspace_create_rust",
   "workspace_upload_zip",
   "workspace_upload_zip_from_url",
   "project_verify",
@@ -31,12 +30,8 @@ try {
   }
 
   const createTool = listed.tools.find(tool => tool.name === "workspace_create");
-  const rustTool = listed.tools.find(tool => tool.name === "workspace_create_rust");
   if (!createTool?.inputSchema.properties?.rust || !createTool.inputSchema.properties?.tauri) {
     throw new Error("workspace_create must advertise Rust and Tauri in MCP tools/list, not only get_capabilities");
-  }
-  if (rustTool?.inputSchema.properties?.rust) {
-    throw new Error("workspace_create_rust must select Rust intrinsically, without an input flag");
   }
 
   const capabilities = await client.callTool({ name: "get_capabilities", arguments: {} });

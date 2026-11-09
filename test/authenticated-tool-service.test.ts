@@ -82,6 +82,44 @@ describe("authenticated MCP tool isolation", () => {
     if (!invalid.ok) assert.match(invalid.error.message, /requires Java 21 and Node 22/);
   });
 
+  it("forwards Rust and Tauri through the authenticated production MCP path", async () => {
+    const { deps, accounts, workspaces } = setup();
+    const service = new AuthenticatedAgentWorkspaceToolService(
+      { issuer: "issuer", subject: "rust-tauri-user", scopes: ["agent-workspace"] }, deps
+    );
+    const profile = await service.getProfile();
+    assert.equal(profile.ok, true);
+    const userId = (profile as any).result.user.id as string;
+    await accounts.upsert({
+      id: "acct-cargo", userId, provider: "modal", credentialRef: "fake:cargo",
+      status: "CONNECTED", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+    });
+    for (const [input, expected] of [
+      [{ rust: true, lifetimeMinutes: 5 }, "rust"],
+      [{ tauri: true, lifetimeMinutes: 5 }, "tauri-linux"],
+      [{}, "java21-node22"]
+    ] as const) {
+      const created = await service.createWorkspace(input);
+      assert.equal(created.ok, true);
+      if (!created.ok) continue;
+      const workspace = created.result as { id: string; runtimeProfile: string };
+      assert.equal(workspace.runtimeProfile, expected);
+      const persisted = await workspaces.findByIdForUser(workspace.id, userId);
+      assert.equal(persisted?.runtimeProfile, expected);
+      const destroyed = await service.destroyWorkspace({ workspaceId: workspace.id });
+      assert.equal(destroyed.ok, true);
+    }
+    for (const input of [
+      { rust: true, java: "21" as const },
+      { rust: true, node: "22" as const },
+      { rust: true, playwright: true },
+      { tauri: true, rust: true }
+    ]) {
+      const response = await service.createWorkspace(input);
+      assert.equal(response.ok, false, "incompatible options must be rejected");
+    }
+  });
+
   it("cannot access another authenticated user's workspace", async () => {
     const { deps, accounts } = setup();
     const alice = new AuthenticatedAgentWorkspaceToolService({ issuer: "issuer", subject: "alice", scopes: ["agent-workspace"] }, deps);

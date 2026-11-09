@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import type { SandboxProvider, WorkspaceHandle, CreateWorkspaceOptions, Command, ExecutionResult } from "../src/core/sandbox-provider.js";
 import { StaticProfileProvider } from "../src/mcp/profile.js";
-import { WorkspaceCreateInputSchema, WorkspaceCreateRustInputSchema } from "../src/mcp/schemas.js";
+import { WorkspaceCreateInputSchema } from "../src/mcp/schemas.js";
 import { AgentWorkspaceToolService } from "../src/mcp/tool-service.js";
 import { WorkspaceService } from "../src/workspace/workspace-service.js";
 import { makeStoredZip } from "./zip-fixture.js";
@@ -47,9 +47,6 @@ describe("DEV-010 MCP tool service contract", () => {
     assert.equal(WorkspaceCreateInputSchema.safeParse({ rust: true, lifetimeMinutes: 5 }).success, true);
     assert.equal(WorkspaceCreateInputSchema.safeParse({ tauri: true, lifetimeMinutes: 5 }).success, true);
     assert.equal(WorkspaceCreateInputSchema.safeParse({ rust: "true" }).success, false);
-    assert.equal(WorkspaceCreateRustInputSchema.safeParse({ lifetimeMinutes: 5 }).success, true);
-    assert.equal(WorkspaceCreateRustInputSchema.safeParse({ rust: true }).success, false);
-    assert.equal(WorkspaceCreateRustInputSchema.safeParse({ lifetimeMinutes: 61 }).success, false);
   });
 
   it("creates a real Rust-profile logical workspace without allocating a sandbox", async () => {
