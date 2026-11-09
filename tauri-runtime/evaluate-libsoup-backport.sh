@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Feasibility-only experiment. NEVER install evaluated packages into the Tauri
-# release image or change the Trivy gate without a separate security review.
+# Feasibility-only experiment. Never install these packages into the release
+# image or weaken its Trivy security gate without an explicit security review.
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 export LC_ALL=C
@@ -9,22 +9,35 @@ OUT="/results"
 mkdir -p "$OUT"
 exec > >(tee "$OUT/build.log") 2>&1
 
-echo "Evaluation: libsoup3 Debian unstable source 3.8.0-3 on Debian 13"
+echo "Evaluation: libsoup3 3.8.0-3 from signed sid source on Debian 13"
 . /etc/os-release
 test "$ID" = debian
 test "$VERSION_ID" = 13
 echo "OS: $PRETTY_NAME"
 
 apt-get update
-apt-get install -y --no-install-recommends ca-certificates dpkg-dev devscripts build-essential   debhelper dh-sequence-gir meson ninja-build pkg-config apt-utils gnupg   python3 python3-pip python3-setuptools
-# Trust only Debian's existing archive signing keys. The additional sid entry
-# is source-only, and must NOT grant installation of binary packages from sid.
-printf 'Types: deb-src\nURIs: https://deb.debian.org/debian\nSuites: sid\nComponents: main\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg\n' \
-  > /etc/apt/sources.list.d/sid-source.sources
-# Debian trixie-backports offers debhelper 14 while other binary packages
-# still resolve from stable unless explicitly requested. No unstable binary repo.
-printf 'Types: deb\\nURIs: https://deb.debian.org/debian\\nSuites: trixie-backports\\nComponents: main\\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg\\n' \\
-  > /etc/apt/sources.list.d/trixie-backports.sources
+apt-get install -y --no-install-recommends \
+  ca-certificates dpkg-dev devscripts build-essential \
+  meson ninja-build pkg-config apt-utils gnupg python3
+
+# Debian sid supplies SOURCE only. Binary packages are never installed from sid.
+cat > /etc/apt/sources.list.d/sid-source.sources <<'SOURCES'
+Types: deb-src
+URIs: https://deb.debian.org/debian
+Suites: sid
+Components: main
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+SOURCES
+
+# Compatible debhelper v14 is available in Debian's signed stable backports.
+cat > /etc/apt/sources.list.d/trixie-backports.sources <<'SOURCES'
+Types: deb
+URIs: https://deb.debian.org/debian
+Suites: trixie-backports
+Components: main
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+SOURCES
+
 apt-get update
 apt-get install -y --no-install-recommends -t trixie-backports debhelper
 mkdir -p /src
@@ -36,9 +49,9 @@ echo "SOURCE_VERSION=$(dpkg-parsechangelog -S Version)"
 echo "SOURCE_SHA256S:"
 sha256sum /src/libsoup3_3.8.0* || true
 
-# The src package from sid is allowed as build input; dependencies must remain
-# from stable Debian 13. apt-get build-dep resolves only stable binary repositories.
-apt-get build-dep -y --no-install-recommends . 
+# Source control metadata is from sid but binary build-dependencies are drawn
+# only from stable + signed trixie-backports, never from sid.
+apt-get build-dep -y --no-install-recommends .
 dpkg-buildpackage -us -uc -b -j2
 find /src -maxdepth 1 -type f -name '*.deb' -printf '%f\n' | tee "$OUT/built-debs.txt"
 test -s "$OUT/built-debs.txt"
