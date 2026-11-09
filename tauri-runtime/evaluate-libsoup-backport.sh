@@ -21,7 +21,12 @@ apt-get install -y --no-install-recommends ca-certificates dpkg-dev devscripts b
 # is source-only, and must NOT grant installation of binary packages from sid.
 printf 'Types: deb-src\nURIs: https://deb.debian.org/debian\nSuites: sid\nComponents: main\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg\n' \
   > /etc/apt/sources.list.d/sid-source.sources
+# Debian trixie-backports offers debhelper 14 while other binary packages
+# still resolve from stable unless explicitly requested. No unstable binary repo.
+printf 'Types: deb\\nURIs: https://deb.debian.org/debian\\nSuites: trixie-backports\\nComponents: main\\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg\\n' \\
+  > /etc/apt/sources.list.d/trixie-backports.sources
 apt-get update
+apt-get install -y --no-install-recommends -t trixie-backports debhelper
 mkdir -p /src
 cd /src
 apt-get source "libsoup3=3.8.0-3"
@@ -33,7 +38,7 @@ sha256sum /src/libsoup3_3.8.0* || true
 
 # The src package from sid is allowed as build input; dependencies must remain
 # from stable Debian 13. apt-get build-dep resolves only stable binary repositories.
-apt-get build-dep -y --no-install-recommends ./ 
+apt-get build-dep -y --no-install-recommends . 
 dpkg-buildpackage -us -uc -b -j2
 find /src -maxdepth 1 -type f -name '*.deb' -printf '%f\n' | tee "$OUT/built-debs.txt"
 test -s "$OUT/built-debs.txt"
