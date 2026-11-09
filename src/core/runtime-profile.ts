@@ -58,12 +58,21 @@ export const RUNTIME_PROFILES: Readonly<Record<RuntimeProfileId, RuntimeProfile>
   rust: { id: "rust", imageRef: `${process.env.AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX ?? DEFAULT_RUNTIME_IMAGE_PREFIX}:rust-v${process.env.AGENT_WORKSPACE_RUST_RUNTIME_IMAGE_VERSION ?? "1"}`, bootstrapCommands: [] }
 };
 
+/** Enforce risk-acceptance expiry at workspace creation, even after image publication. */
+export function assertTauriBuildOnlyRiskWindow(nowMs: number = Date.now()): void {
+  const expiryUtc = Date.parse("2026-12-10T00:00:00Z");
+  if (!Number.isFinite(nowMs) || nowMs >= expiryUtc) {
+    throw new Error("Tauri Ubuntu WebKitGTK risk acceptance expired after 2026-12-09; a patched runtime is required");
+  }
+}
+
 export function resolveRuntimeProfile(request: RuntimeRequest = {}): RuntimeProfile {
   if (request.tauri === true) {
     if (request.java !== undefined || request.rust === true || request.playwright === true ||
         (request.node !== undefined && request.node !== "22")) {
       throw new Error("Tauri runtime requires Node 22 and cannot be combined with Java, Rust or Playwright options");
     }
+    assertTauriBuildOnlyRiskWindow();
     return RUNTIME_PROFILES["tauri-linux"];
   }
   if (request.rust === true) {
