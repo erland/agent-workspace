@@ -18,7 +18,7 @@ All runtime images live in the GHCR container package `ghcr.io/erland/agent-work
 - **Pull request:** Build, smoke-test, scan. Never publish.
 - **Run workflow (manual):** Build, smoke-test, scan. Never publish or attempt to overwrite existing tags.
 - **Tauri weekly schedule:** Build and scan Ubuntu patch status. Never publish.
-- **Push to main of relevant image or workflow paths:** Build, smoke-test and scan, then check for an existing immutable tag. If a changed image must be published, **increment its own version.txt before merge**. A tag that already exists still blocks a push-triggered publish; this avoids silently replacing a production image.
+- **Push to main that changes the corresponding `version.txt`:** Build, smoke-test and scan, then check for an existing immutable tag. If a changed image must be published, **increment its own version.txt before merge**. Workflow-only or Dockerfile-only changes do not automatically publish on merge; PR validation still runs for those changes. A tag that already exists still blocks publication; this avoids silently replacing a production image.
 
 The existing version check is deliberately strict. A repeated manual verification of `tauri-linux-v1` must NOT be treated as a new image release. The failure in GitHub Actions run [42607790377](https://github.com/erland/agent-workspace/actions/runs/42607790377) occurred because the previous workflow tried to publish that existing tag again.
 
