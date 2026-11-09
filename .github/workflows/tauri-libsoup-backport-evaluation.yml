@@ -1,0 +1,53 @@
+name: Tauri libsoup backport feasibility
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "tauri-runtime/evaluate-libsoup-backport.sh"
+      - ".github/workflows/tauri-libsoup-backport-evaluation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  libsoup-evaluation:
+    name: Debian 13 source-only libsoup3 3.8.0-3 feasibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Evaluate signed upstream source against Debian 13
+        id: evaluate
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p tauri-backport-results
+          docker run --rm --cpus=2 --memory=6g \
+            --mount type=bind,source="${{ github.workspace }}/tauri-runtime/evaluate-libsoup-backport.sh",target=/evaluate.sh,readonly \
+            --mount type=bind,source="${{ github.workspace }}/tauri-backport-results",target=/results \
+            debian:trixie-slim bash /evaluate.sh
+      - name: Report evaluation outcome without granting approval
+        if: always()
+        env:
+          RESULT: ${{ steps.evaluate.outcome }}
+        shell: bash
+        run: |
+          {
+            echo "## Source-only libsoup3 3.8.0-3 evaluation"
+            echo "Outcome: ${RESULT}"
+            echo ""
+            echo "Uses signed Debian sid **source only** and stable/backports binary dependencies."
+            echo "No experimental binaries are installed in the Tauri release image."
+            echo "An experimental compile success does NOT prove ABI compatibility, CVE remediation, or release approval."
+            echo "The existing Tauri image Trivy security gate remains unchanged."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload evaluation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-libsoup-backport-feasibility
+          path: tauri-backport-results/
+          if-no-files-found: warn
+          retention-days: 30
