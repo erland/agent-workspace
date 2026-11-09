@@ -6,13 +6,13 @@ on:
     paths:
       - "tauri-runtime/**"
       - ".github/workflows/tauri-runtime.yml"
-      - "rust-runtime/trivy-kernel-headers.rego"
+      - "tauri-runtime/trivy-temporary-policy.rego"
   push:
     branches: [main]
     paths:
       - "tauri-runtime/**"
       - ".github/workflows/tauri-runtime.yml"
-      - "rust-runtime/trivy-kernel-headers.rego"
+      - "tauri-runtime/trivy-temporary-policy.rego"
 
 permissions:
   contents: read
@@ -49,7 +49,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=tauri-runtime
       - name: Verify Node, Rust, GTK, WebKitGTK and non-root compilation
         run: docker run --rm --mount type=bind,source="${{ github.workspace }}/tauri-runtime/smoke.sh",target=/tmp/smoke.sh,readonly agent-workspace-runtime:tauri-smoke bash /tmp/smoke.sh
-      - name: Inventory exact Debian packages and manually installed tools
+      - name: Inventory exact Ubuntu packages and manually installed tools
         run: |
           docker run --rm agent-workspace-runtime:tauri-smoke bash -lc 'dpkg-query -W -f="${Package}\t${Version}\n"' > tauri-packages.tsv
           docker run --rm agent-workspace-runtime:tauri-smoke bash -lc 'apt-mark showmanual' > tauri-manual-packages.txt
@@ -89,12 +89,17 @@ jobs:
             tauri-trivy-triage.json
             tauri-trivy-triage.md
           retention-days: 30
-      - name: Enforce inherited kernel-headers review deadline
+      - name: Enforce both scoped risk-acceptance deadlines
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$(date -u +%F)" > "2026-12-08" ]]; then
-            echo "::error::Inherited linux-libc-dev review expired 2026-12-08; re-evaluate Tauri and Rust image policies."
+          today="$(date -u +%F)"
+          if [[ "$today" > "2026-12-08" ]]; then
+            echo "::error::Inherited linux-libc-dev review expired 2026-12-08; re-evaluate Rust and Tauri policies."
+            exit 1
+          fi
+          if [[ "$today" > "2026-12-09" ]]; then
+            echo "::error::CVE-2026-3909 build-only waiver expired 2026-12-09; remove waiver and use patched WebKitGTK."
             exit 1
           fi
       - name: Block all other high and critical vulnerability and secret findings
@@ -104,7 +109,7 @@ jobs:
           scanners: vuln,secret
           severity: HIGH,CRITICAL
           exit-code: "1"
-          ignore-policy: rust-runtime/trivy-kernel-headers.rego
+          ignore-policy: tauri-runtime/trivy-temporary-policy.rego
           trivyignores: security/trivy-runtime-ignore.yaml
           skip-setup-trivy: true
       - name: Refuse overwrite of published Tauri image tag
