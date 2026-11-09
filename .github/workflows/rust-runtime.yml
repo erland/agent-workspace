@@ -7,12 +7,9 @@ on:
       - "rust-runtime/**"
       - ".github/workflows/rust-runtime.yml"
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
-      - "rust-runtime/**"
-      - ".github/workflows/rust-runtime.yml"
-
+      - "rust-runtime/version.txt"
 permissions:
   contents: read
   packages: write
