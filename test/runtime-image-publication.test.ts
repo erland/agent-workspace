@@ -39,7 +39,7 @@ describe("immutable runtime image publication", () => {
   it("keeps independent Java/Node, Rust and Tauri version files", () => {
     const version = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8").trim();
     for (const path of ["runtime-images/version.txt", "rust-runtime/version.txt", "tauri-runtime/version.txt"]) {
-      assert.match(version(path), /^[1-9]\\d*$/, `${path} must declare a positive integer image version`);
+      assert.match(version(path), /^[1-9]\d*$/, `${path} must declare a positive integer image version`);
     }
   });
 });
