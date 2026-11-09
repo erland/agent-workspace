@@ -377,3 +377,11 @@ Den historiska källan `libsoup3=3.8.0-3` var inte längre tillgänglig från ak
 Denna utvärdering muterar inte `tauri-runtime/Dockerfile`, ändrar **inga** befintliga Trivy-undantag och publicerar **inte** experimentella paket. Ett eventuellt fungerande backport behöver därefter en separat, verifierbar kandidatimage med ABI-test, verklig Tauri-kompilering, paketinventering, SBOM och full blockerande säkerhetsskanning. Övriga kritiska Debianfynd kvarstår även om libsoup åtgärdas.
 
 Källreferenser: https://packages.debian.org/source/sid/libsoup , https://sources.debian.org/src/libsoup3/3.8.0-3/ , https://security-tracker.debian.org/tracker/source-package/libsoup3 .
+
+### Utfall av libsoup-backportens byggbarhet (9 november 2026)
+
+**PASS – källkodsbygge, inte säkerhetsgodkännande.** GitHub Actions [Tauri libsoup backport feasibility #42568137595](https://github.com/erland/agent-workspace/actions/runs/42568137595) hämtade Debian unstable-källpaketet `libsoup` **3.8.1-1**, med sparad faktisk källversion och SHA256-värden. Byggberoendena kom från trixie och trixie-backports; inga Debian sid-binärer installerades. Efter att det felande `dh_gnome_clean`-steget kringgåtts med `dpkg-buildpackage -nc` byggdes bland annat `libsoup-3.0-0`, `libsoup-3.0-common`, `libsoup-3.0-dev`, `gir1.2-soup-3.0` och tests-/debugpaket med version 3.8.1-1.
+
+GitHub Actions-artefakten `tauri-libsoup-backport-feasibility` innehåller bygglogg, källversionsfil, källchecksummer och paketförteckning, **inte färdiga paket för distribution**. Denna källkodsbyggning har **inte** validerat ABI- och runtidskompatibilitet med Debian 13:s WebKitGTK, verkliga Tauri-byggen eller frånvaro av CVE:er enligt Trivy. PR #68 är därför fortsatt Draft; den befintliga imagebygg- och säkerhetsgrinden ändras inte.
+
+Nästa säkra steg är att skapa en **separat kandidatimage för test**, installera de byggda Debianpaketen där med kontrollerad beroendelösning och testa (1) dynamiska bibliotek/ABI, (2) WebKitGTK 4.1 och faktiskt Tauri-projekt, (3) nytt komplett Trivyresultat med jämförbar CVE-lista mot Debian 13-baslinjen. Kandidaten får inte publiceras som `tauri-linux-v1` innan övriga blockerande sårbarheter har lösts eller formellt riskbedömts.
