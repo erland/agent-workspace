@@ -607,4 +607,8 @@ Required verification:
 
 Scope: explicit `workspace_create({go:true})` image profile, `go.mod`/`go.work` inspection, Go image CI and smoke test. Go verification/build is **not available** in this step; attempts are rejected rather than reporting false PASS.
 
-Verification: Node unit tests/typecheck/build, Docker image smoke, image vulnerability scan and immutable GHCR publication. GO-002 implements a registered Go verifier. GO-003 implements build artifact support.
+Verification: Node unit tests/typecheck/build, Docker image smoke, image vulnerability scan and immutable GHCR publication. GO-002 registers an isolated Go verifier: gofmt, go mod download, go vet and go test -json -count=1, including go.work module traversal and test-evidence enforcement. GO-003 implements build artifact support.
+
+## GO-002 – Go verification
+
+Required: CI typecheck/test/build, execution-failure and no-test BLOCKED behavior, safe go.work paths, and Go runtime image smoke. Full live Modal verification remains an external acceptance gate; do not report it PASSED before deployment.
