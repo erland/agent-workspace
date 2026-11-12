@@ -1,3 +1,4 @@
+import path from "node:path";
 import { NODE_PROJECT_INSPECTION, selectNodePackageManager } from "../project/node-package-manager.js";
 import type { SandboxProvider, WorkspaceHandle } from "../core/sandbox-provider.js";
 import type { ProjectType } from "../project/project-detector.js";
@@ -19,7 +20,7 @@ export interface BuildArtifactOutput {
 
 export interface ProjectBuildResult {
   status: "PASSED";
-  projectType: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "CARGO";
+  projectType: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "CARGO" | "GO";
   outputs: BuildArtifactOutput[];
 }
 
@@ -40,6 +41,7 @@ export class ProjectBuildService {
     if (projectType === "PYTHON") return this.buildPython(handle, requested);
     if (projectType === "GRADLE") return this.buildGradle(handle, requested);
     if (projectType === "CARGO") return this.buildCargo(handle, requested);
+    if (projectType === "GO") return this.buildGo(handle, requested);
     throw new Error(`Unsupported build project type: ${projectType}`);
   }
 
@@ -146,6 +148,91 @@ export class ProjectBuildService {
       }
     }
     return [...names].sort().map(name=>({path:`target/release/${name}`,name,kind:"linux-binary"}));
+  }
+
+
+  /** Build Linux/amd64 binaries from main packages, including go.work modules. */
+  private async buildGo(handle: WorkspaceHandle, requested: readonly RequestedBuildOutput[]): Promise<ProjectBuildResult> {
+    if (requested.length > 12) throw new Error("Build produced more than 12 publishable outputs");
+    // Never use source-provided executable scripts to find binaries. Go itself reports
+    // main packages; all commands execute in the pinned, non-root Go sandbox.
+    const probe = await this.exec(handle, ["bash", "-lc",
+      "if [ -f go.work ]; then printf workspace; elif [ -f go.mod ]; then printf module; else exit 2; fi"]);
+    if (probe.exitCode !== 0) throw new Error("Go build requires go.mod or go.work");
+    let modules = [this.projectRoot];
+    if (probe.stdout.trim() === "workspace") {
+      const work = await this.exec(handle, ["go", "work", "edit", "-json"]);
+      if (work.exitCode !== 0) throw new Error(work.stderr || "Cannot inspect go.work");
+      let raw: unknown;
+      try { raw = JSON.parse(work.stdout); } catch { throw new Error("Invalid go.work metadata"); }
+      if (!raw || typeof raw !== "object" || !("Use" in raw) || !Array.isArray(raw.Use)) {
+        throw new Error("Invalid go.work module list");
+      }
+      const uses: unknown[] = raw.Use;
+      if (uses.length < 1 || uses.length > 12) throw new Error("go.work requires 1–12 local modules");
+      const base = path.posix.resolve(this.projectRoot);
+      const resolved: string[] = [];
+      for (const value of uses) {
+        if (!value || typeof value !== "object" || !("DiskPath" in value) || typeof value.DiskPath !== "string") {
+          throw new Error("Invalid go.work module path");
+        }
+        const relative: string = value.DiskPath;
+        const directory = path.posix.resolve(base, relative);
+        if (path.posix.isAbsolute(relative) || (directory !== base && !directory.startsWith(base + "/"))) {
+          throw new Error("go.work module path escapes uploaded project");
+        }
+        resolved.push(directory);
+      }
+      modules = [...new Set(resolved)];
+    } else if (probe.stdout.trim() !== "module") {
+      throw new Error("Could not identify Go module or workspace");
+    }
+
+    // Remove stale outputs supplied in an uploaded ZIP. Refuse symlinked output
+    // directories to avoid following links outside the project.
+    await this.mustExec(handle, ["bash", "-lc",
+      "if [ -L .agent-workspace-go-bin ]; then exit 2; fi; rm -rf -- .agent-workspace-go-bin && mkdir -m 700 -- .agent-workspace-go-bin"]);
+    const discovered: Array<{module: string; importPath: string; name: string}> = [];
+    for (const module of modules) {
+      const prefix = module === this.projectRoot ? [] : ["-C", module];
+      await this.mustExec(handle, ["go", ...prefix, "mod", "download"]);
+      const listing = await this.exec(handle, ["go", ...prefix, "list", "-f",
+        "{{if eq .Name \\"main\\"}}{{.ImportPath}}{{end}}", "./..."]);
+      if (listing.exitCode !== 0) throw new Error(listing.stderr || "Cannot enumerate Go main packages");
+      for (const line of listing.stdout.split(/\\r?\\n/)) {
+        const importPath = line.trim();
+        if (!importPath) continue;
+        // Import paths are passed as argv, never interpolated into a shell command.
+        if (!/^[A-Za-z0-9._~+\\/@-]+$/.test(importPath) || importPath.startsWith("-")) {
+          throw new Error("Unsupported Go package import path");
+        }
+        const name = importPath.split("/").at(-1) ?? "application";
+        if (!/^[A-Za-z0-9._-]+$/.test(name) || name === "." || name === "..") {
+          throw new Error("Unsupported Go binary target name");
+        }
+        discovered.push({module, importPath, name});
+        if (discovered.length > 12) throw new Error("Build produced more than 12 Go binary targets");
+      }
+    }
+    if (discovered.length === 0) {
+      throw new Error("Go build found no executable main packages; library-only modules do not produce binaries");
+    }
+    const names = new Set<string>();
+    const outputs: RequestedBuildOutput[] = [];
+    for (const [index, pkg] of discovered.entries()) {
+      let name = pkg.name;
+      if (names.has(name)) name = `${name}-${index + 1}`;
+      names.add(name);
+      const target = `.agent-workspace-go-bin/${name}`;
+      const destination = `${this.projectRoot}/${target}`;
+      const prefix = pkg.module === this.projectRoot ? [] : ["-C", pkg.module];
+      await this.mustExec(handle, ["go", ...prefix, "build", "-trimpath", "-o", destination, pkg.importPath]);
+      outputs.push({path:target, name, kind:"linux-binary"});
+    }
+    return {
+      status: "PASSED", projectType: "GO",
+      outputs: await this.collectOutputs(handle, requested.length ? requested : outputs)
+    };
   }
 
   private async buildPython(handle: WorkspaceHandle, requested: readonly RequestedBuildOutput[]): Promise<ProjectBuildResult> {
