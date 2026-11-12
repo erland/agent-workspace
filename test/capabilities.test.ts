@@ -30,8 +30,8 @@ describe("getCapabilities", () => {
 
   it("reports Python alongside npm and Maven as a supported verifier", () => {
     const capabilities = getCapabilities();
-    assert.deepEqual(capabilities.buildSystems, ["maven", "npm", "python", "gradle", "cargo"]);
+    assert.deepEqual(capabilities.buildSystems, ["maven", "npm", "python", "gradle", "cargo", "go"]);
     assert.deepEqual(capabilities.projectDetection.supported, ["maven", "npm", "python", "gradle", "cargo", "go"]);
-    assert.deepEqual(capabilities.runtimes.go, {available:true,profile:"go",verificationAvailable:false});
+    assert.deepEqual(capabilities.runtimes.go, {available:true,profile:"go",verificationAvailable:true});
   });
 });
