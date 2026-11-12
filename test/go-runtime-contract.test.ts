@@ -17,12 +17,13 @@ test("Go runtime can be selected without altering defaults", () => {
   }
 });
 
-test("go.mod project is detected, and verification cannot silently pass", () => {
+test("go.mod project is detected and Go runtime compatibility is enforced", () => {
   const zip = makeStoredZip([{path:"app/go.mod",content:"module example.com/app\ngo 1.27\n"}]);
   const analysis = analyzeProjectArchive(zip,validateZipArchive(zip),{workspaceRuntimeProfile:"go"});
   assert.equal(analysis.projectType,"GO");
   assert.deepEqual(analysis.projectManifests,[{root:"app",type:"GO"}]);
-  assert.throws(()=>assertRuntimeCompatibility("go",["GO"]),/not implemented/);
+  assert.doesNotThrow(()=>assertRuntimeCompatibility("go",["GO"]));
+  assert.throws(()=>assertRuntimeCompatibility("go",["GO","NPM"]),/Mixed Go/);
   assert.throws(()=>assertRuntimeCompatibility("java21-node22",["GO"]),/require/);
 });
 
