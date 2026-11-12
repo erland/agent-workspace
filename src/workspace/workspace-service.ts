@@ -700,7 +700,7 @@ export function selectVerificationTargets(
   if (manifests.some(item => item.type === "GO")) {
     if (manifests.some(item => item.type !== "GO")) throw new Error("Mixed Go projects require separate workspaces");
     if (candidates.length > 12) throw new Error("Too many required project verifiers (maximum 12)");
-    return candidates;
+    return [...candidates];
   }
   const hasPythonMix = new Set(candidates.map(x => x.type)).size > 1 && candidates.some(x => x.type === "PYTHON" || x.type === "GRADLE" || x.type === "CARGO");
   if (!hasPythonMix) return [selectProjectRoot(analysis, requested, true)];
