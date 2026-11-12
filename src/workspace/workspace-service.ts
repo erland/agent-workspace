@@ -234,6 +234,9 @@ export class WorkspaceService {
 
   public async verifyProject(workspaceId: string, captureFiles: readonly string[] = [], projectRoot?: string): Promise<ProjectVerificationResult & { logArtifact?: ArtifactRecord; artifacts?: ArtifactRecord[]; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
     const workspace = await this.requireReadyProject(workspaceId, "verification");
+    if (workspace.project!.analysis.projectManifests.some(manifest => manifest.type === "GO")) {
+      throw new Error("Go project verification is not implemented yet (GO-002); cannot report PASS");
+    }
     const targets = selectVerificationTargets(workspace.project!.analysis, projectRoot);
     assertRuntimeCompatibility(workspace.runtimeProfile, targets.map(x=>x.type));
     const log: string[] = [];
@@ -298,6 +301,9 @@ export class WorkspaceService {
     const workspace = await this.requireReadyProject(workspaceId, "build");
     const selected = selectProjectRoot(workspace.project!.analysis, projectRoot, true);
     const projectType = selected.type;
+    if (workspace.project!.analysis.projectManifests.some(manifest => manifest.type === "GO")) {
+      throw new Error("Go project build is not implemented yet (GO-003)");
+    }
     assertRuntimeCompatibility(workspace.runtimeProfile, [projectType]);
     const log: string[] = [];
     const capture = normalizeCaptureFiles(captureFiles, projectType);
@@ -657,6 +663,11 @@ function cloneWorkspace(workspace: Workspace): Workspace {
 
 /** A workspace has one immutable image; never report PASS from an incompatible toolchain. */
 export function assertRuntimeCompatibility(runtime: RuntimeProfileId, kinds: readonly string[]): void {
+  if (kinds.includes("GO")) {
+    if (runtime !== "go") throw new Error("Go projects require workspace_create({go:true})");
+    throw new Error("Go project verification is not implemented yet (GO-002); cannot report PASS");
+  }
+  if (runtime === "go") throw new Error("Go runtime supports Go projects only");
   const hasCargo = kinds.includes("CARGO");
   const hasOther = kinds.some(x => x !== "CARGO");
   if (hasCargo && hasOther && !(runtime === "tauri-linux" && kinds.every(x => x === "CARGO" || x === "NPM"))) {

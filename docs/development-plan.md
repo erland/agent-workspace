@@ -601,3 +601,10 @@ Required verification:
 - [ ] an allowlisted user saves a real personal Modal token and connection verification passes.
 - [ ] a second user is verified to execute through a distinct Modal account.
 - [ ] disconnect is verified in the deployed environment.
+
+
+## GO-001 – Go runtime and project detection (separate improvement track)
+
+Scope: explicit `workspace_create({go:true})` image profile, `go.mod`/`go.work` inspection, Go image CI and smoke test. Go verification/build is **not available** in this step; attempts are rejected rather than reporting false PASS.
+
+Verification: Node unit tests/typecheck/build, Docker image smoke, image vulnerability scan and immutable GHCR publication. GO-002 implements a registered Go verifier. GO-003 implements build artifact support.

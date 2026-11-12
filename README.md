@@ -360,3 +360,8 @@ See [`docs/openai-plugin-distribution.md`](docs/openai-plugin-distribution.md) f
 ### Python runtime support (v9)
 
 Runtime v9 includes `python`, `python3`, `pip`, `pip3`, and `python3-venv`. The image smoke test creates a virtual environment and checks pip runs as the non-root runtime user. Install project-specific locked Python dependencies (such as `rfc8785`) into a virtual environment during verification; they are not embedded in the shared image. Automatic `project_verify` remains limited to npm and Maven projects; Python-only project discovery/verification is a separate feature.
+
+
+### Experimental Go runtime (GO-001)
+
+`workspace_create({"go":true})` selects the separate `go-v1` runtime image. ZIP inspection detects `go.mod` and `go.work`, including workspace roots. This is **runtime selection only**: project verification and binary artifact builds are not implemented yet (GO-002/GO-003), and Go projects are rejected from verification rather than marked passed. The image must be built, security-scanned, and published through `.github/workflows/go-runtime.yml` before a hosted Modal workspace can use it.

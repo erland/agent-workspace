@@ -14,6 +14,7 @@ describe("getCapabilities", () => {
     assert.deepEqual(capabilities.runtimes.rust,{available:true,profile:"rust"});
     assert.deepEqual(capabilities.runtimes.tauri,{available:true,profile:"tauri-linux",node:"22"});
     assert.deepEqual(capabilities.provider.runtimeProfiles, [
+      "go",
       "java17-node20",
       "java17-node22",
       "java21-node20",
@@ -30,6 +31,7 @@ describe("getCapabilities", () => {
   it("reports Python alongside npm and Maven as a supported verifier", () => {
     const capabilities = getCapabilities();
     assert.deepEqual(capabilities.buildSystems, ["maven", "npm", "python", "gradle", "cargo"]);
-    assert.deepEqual(capabilities.projectDetection.supported, ["maven", "npm", "python", "gradle", "cargo"]);
+    assert.deepEqual(capabilities.projectDetection.supported, ["maven", "npm", "python", "gradle", "cargo", "go"]);
+    assert.deepEqual(capabilities.runtimes.go, {available:true,profile:"go",verificationAvailable:false});
   });
 });

@@ -116,3 +116,14 @@ playwright_selection:
   - CI tests and typecheck.
   - Live Modal Chromium test after deployment.
   next: Add Playwright-specific project_verify execution after runtime-selection acceptance.
+
+# Independent Go runtime track; existing DEV-018 production gates remain unchanged.
+go_runtime:
+  step: GO-001
+  status: IN_PROGRESS
+  implementation: Explicit Go runtime and go.mod/go.work detection; verification deliberately blocked until GO-002.
+  verification: PENDING
+  pending:
+    - Node tests, typecheck and build.
+    - Go Docker image build and smoke in CI.
+    - Live Modal runtime acceptance after image publication.

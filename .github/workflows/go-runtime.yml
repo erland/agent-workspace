@@ -1,0 +1,101 @@
+name: Go Runtime Image
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "go-runtime/**"
+      - ".github/workflows/go-runtime.yml"
+  push:
+    branches: [main]
+    paths:
+      - "go-runtime/version.txt"
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  go:
+    name: go-linux-amd64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Explain manual and scheduled verification mode
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        run: echo 'Validation-only run. Published GHCR tags are immutable; publishing requires a new image version merged to main.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Read Go image version
+        id: version
+        shell: bash
+        run: echo "value=$(tr -d '[:space:]' < go-runtime/version.txt)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - name: Build Go runtime for Linux
+        uses: docker/build-push-action@v6
+        with:
+          context: go-runtime
+          file: go-runtime/Dockerfile
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: agent-workspace-runtime:go-smoke
+          cache-from: type=gha,scope=go-runtime
+          cache-to: type=gha,mode=max,scope=go-runtime
+      - name: Verify Cargo, tests, lint and non-root execution
+        run: docker run --rm --mount type=bind,source="${{ github.workspace }}/go-runtime/smoke.sh",target=/tmp/smoke.sh,readonly agent-workspace-runtime:go-smoke bash /tmp/smoke.sh
+      - name: Export complete unfiltered findings for security review
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: agent-workspace-runtime:go-smoke
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          format: json
+          output: go-trivy-raw.json
+          exit-code: "0"
+      - name: Archive complete vulnerability report
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-trivy-unfiltered-report
+          path: go-trivy-raw.json
+          retention-days: 30
+      - name: Scan image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: agent-workspace-runtime:go-smoke
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          trivyignores: security/trivy-runtime-ignore.yaml
+          skip-setup-trivy: true
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Refuse overwriting published Go image tag
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_TAG: go-v${{ steps.version.outputs.value }}
+          OWNER: ${{ github.repository_owner }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp)"
+          if gh api --paginate "/users/${OWNER}/packages/container/agent-workspace-runtime/versions?per_page=100" > "${tmp}" 2>gh-api-error.txt; then
+            if jq -e --arg tag "${IMAGE_TAG}" '.[] | select(any(.metadata.container.tags[]?; . == $tag))' "${tmp}" >/dev/null; then
+              echo "::error::Go image ${IMAGE_TAG} already exists. Bump go-runtime/version.txt before publishing."
+              exit 1
+            fi
+          elif ! grep -q "HTTP 404" gh-api-error.txt; then
+            cat gh-api-error.txt >&2
+            exit 1
+          fi
+      - name: Publish immutable Go image
+        if: github.event_name == 'push'
+        run: |
+          docker tag agent-workspace-runtime:go-smoke ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:go-v${{ steps.version.outputs.value }}
+          docker push ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:go-v${{ steps.version.outputs.value }}
+      - name: Summary
+        if: github.event_name == 'push'
+        run: echo 'Published `ghcr.io/${{ github.repository_owner }}/agent-workspace-runtime:go-v${{ steps.version.outputs.value }}`' >> "$GITHUB_STEP_SUMMARY"
