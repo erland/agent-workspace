@@ -681,7 +681,7 @@ export function assertRuntimeCompatibility(runtime: RuntimeProfileId, kinds: rea
   }
 }
 
-export type VerificationTarget = { root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO" };
+export type VerificationTarget = { root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO" | "GO" };
 
 /** One required verifier per detected build system and project root. */
 export function selectVerificationTargets(
