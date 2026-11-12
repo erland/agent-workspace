@@ -294,12 +294,13 @@ export class WorkspaceService {
     outputs: readonly RequestedBuildOutput[] = [],
     captureFiles: readonly string[] = [],
     projectRoot?: string
-  ): Promise<{ status: "PASSED" | "FAILED"; projectType: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "CARGO"; artifacts: ArtifactRecord[]; logArtifact: ArtifactRecord; failureSummary?: string; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
+  ): Promise<{ status: "PASSED" | "FAILED"; projectType: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "CARGO" | "GO"; artifacts: ArtifactRecord[]; logArtifact: ArtifactRecord; failureSummary?: string; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
     const workspace = await this.requireReadyProject(workspaceId, "build");
-    if (workspace.project!.analysis.projectManifests.some(manifest => manifest.type === "GO")) {
-      throw new Error("Go project build is not implemented yet (GO-003)");
+    if (workspace.project!.analysis.projectManifests.some(manifest => manifest.type === "GO") &&
+        workspace.project!.analysis.projectManifests.some(manifest => manifest.type !== "GO")) {
+      throw new Error("Mixed Go projects require separate workspaces");
     }
-    const selected = selectProjectRoot(workspace.project!.analysis, projectRoot, true);
+    const selected = selectProjectRoot(workspace.project!.analysis, projectRoot, true, true);
     const projectType = selected.type;
     assertRuntimeCompatibility(workspace.runtimeProfile, [projectType]);
     const log: string[] = [];
@@ -743,8 +744,9 @@ export function aggregateVerification(
 export function selectProjectRoot(
   analysis: NonNullable<Workspace["project"]>["analysis"],
   requested?: string,
-  allowPython = false
-): {root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO"} {
+  allowPython = false,
+  allowGo = false
+): {root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO" | "GO"} {
   const manifests = analysis.projectManifests ?? [];
   // PY-002 can verify a standalone Python root. Mixed projects must not
   // silently skip required project verification; PY-003 coordinates them.
@@ -777,6 +779,10 @@ export function selectProjectRoot(
     throw new Error(`Mixed Maven/npm manifests at ${selected || "."}; select a dedicated subproject root`);
   }
   const type = matches[0]!.type;
+  if (type === "GO") {
+    if (!allowGo) throw new Error("Go project builds require project_build with Go support");
+    return {root: selected, type};
+  }
   if (type !== "NPM" && type !== "MAVEN" && type !== "PYTHON" && type !== "GRADLE" && type !== "CARGO") throw new Error("Unsupported verifier: " + type);
   return {root: selected, type};
 }
