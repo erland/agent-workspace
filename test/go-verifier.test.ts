@@ -36,6 +36,8 @@ test("Go verifier checks formatting, dependencies, vet and executed tests in iso
   assert.equal(result.status, "PASSED");
   assert.equal(result.projectType, "GO");
   assert.deepEqual(result.steps.map(s => s.name), ["format", "dependencies", "vet", "test"]);
+  // Login shells overwrite PATH in the deployed Alpine sandbox, hiding gofmt.
+  assert.deepEqual(provider.commands[1]?.argv.slice(0, 2), ["bash", "-c"]);
   assert.ok(provider.commands.every(c => c.workdir === "/workspace/project/app"));
   assert.deepEqual(provider.commands.at(-1)?.argv, ["go", "test", "-json", "-count=1", "./..."]);
   assert.ok(provider.commands.slice(1).every(c => c.env?.GOTOOLCHAIN === "local"));

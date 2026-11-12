@@ -62,7 +62,7 @@ export class GoVerifier implements ProjectVerifier {
     for (const root of roots) {
       const prefix = roots.length === 1 ? "" : path.posix.relative(this.options.projectRoot, root) + ":";
       const tasks: Array<[string, readonly string[]]> = [
-        ["format", ["bash", "-lc", "set -euo pipefail; files=$(find . -type f -name '*.go' -not -path '*/vendor/*' -not -path '*/.git/*' -print0 | xargs -0 -r gofmt -l); if [ -n \"$files\" ]; then printf '%s\\n' \"$files\"; exit 1; fi"]],
+        ["format", ["bash", "-c", "set -euo pipefail; files=$(find . -type f -name '*.go' -not -path '*/vendor/*' -not -path '*/.git/*' -print0 | xargs -0 -r gofmt -l); if [ -n \"$files\" ]; then printf '%s\\n' \"$files\"; exit 1; fi"]],
         ["dependencies", ["go", "mod", "download"]],
         ["vet", ["go", "vet", "./..."]],
         ["test", ["go", "test", "-json", "-count=1", "./..."]]
