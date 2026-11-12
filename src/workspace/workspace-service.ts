@@ -681,7 +681,7 @@ export function assertRuntimeCompatibility(runtime: RuntimeProfileId, kinds: rea
   }
 }
 
-export type VerificationTarget = { root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO" | "GO" };
+export type VerificationTarget = { root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO" };
 
 /** One required verifier per detected build system and project root. */
 export function selectVerificationTargets(
@@ -689,11 +689,15 @@ export function selectVerificationTargets(
   requested?: string
 ): VerificationTarget[] {
   const manifests = analysis.projectManifests ?? [];
+  if (manifests.some(item => item.type === "GO")) {
+    throw new Error("Go project verification is not implemented yet (GO-002); cannot report PASS");
+  }
   if (requested !== undefined && (requested.startsWith("/") || requested.includes("\\") ||
       requested.split("/").some(part => part === "." || part === ".." || (part === "" && requested !== "")))) {
     throw new Error("Invalid projectRoot: use a relative directory path inside the ZIP");
   }
-  const candidates = requested === undefined ? manifests : manifests.filter(x => x.root === requested);
+  const candidates = (requested === undefined ? manifests : manifests.filter(x => x.root === requested))
+    .filter((item): item is VerificationTarget => item.type !== "GO");
   if (candidates.length === 0) {
     throw new Error(`No project manifest for projectRoot ${JSON.stringify(requested)}. Available: ${manifests.map(x => x.root || ".").join(", ")}`);
   }
