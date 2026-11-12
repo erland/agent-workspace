@@ -22,10 +22,10 @@ export interface AgentWorkspaceCapabilities {
       default: string;
     };
     rust: { available: boolean; profile: "rust"; };
-    go: { available: boolean; profile: "go"; verificationAvailable: false; };
+    go: { available: boolean; profile: "go"; verificationAvailable: boolean; };
     tauri: { available: boolean; profile: "tauri-linux"; node: "22"; };
   };
-  buildSystems: readonly ["maven", "npm", "python", "gradle", "cargo"];
+  buildSystems: readonly ["maven", "npm", "python", "gradle", "cargo", "go"];
   projectDetection: { supported: readonly ["maven", "npm", "python", "gradle", "cargo", "go"]; };
   workspace: {
     defaultLifetimeMinutes: number;
@@ -55,10 +55,10 @@ export function getCapabilities(): AgentWorkspaceCapabilities {
         default: DEFAULT_NODE_VERSION
       },
       rust: { available: true, profile: "rust" },
-      go: { available: true, profile: "go", verificationAvailable: false },
+      go: { available: true, profile: "go", verificationAvailable: true },
       tauri: {available:true,profile:"tauri-linux",node:"22"}
     },
-    buildSystems: ["maven", "npm", "python", "gradle", "cargo"],
+    buildSystems: ["maven", "npm", "python", "gradle", "cargo", "go"],
     projectDetection: { supported: ["maven", "npm", "python", "gradle", "cargo", "go"] },
     workspace: {
       defaultLifetimeMinutes: 60,
