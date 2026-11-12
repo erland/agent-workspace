@@ -3,7 +3,7 @@ export const SUPPORTED_NODE_VERSIONS = ["20", "22"] as const;
 
 export type JavaVersion = (typeof SUPPORTED_JAVA_VERSIONS)[number];
 export type NodeVersion = (typeof SUPPORTED_NODE_VERSIONS)[number];
-export type RuntimeProfileId = `java${JavaVersion}-node${NodeVersion}` | "playwright-chromium-node22" | "rust" | "tauri-linux";
+export type RuntimeProfileId = `java${JavaVersion}-node${NodeVersion}` | "playwright-chromium-node22" | "rust" | "go" | "tauri-linux";
 
 export interface RuntimeProfile {
   id: RuntimeProfileId;
@@ -18,6 +18,7 @@ export interface RuntimeRequest {
   node?: NodeVersion;
   playwright?: boolean;
   rust?: boolean;
+  go?: boolean;
   tauri?: boolean;
 }
 
@@ -55,6 +56,7 @@ export const RUNTIME_PROFILES: Readonly<Record<RuntimeProfileId, RuntimeProfile>
     imageRef: `${process.env.AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX ?? DEFAULT_RUNTIME_IMAGE_PREFIX}:tauri-linux-v${process.env.AGENT_WORKSPACE_TAURI_RUNTIME_IMAGE_VERSION ?? "1"}`,
     bootstrapCommands: []
   },
+  go: { id: "go", imageRef: `${process.env.AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX ?? DEFAULT_RUNTIME_IMAGE_PREFIX}:go-v${process.env.AGENT_WORKSPACE_GO_RUNTIME_IMAGE_VERSION ?? "1"}`, bootstrapCommands: [] },
   rust: { id: "rust", imageRef: `${process.env.AGENT_WORKSPACE_RUNTIME_IMAGE_PREFIX ?? DEFAULT_RUNTIME_IMAGE_PREFIX}:rust-v${process.env.AGENT_WORKSPACE_RUST_RUNTIME_IMAGE_VERSION ?? "1"}`, bootstrapCommands: [] }
 };
 
@@ -67,10 +69,16 @@ export function assertTauriBuildOnlyRiskWindow(nowMs: number = Date.now()): void
 }
 
 export function resolveRuntimeProfile(request: RuntimeRequest = {}): RuntimeProfile {
+  if (request.go === true) {
+    if (request.java !== undefined || request.node !== undefined || request.playwright === true || request.rust === true || request.tauri === true) {
+      throw new Error("Go runtime cannot be combined with Java, Node, Playwright, Rust or Tauri runtime options");
+    }
+    return RUNTIME_PROFILES.go;
+  }
   if (request.tauri === true) {
     if (request.java !== undefined || request.rust === true || request.playwright === true ||
         (request.node !== undefined && request.node !== "22")) {
-      throw new Error("Tauri runtime requires Node 22 and cannot be combined with Java, Rust or Playwright options");
+      throw new Error("Tauri runtime requires Node 22 and cannot be combined with Java, Rust, Go or Playwright options");
     }
     assertTauriBuildOnlyRiskWindow();
     return RUNTIME_PROFILES["tauri-linux"];

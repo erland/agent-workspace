@@ -601,3 +601,18 @@ Required verification:
 - [ ] an allowlisted user saves a real personal Modal token and connection verification passes.
 - [ ] a second user is verified to execute through a distinct Modal account.
 - [ ] disconnect is verified in the deployed environment.
+
+
+## GO-001 – Go runtime and project detection (separate improvement track)
+
+Scope: explicit `workspace_create({go:true})` image profile, `go.mod`/`go.work` inspection, Go image CI and smoke test. Go verification/build is **not available** in this step; attempts are rejected rather than reporting false PASS.
+
+Verification: Node unit tests/typecheck/build, Docker image smoke, image vulnerability scan and immutable GHCR publication. GO-002 registers an isolated Go verifier: gofmt, go mod download, go vet and go test -json -count=1, including go.work module traversal and test-evidence enforcement. GO-003 implements build artifact support.
+
+## GO-002 – Go verification
+
+Required: CI typecheck/test/build, execution-failure and no-test BLOCKED behavior, safe go.work paths, and Go runtime image smoke. Full live Modal verification remains an external acceptance gate; do not report it PASSED before deployment.
+
+## GO-003 – Go binary build and artifact handoff
+
+Build executable Go `main` packages (including `go.work` module roots) using the pinned Go runtime, stage clean Linux/amd64 binaries, and publish them through the existing artifact store. Limit auto-discovery to 12 packages, reject unsafe module paths and ambiguous project roots, and fail rather than publish stale or absent binaries. The final Go runtime CI build/smoke/security gates and full TypeScript tests must pass before merge; real Modal acceptance remains required after image publication.

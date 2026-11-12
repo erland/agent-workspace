@@ -17,6 +17,7 @@ describe("runtime profiles", () => {
 
   it("contains six Java/Node combinations plus optional Playwright", () => {
     assert.deepEqual(Object.keys(RUNTIME_PROFILES).sort(), [
+      "go",
       "java17-node20",
       "java17-node22",
       "java21-node20",
@@ -31,7 +32,7 @@ describe("runtime profiles", () => {
 
 
   it("uses prebuilt versioned GHCR images without per-workspace bootstrap", () => {
-    for (const profile of Object.values(RUNTIME_PROFILES).filter(profile => profile.id !== "playwright-chromium-node22" && profile.id !== "rust" && profile.id !== "tauri-linux")) {
+    for (const profile of Object.values(RUNTIME_PROFILES).filter(profile => profile.id !== "playwright-chromium-node22" && profile.id !== "rust" && profile.id !== "go" && profile.id !== "tauri-linux")) {
       assert.equal(
         profile.imageRef,
         `ghcr.io/erland/agent-workspace-runtime:${profile.id}-v${DEFAULT_RUNTIME_IMAGE_VERSION}`

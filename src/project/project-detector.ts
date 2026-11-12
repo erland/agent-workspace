@@ -10,7 +10,7 @@ import {
 import { readZipTextEntries } from "../archive/zip-entry-reader.js";
 import type { ArchiveValidationResult } from "../archive/archive-validator.js";
 
-export type ProjectType = "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO" | "MAVEN_NPM" | "MIXED" | "UNKNOWN";
+export type ProjectType = "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO" | "GO" | "MAVEN_NPM" | "MIXED" | "UNKNOWN";
 
 export interface RuntimeDetection<T extends string> {
   version: T;
@@ -25,14 +25,15 @@ export interface ProjectWarning {
     | "UNSUPPORTED_NODE_VERSION"
     | "JAVA_RUNTIME_MISMATCH"
     | "NODE_RUNTIME_MISMATCH"
-    | "INVALID_PACKAGE_JSON";
+    | "INVALID_PACKAGE_JSON"
+    | "GO_RUNTIME_MISMATCH";
   message: string;
 }
 
 export interface ProjectAnalysis {
   projectType: ProjectType;
   projectRoots: readonly string[];
-  projectManifests: readonly { root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO" }[];
+  projectManifests: readonly { root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO" | "GO" }[];
   java?: RuntimeDetection<string>;
   node?: RuntimeDetection<string>;
   recommendedRuntime: {
@@ -60,7 +61,8 @@ export function analyzeProjectArchive(
   const pythonPaths = candidates.pythonPaths;
   const gradlePaths = candidates.gradlePaths;
   const cargoPaths = candidates.cargoPaths;
-  const kinds = [pomPaths.length > 0 ? "MAVEN" : undefined, packagePaths.length > 0 ? "NPM" : undefined, pythonPaths.length > 0 ? "PYTHON" : undefined, gradlePaths.length > 0 ? "GRADLE" : undefined, cargoPaths.length > 0 ? "CARGO" : undefined].filter(Boolean);
+  const goPaths = candidates.goPaths;
+  const kinds = [pomPaths.length > 0 ? "MAVEN" : undefined, packagePaths.length > 0 ? "NPM" : undefined, pythonPaths.length > 0 ? "PYTHON" : undefined, gradlePaths.length > 0 ? "GRADLE" : undefined, cargoPaths.length > 0 ? "CARGO" : undefined, goPaths.length > 0 ? "GO" : undefined].filter(Boolean);
   const projectType: ProjectType = kinds.length === 0 ? "UNKNOWN"
     : kinds.length === 1 ? kinds[0] as ProjectType
     : kinds.length === 2 && kinds.includes("MAVEN") && kinds.includes("NPM") ? "MAVEN_NPM" : "MIXED";
@@ -68,12 +70,13 @@ export function analyzeProjectArchive(
   const manifests = [...pomPaths.map(path => ({ root: parentPath(path), type: "MAVEN" as const })), ...packagePaths.map(path => ({ root: parentPath(path), type: "NPM" as const })),
     ...pythonPaths.map(path => ({ root: parentPath(path), type: "PYTHON" as const })),
     ...gradlePaths.map(path => ({ root: parentPath(path), type: "GRADLE" as const })),
-    ...cargoPaths.map(path => ({ root: parentPath(path), type: "CARGO" as const }))];
+    ...cargoPaths.map(path => ({ root: parentPath(path), type: "CARGO" as const })),
+    ...goPaths.map(path => ({ root: parentPath(path), type: "GO" as const }))];
   const roots = [...new Set(manifests.map(item => item.root))].sort();
-  if (pomPaths.length > 1 || packagePaths.length > 1 || new Set(pythonPaths.map(parentPath)).size > 1 || gradlePaths.length > 1 || cargoPaths.length > 1) {
+  if (pomPaths.length > 1 || packagePaths.length > 1 || new Set(pythonPaths.map(parentPath)).size > 1 || gradlePaths.length > 1 || cargoPaths.length > 1 || goPaths.length > 1) {
     warnings.push({
       code: "AMBIGUOUS_PROJECT",
-      message: `Multiple project manifests detected (${pomPaths.length} pom.xml, ${packagePaths.length} package.json, ${pythonPaths.length} Python manifests, ${gradlePaths.length} Gradle roots, ${cargoPaths.length} Cargo.toml)`
+      message: `Multiple project manifests detected (${pomPaths.length} pom.xml, ${packagePaths.length} package.json, ${pythonPaths.length} Python manifests, ${gradlePaths.length} Gradle roots, ${cargoPaths.length} Cargo.toml, ${goPaths.length} Go modules/workspaces)`
     });
   }
 
@@ -97,6 +100,9 @@ export function analyzeProjectArchive(
   const recommendedNode = supportedNode(node?.version) ?? DEFAULT_NODE_VERSION;
 
   if (options.workspaceRuntimeProfile !== undefined) {
+    if (goPaths.length > 0 && options.workspaceRuntimeProfile !== "go") {
+      warnings.push({code: "GO_RUNTIME_MISMATCH", message: "Go projects require workspace_create({go:true})"});
+    }
     const locked = parseRuntimeProfile(options.workspaceRuntimeProfile);
     if (locked?.java !== undefined && java?.supported === true && java.version !== locked.java) {
       warnings.push({
@@ -129,6 +135,7 @@ function discoverMetadataPaths(validation: ArchiveValidationResult): {
   pythonPaths: string[];
   gradlePaths: string[];
   cargoPaths: string[];
+  goPaths: string[];
   nodeVersionPaths: string[];
   metadataPaths: string[];
 } {
@@ -139,11 +146,15 @@ function discoverMetadataPaths(validation: ArchiveValidationResult): {
     ["pyproject.toml", "requirements.txt", "uv.lock"].includes(basename(path)) && !ignoredPath(path)
   ).sort();
   const cargoPaths = paths.filter(path => basename(path) === "Cargo.toml" && !ignoredPath(path)).sort();
+  // go.work is a workspace root; avoid treating nested go.mod files as separate build systems.
+  const workPaths = paths.filter(path => basename(path) === "go.work" && !ignoredPath(path)).sort();
+  const modules = paths.filter(path => basename(path) === "go.mod" && !ignoredPath(path)).sort();
+  const goPaths = [...workPaths, ...modules.filter(path => !workPaths.some(work => parentPath(work) === "" || parentPath(path).startsWith(parentPath(work) + "/")))];
   const allGradlePaths = paths.filter(path => ["build.gradle", "build.gradle.kts"].includes(basename(path)) && !ignoredPath(path)).sort();
   const gradlePaths = [...new Map(allGradlePaths.map(path => [parentPath(path), path])).values()];
   // Multiple Python metadata files in one directory represent a single project.
   const selectedPythonPaths = [...new Map(pythonPaths.map(path => [parentPath(path), path])).values()];
-  const roots = [...new Set([...pomPaths, ...packagePaths, ...selectedPythonPaths, ...gradlePaths, ...cargoPaths].map(parentPath))];
+  const roots = [...new Set([...pomPaths, ...packagePaths, ...selectedPythonPaths, ...gradlePaths, ...cargoPaths, ...goPaths].map(parentPath))];
   const nodeVersionPaths = paths.filter((path) => {
     const base = basename(path);
     if (base !== ".nvmrc" && base !== ".node-version") return false;
@@ -156,6 +167,7 @@ function discoverMetadataPaths(validation: ArchiveValidationResult): {
     pythonPaths: selectedPythonPaths,
     gradlePaths,
     cargoPaths,
+    goPaths,
     nodeVersionPaths,
     metadataPaths: [...new Set([...pomPaths, ...packagePaths, ...gradlePaths, ...nodeVersionPaths])]
   };
@@ -282,7 +294,7 @@ function supportedNode(version: string | undefined): NodeVersion | undefined {
 }
 
 function parseRuntimeProfile(id: RuntimeProfileId): { java?: JavaVersion; node?: NodeVersion } | undefined {
-  if (id === "rust") return undefined;
+  if (id === "rust" || id === "go") return undefined;
   if (id === "tauri-linux") return {node:"22"};
   if (id === "playwright-chromium-node22") return { java: "21", node: "22" };
   const match = /^java(17|21|25)-node(20|22)$/.exec(id);

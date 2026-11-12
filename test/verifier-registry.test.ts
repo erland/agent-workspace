@@ -4,6 +4,7 @@ import type { SandboxProvider, WorkspaceHandle, CreateWorkspaceOptions, Command,
 import { VerifierRegistry, defaultVerifierRegistry, type VerifierRegistration } from "../src/verification/verifier-registry.js";
 import { MavenVerifier } from "../src/verification/maven-verifier.js";
 import { CargoVerifier } from "../src/verification/cargo-verifier.js";
+import { GoVerifier } from "../src/verification/go-verifier.js";
 import { GradleVerifier } from "../src/verification/gradle-verifier.js";
 import { NpmVerifier } from "../src/verification/npm-verifier.js";
 import { PythonVerifier } from "../src/verification/python-verifier.js";
@@ -32,6 +33,7 @@ const fakeHandle = { providerId: "fake", providerWorkspaceId: "one" };
 test("registry lists existing build-system manifests without introducing new runtimes", () => {
   assert.deepEqual(defaultVerifierRegistry.list(), [
     {kind:"CARGO",manifests:["Cargo.toml"]},
+    {kind:"GO",manifests:["go.mod","go.work"]},
     {kind:"GRADLE",manifests:["build.gradle","build.gradle.kts"]},
     {kind:"MAVEN",manifests:["pom.xml"]},
     {kind:"NPM",manifests:["package.json"]},
@@ -45,6 +47,7 @@ test("registry creates the three existing verifier implementations with root iso
   assert.ok(defaultVerifierRegistry.create("MAVEN",context) instanceof MavenVerifier);
   assert.ok(defaultVerifierRegistry.create("CARGO",context) instanceof CargoVerifier);
   assert.ok(defaultVerifierRegistry.create("GRADLE",context) instanceof GradleVerifier);
+  assert.ok(defaultVerifierRegistry.create("GO",context) instanceof GoVerifier);
   assert.ok(defaultVerifierRegistry.create("NPM",context) instanceof NpmVerifier);
   assert.ok(defaultVerifierRegistry.create("PYTHON",context) instanceof PythonVerifier);
   const result = await defaultVerifierRegistry.create("MAVEN",context).verify(fakeHandle);

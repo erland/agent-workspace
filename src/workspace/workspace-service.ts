@@ -294,9 +294,13 @@ export class WorkspaceService {
     outputs: readonly RequestedBuildOutput[] = [],
     captureFiles: readonly string[] = [],
     projectRoot?: string
-  ): Promise<{ status: "PASSED" | "FAILED"; projectType: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "CARGO"; artifacts: ArtifactRecord[]; logArtifact: ArtifactRecord; failureSummary?: string; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
+  ): Promise<{ status: "PASSED" | "FAILED"; projectType: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "CARGO" | "GO"; artifacts: ArtifactRecord[]; logArtifact: ArtifactRecord; failureSummary?: string; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
     const workspace = await this.requireReadyProject(workspaceId, "build");
-    const selected = selectProjectRoot(workspace.project!.analysis, projectRoot, true);
+    if (workspace.project!.analysis.projectManifests.some(manifest => manifest.type === "GO") &&
+        workspace.project!.analysis.projectManifests.some(manifest => manifest.type !== "GO")) {
+      throw new Error("Mixed Go projects require separate workspaces");
+    }
+    const selected = selectProjectRoot(workspace.project!.analysis, projectRoot, true, true);
     const projectType = selected.type;
     assertRuntimeCompatibility(workspace.runtimeProfile, [projectType]);
     const log: string[] = [];
@@ -657,6 +661,12 @@ function cloneWorkspace(workspace: Workspace): Workspace {
 
 /** A workspace has one immutable image; never report PASS from an incompatible toolchain. */
 export function assertRuntimeCompatibility(runtime: RuntimeProfileId, kinds: readonly string[]): void {
+  if (kinds.includes("GO")) {
+    if (runtime !== "go") throw new Error("Go projects require workspace_create({go:true})");
+    if (kinds.some(kind => kind !== "GO")) throw new Error("Mixed Go projects require separate workspaces");
+    return;
+  }
+  if (runtime === "go") throw new Error("Go runtime supports Go projects only");
   const hasCargo = kinds.includes("CARGO");
   const hasOther = kinds.some(x => x !== "CARGO");
   if (hasCargo && hasOther && !(runtime === "tauri-linux" && kinds.every(x => x === "CARGO" || x === "NPM"))) {
@@ -670,7 +680,7 @@ export function assertRuntimeCompatibility(runtime: RuntimeProfileId, kinds: rea
   }
 }
 
-export type VerificationTarget = { root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO" };
+export type VerificationTarget = { root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO" | "GO" };
 
 /** One required verifier per detected build system and project root. */
 export function selectVerificationTargets(
@@ -685,6 +695,13 @@ export function selectVerificationTargets(
   const candidates = requested === undefined ? manifests : manifests.filter(x => x.root === requested);
   if (candidates.length === 0) {
     throw new Error(`No project manifest for projectRoot ${JSON.stringify(requested)}. Available: ${manifests.map(x => x.root || ".").join(", ")}`);
+  }
+  // A Go workspace is a single manifest; independent modules each require verification.
+  // Never allow a mixed-language upload to be reported as green in a Go-only image.
+  if (manifests.some(item => item.type === "GO")) {
+    if (manifests.some(item => item.type !== "GO")) throw new Error("Mixed Go projects require separate workspaces");
+    if (candidates.length > 12) throw new Error("Too many required project verifiers (maximum 12)");
+    return [...candidates];
   }
   const hasPythonMix = new Set(candidates.map(x => x.type)).size > 1 && candidates.some(x => x.type === "PYTHON" || x.type === "GRADLE" || x.type === "CARGO");
   if (!hasPythonMix) return [selectProjectRoot(analysis, requested, true)];
@@ -727,8 +744,9 @@ export function aggregateVerification(
 export function selectProjectRoot(
   analysis: NonNullable<Workspace["project"]>["analysis"],
   requested?: string,
-  allowPython = false
-): {root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO"} {
+  allowPython = false,
+  allowGo = false
+): {root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO" | "GO"} {
   const manifests = analysis.projectManifests ?? [];
   // PY-002 can verify a standalone Python root. Mixed projects must not
   // silently skip required project verification; PY-003 coordinates them.
@@ -761,6 +779,10 @@ export function selectProjectRoot(
     throw new Error(`Mixed Maven/npm manifests at ${selected || "."}; select a dedicated subproject root`);
   }
   const type = matches[0]!.type;
+  if (type === "GO") {
+    if (!allowGo) throw new Error("Go project builds require project_build with Go support");
+    return {root: selected, type};
+  }
   if (type !== "NPM" && type !== "MAVEN" && type !== "PYTHON" && type !== "GRADLE" && type !== "CARGO") throw new Error("Unsupported verifier: " + type);
   return {root: selected, type};
 }
@@ -779,7 +801,7 @@ export function executionTimeoutMs(remainingMs: number): number {
   return Math.floor(Math.min(remainingMs, EPHEMERAL_EXECUTION_TIMEOUT_MS) / 1000) * 1000;
 }
 
-function normalizeCaptureFiles(paths: readonly string[], kind: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "CARGO" | "MIXED"): string[] {
+function normalizeCaptureFiles(paths: readonly string[], kind: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "CARGO" | "GO" | "MIXED"): string[] {
   if (paths.length > 12) throw new Error("captureFiles exceeds 12 entries");
   const result = new Set<string>(kind === "NPM" ? ["package-lock.json"] : []);
   for (const path of paths) {
