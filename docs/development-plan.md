@@ -612,3 +612,7 @@ Verification: Node unit tests/typecheck/build, Docker image smoke, image vulnera
 ## GO-002 – Go verification
 
 Required: CI typecheck/test/build, execution-failure and no-test BLOCKED behavior, safe go.work paths, and Go runtime image smoke. Full live Modal verification remains an external acceptance gate; do not report it PASSED before deployment.
+
+## GO-003 – Go binary build and artifact handoff
+
+Build executable Go `main` packages (including `go.work` module roots) using the pinned Go runtime, stage clean Linux/amd64 binaries, and publish them through the existing artifact store. Limit auto-discovery to 12 packages, reject unsafe module paths and ambiguous project roots, and fail rather than publish stale or absent binaries. The final Go runtime CI build/smoke/security gates and full TypeScript tests must pass before merge; real Modal acceptance remains required after image publication.
