@@ -119,11 +119,12 @@ playwright_selection:
 
 # Independent Go runtime track; existing DEV-018 production gates remain unchanged.
 go_runtime:
-  step: GO-001
+  step: GO-002
   status: IN_PROGRESS
-  implementation: Explicit Go runtime and go.mod/go.work detection; verification deliberately blocked until GO-002.
-  verification: PENDING
+  implementation: GO-001 Go image/detection passed CI; GO-002 adds registered Go verifier, format/vet/tests and strict test evidence.
+  verification: CI_PENDING
   pending:
-    - Node tests, typecheck and build.
-    - Go Docker image build and smoke in CI.
+    - GO-002 Node tests, typecheck and build on PR #73.
+    - Go Docker image scan and smoke after GO-002 changes.
     - Live Modal runtime acceptance after image publication.
+    - GO-003 Go build artifact support.
