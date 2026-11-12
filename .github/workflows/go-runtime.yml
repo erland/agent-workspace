@@ -39,7 +39,7 @@ jobs:
           tags: agent-workspace-runtime:go-smoke
           cache-from: type=gha,scope=go-runtime
           cache-to: type=gha,mode=max,scope=go-runtime
-      - name: Verify Cargo, tests, lint and non-root execution
+      - name: Verify Go tests, vet, build and non-root execution
         run: docker run --rm --mount type=bind,source="${{ github.workspace }}/go-runtime/smoke.sh",target=/tmp/smoke.sh,readonly agent-workspace-runtime:go-smoke bash /tmp/smoke.sh
       - name: Export complete unfiltered findings for security review
         uses: aquasecurity/trivy-action@v0.36.0
