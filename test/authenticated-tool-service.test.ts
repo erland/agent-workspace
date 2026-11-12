@@ -120,6 +120,43 @@ describe("authenticated MCP tool isolation", () => {
     }
   });
 
+  it("forwards Go selection and rejects incompatible runtime choices in authenticated MCP", async () => {
+    const { deps, accounts, workspaces } = setup();
+    const service = new AuthenticatedAgentWorkspaceToolService(
+      { issuer: "issuer", subject: "go-user", scopes: ["agent-workspace"] }, deps
+    );
+    const profile = await service.getProfile();
+    assert.equal(profile.ok, true);
+    const userId = (profile as any).result.user.id as string;
+    await accounts.upsert({
+      id: "acct-go", userId, provider: "modal", credentialRef: "fake:go",
+      status: "CONNECTED", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+    });
+
+    const created = await service.createWorkspace({ go: true, lifetimeMinutes: 5 });
+    assert.equal(created.ok, true);
+    if (created.ok) {
+      const workspace = created.result as { id: string; runtimeProfile: string };
+      assert.equal(workspace.runtimeProfile, "go");
+      const persisted = await workspaces.findByIdForUser(workspace.id, userId);
+      assert.equal(persisted?.runtimeProfile, "go");
+      const destroyed = await service.destroyWorkspace({ workspaceId: workspace.id });
+      assert.equal(destroyed.ok, true);
+    }
+
+    for (const input of [
+      { go: true, rust: true },
+      { go: true, java: "17" as const },
+      { go: true, node: "22" as const },
+      { go: true, playwright: true },
+      { go: true, tauri: true }
+    ]) {
+      const result = await service.createWorkspace(input);
+      assert.equal(result.ok, false, "Go cannot be silently ignored when combined with incompatible runtimes");
+      if (!result.ok) assert.match(result.error.message, /Go runtime cannot be combined/);
+    }
+  });
+
   it("cannot access another authenticated user's workspace", async () => {
     const { deps, accounts } = setup();
     const alice = new AuthenticatedAgentWorkspaceToolService({ issuer: "issuer", subject: "alice", scopes: ["agent-workspace"] }, deps);
