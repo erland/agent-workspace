@@ -234,9 +234,6 @@ export class WorkspaceService {
 
   public async verifyProject(workspaceId: string, captureFiles: readonly string[] = [], projectRoot?: string): Promise<ProjectVerificationResult & { logArtifact?: ArtifactRecord; artifacts?: ArtifactRecord[]; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
     const workspace = await this.requireReadyProject(workspaceId, "verification");
-    if (workspace.project!.analysis.projectManifests.some(manifest => manifest.type === "GO")) {
-      throw new Error("Go project verification is not implemented yet (GO-002); cannot report PASS");
-    }
     const targets = selectVerificationTargets(workspace.project!.analysis, projectRoot);
     assertRuntimeCompatibility(workspace.runtimeProfile, targets.map(x=>x.type));
     const log: string[] = [];
@@ -299,11 +296,11 @@ export class WorkspaceService {
     projectRoot?: string
   ): Promise<{ status: "PASSED" | "FAILED"; projectType: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "CARGO"; artifacts: ArtifactRecord[]; logArtifact: ArtifactRecord; failureSummary?: string; missingCaptureFiles: CaptureFailure[]; execution: ExecutionDiagnostics }> {
     const workspace = await this.requireReadyProject(workspaceId, "build");
-    const selected = selectProjectRoot(workspace.project!.analysis, projectRoot, true);
-    const projectType = selected.type;
     if (workspace.project!.analysis.projectManifests.some(manifest => manifest.type === "GO")) {
       throw new Error("Go project build is not implemented yet (GO-003)");
     }
+    const selected = selectProjectRoot(workspace.project!.analysis, projectRoot, true);
+    const projectType = selected.type;
     assertRuntimeCompatibility(workspace.runtimeProfile, [projectType]);
     const log: string[] = [];
     const capture = normalizeCaptureFiles(captureFiles, projectType);
@@ -665,7 +662,8 @@ function cloneWorkspace(workspace: Workspace): Workspace {
 export function assertRuntimeCompatibility(runtime: RuntimeProfileId, kinds: readonly string[]): void {
   if (kinds.includes("GO")) {
     if (runtime !== "go") throw new Error("Go projects require workspace_create({go:true})");
-    throw new Error("Go project verification is not implemented yet (GO-002); cannot report PASS");
+    if (kinds.some(kind => kind !== "GO")) throw new Error("Mixed Go projects require separate workspaces");
+    return;
   }
   if (runtime === "go") throw new Error("Go runtime supports Go projects only");
   const hasCargo = kinds.includes("CARGO");
@@ -681,7 +679,7 @@ export function assertRuntimeCompatibility(runtime: RuntimeProfileId, kinds: rea
   }
 }
 
-export type VerificationTarget = { root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO" };
+export type VerificationTarget = { root: string; type: "MAVEN" | "NPM" | "PYTHON" | "GRADLE" | "CARGO" | "GO" };
 
 /** One required verifier per detected build system and project root. */
 export function selectVerificationTargets(
@@ -689,17 +687,20 @@ export function selectVerificationTargets(
   requested?: string
 ): VerificationTarget[] {
   const manifests = analysis.projectManifests ?? [];
-  if (manifests.some(item => item.type === "GO")) {
-    throw new Error("Go project verification is not implemented yet (GO-002); cannot report PASS");
-  }
   if (requested !== undefined && (requested.startsWith("/") || requested.includes("\\") ||
       requested.split("/").some(part => part === "." || part === ".." || (part === "" && requested !== "")))) {
     throw new Error("Invalid projectRoot: use a relative directory path inside the ZIP");
   }
-  const candidates = (requested === undefined ? manifests : manifests.filter(x => x.root === requested))
-    .filter((item): item is VerificationTarget => item.type !== "GO");
+  const candidates = requested === undefined ? manifests : manifests.filter(x => x.root === requested);
   if (candidates.length === 0) {
     throw new Error(`No project manifest for projectRoot ${JSON.stringify(requested)}. Available: ${manifests.map(x => x.root || ".").join(", ")}`);
+  }
+  // A Go workspace is a single manifest; independent modules each require verification.
+  // Never allow a mixed-language upload to be reported as green in a Go-only image.
+  if (manifests.some(item => item.type === "GO")) {
+    if (manifests.some(item => item.type !== "GO")) throw new Error("Mixed Go projects require separate workspaces");
+    if (candidates.length > 12) throw new Error("Too many required project verifiers (maximum 12)");
+    return candidates;
   }
   const hasPythonMix = new Set(candidates.map(x => x.type)).size > 1 && candidates.some(x => x.type === "PYTHON" || x.type === "GRADLE" || x.type === "CARGO");
   if (!hasPythonMix) return [selectProjectRoot(analysis, requested, true)];
@@ -794,7 +795,7 @@ export function executionTimeoutMs(remainingMs: number): number {
   return Math.floor(Math.min(remainingMs, EPHEMERAL_EXECUTION_TIMEOUT_MS) / 1000) * 1000;
 }
 
-function normalizeCaptureFiles(paths: readonly string[], kind: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "CARGO" | "MIXED"): string[] {
+function normalizeCaptureFiles(paths: readonly string[], kind: "NPM" | "MAVEN" | "PYTHON" | "GRADLE" | "CARGO" | "GO" | "MIXED"): string[] {
   if (paths.length > 12) throw new Error("captureFiles exceeds 12 entries");
   const result = new Set<string>(kind === "NPM" ? ["package-lock.json"] : []);
   for (const path of paths) {
