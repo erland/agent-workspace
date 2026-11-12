@@ -65,7 +65,7 @@ test("GO-003 rejects library-only projects rather than publishing stale files",a
 test("GO-003 failures and oversized output never publish files",async()=>{
  for(const failAt of ["probe","prepare","dependencies","list","build","inspect"]){
   const provider=new GoBuildProvider();provider.failAt=failAt;
-  await assert.rejects(()=>new ProjectBuildService(provider,"/workspace/project").build(handle,"GO"),failAt==="probe"?/go.mod or go.work/:/forced failure|Command failed|Could not inspect/);
+  await assert.rejects(()=>new ProjectBuildService(provider,"/workspace/project").build(handle,"GO"),failAt==="probe"?/go.mod or go.work/:/forced failure|Command failed|Could not inspect|does not exist/);
   assert.equal(provider.reads.length,0);
  }
  const tooLarge=new GoBuildProvider();tooLarge.outputSize=4096;
