@@ -197,13 +197,13 @@ export class ProjectBuildService {
       const prefix = module === this.projectRoot ? [] : ["-C", module];
       await this.mustExec(handle, ["go", ...prefix, "mod", "download"]);
       const listing = await this.exec(handle, ["go", ...prefix, "list", "-f",
-        "{{if eq .Name \\"main\\"}}{{.ImportPath}}{{end}}", "./..."]);
+        "{{if eq .Name \"main\"}}{{.ImportPath}}{{end}}", "./..."]);
       if (listing.exitCode !== 0) throw new Error(listing.stderr || "Cannot enumerate Go main packages");
-      for (const line of listing.stdout.split(/\\r?\\n/)) {
+      for (const line of listing.stdout.split(/\r?\n/)) {
         const importPath = line.trim();
         if (!importPath) continue;
         // Import paths are passed as argv, never interpolated into a shell command.
-        if (!/^[A-Za-z0-9._~+\\/@-]+$/.test(importPath) || importPath.startsWith("-")) {
+        if (!/^[A-Za-z0-9._~+/@-]+$/.test(importPath) || importPath.startsWith("-")) {
           throw new Error("Unsupported Go package import path");
         }
         const name = importPath.split("/").at(-1) ?? "application";
