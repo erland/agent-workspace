@@ -76,7 +76,7 @@ export function resolveRuntimeProfile(request: RuntimeRequest = {}): RuntimeProf
     return RUNTIME_PROFILES.go;
   }
   if (request.tauri === true) {
-    if (request.java !== undefined || request.rust === true || request.go === true || request.playwright === true ||
+    if (request.java !== undefined || request.rust === true || request.playwright === true ||
         (request.node !== undefined && request.node !== "22")) {
       throw new Error("Tauri runtime requires Node 22 and cannot be combined with Java, Rust, Go or Playwright options");
     }
@@ -84,7 +84,7 @@ export function resolveRuntimeProfile(request: RuntimeRequest = {}): RuntimeProf
     return RUNTIME_PROFILES["tauri-linux"];
   }
   if (request.rust === true) {
-    if (request.java !== undefined || request.node !== undefined || request.playwright === true || request.go === true || request.tauri === true ) {
+    if (request.java !== undefined || request.node !== undefined || request.playwright === true ) {
       throw new Error("Rust runtime cannot be combined with Java, Node or Playwright runtime options");
     }
     return RUNTIME_PROFILES.rust;
