@@ -119,12 +119,11 @@ playwright_selection:
 
 # Independent Go runtime track; existing DEV-018 production gates remain unchanged.
 go_runtime:
-  step: GO-002
+  step: GO-003
   status: IN_PROGRESS
-  implementation: GO-001 Go image/detection passed CI; GO-002 adds registered Go verifier, format/vet/tests and strict test evidence.
+  implementation: GO-001 and GO-002 CI passed; GO-003 adds main-package Linux binaries, go.work support and existing artifact publication.
   verification: CI_PENDING
   pending:
-    - GO-002 Node tests, typecheck and build on PR #73.
-    - Go Docker image scan and smoke after GO-002 changes.
-    - Live Modal runtime acceptance after image publication.
-    - GO-003 Go build artifact support.
+    - GO-003 Node unit tests, typecheck, build and contract tests on PR #73.
+    - Go runtime image scan and smoke.
+    - Live Modal Go verify/build and artifact download acceptance after image publication.
