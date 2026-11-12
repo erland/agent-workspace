@@ -9,7 +9,7 @@ import { assertRuntimeCompatibility } from "../src/workspace/workspace-service.j
 
 test("Go runtime can be selected without altering defaults", () => {
   const request = WorkspaceCreateInputSchema.parse({go:true});
-  assert.equal(resolveRuntimeProfile({go:request.go}).id,"go");
+  assert.equal(resolveRuntimeProfile({go:request.go === true}).id,"go");
   assert.match(resolveRuntimeProfile({go:true}).imageRef,/go-v1$/);
   assert.equal(resolveRuntimeProfile().id,"java21-node22");
   for (const conflict of [{go:true,rust:true},{go:true,tauri:true},{go:true,node:"22" as const},{go:true,playwright:true},{go:true,java:"21" as const}]) {
